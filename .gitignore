@@ -33,3 +33,9 @@ secrets.toml
 
 # Other
 .DS_Store
+
+
+.ipynb_checkpoints/
+*.ipynb
+
+datasets/

@@ -3,38 +3,33 @@ import re
 import json
 import yaml
 import time
-import argparse
 import shutil
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
 from loader import load_med_qa_dataset
 from api_handler import get_model_response
 
-def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, format_prompt):
+def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, format_prompt, sleep_time):
     """
     Processes a single data sample: formats prompt, calls API, parses result.
-    This function is designed to be run in a parallel worker.
+    This function runs sequentially.
     """
-    with open("evaluate_sml/config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-
-    sleep_time = config["sleep_time"]
-
+    # Sleep to respect API rate limits
     time.sleep(sleep_time)
+    
     input_text = sample["question"] + "\n" + str(sample["options"]) + "\n" + format_prompt
     
     error_message = None  # To store potential error messages
-    
+    model_output = None
+    successful_api_call = False
+
     try:
         model_output = get_model_response(model_name, api_key, input_text, max_tokens, temperature)
         successful_api_call = True
     except Exception as e:
-        # Capture the error message instead of printing it directly
+        # Capture the error message
         error_message = f"API call failed for sample {idx}: {e}"
-        model_output = None
-        successful_api_call = False
 
     # Initialize parsing-related variables
     right_format = False
@@ -42,7 +37,6 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, fo
 
     # Only attempt to parse if the API call was successful
     if successful_api_call:
-        # This parsing logic now matches the user's required prompt format
         pattern = r"<a>([A-D])</a>"
         match = re.search(pattern, model_output)
         if match:
@@ -57,8 +51,8 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, fo
         "input_text": input_text,
         "model_output": model_output,
         "model_answer": extracted_letter,
-        "correct_answer": sample["answer"],
-        "error": error_message,
+        "correct_answer": sample["answer_idx"],
+        "error": error_message, 
     }
 
 def evaluate_model(
@@ -67,13 +61,15 @@ def evaluate_model(
     api_key: str, 
     max_tokens: int, 
     temperature: float,
-    num_workers: int,
-    sleep_time: float,
     use_cache: bool
 ):
     """
-    Main function to run the model evaluation pipeline.
+    Main function to run the model evaluation pipeline sequentially.
     """
+    with open("evaluate_sml/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    sleep_time = config['sleep_time']
+
     start_time = time.time()
     run_timestamp = datetime.now()
 
@@ -102,6 +98,7 @@ def evaluate_model(
     processed_indices = set()
     cached_exp_dir_to_delete = None
     
+    # --- Caching Logic (MODIFIED) ---
     if use_cache:
         latest_exp_id = experiment_id - 1
         if latest_exp_id > 0:
@@ -124,10 +121,13 @@ def evaluate_model(
                     with open(prev_results_file, "r") as f:
                         for line in f:
                             cached_result = json.loads(line)
-                            results.append(cached_result)
-                            processed_indices.add(cached_result["idx"])
+                            # ONLY cache samples that were successful and correctly formatted
+                            if cached_result.get("successful_api_call") and cached_result.get("right_format"):
+                                results.append(cached_result)
+                                processed_indices.add(cached_result["idx"])
+                    
                     cached_exp_dir_to_delete = prev_exp_dir
-                    print(f"Loaded {len(results)} results from cache.")
+                    print(f"Loaded {len(results)} valid results from cache. Failed/invalid samples will be re-processed.")
                 else:
                     print("Config mismatch or cache invalid. Starting from scratch.")
             else:
@@ -135,6 +135,7 @@ def evaluate_model(
     else:
         print("`use_cache` is False. Starting from scratch.")
 
+    # --- Data Loading ---
     if dataset_name == "medqa":
         dataset = list(load_med_qa_dataset())
     else:
@@ -145,40 +146,49 @@ def evaluate_model(
 
     if not unprocessed_samples:
         print("All samples have been processed. Exiting.")
+        # Need to handle the case where we just copy over the cache and finish
+        if cached_exp_dir_to_delete:
+            shutil.copy(os.path.join(cached_exp_dir_to_delete, "results.jsonl"), results_file)
+            shutil.copy(os.path.join(cached_exp_dir_to_delete, "run_details.json"), run_details_file)
+            shutil.rmtree(cached_exp_dir_to_delete)
+            print("Copied all cached results to new experiment directory and cleaned up old one.")
         return
 
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        future_to_sample = {
-            executor.submit(process_sample, sample, idx, model_name, api_key, max_tokens, temperature, format_prompt): (sample, idx)
-            for sample, idx in unprocessed_samples
-        }
-        
-        # Wrap as_completed with tqdm for a progress bar
-        progress_bar = tqdm(as_completed(future_to_sample), total=len(unprocessed_samples), desc="Processing Samples", unit="sample")
-        
-        # Append new results to the main list as they complete
-        for future in progress_bar:
-            try:
-                result = future.result()
-                # If the worker returned an error, log it using tqdm.write
-                if result.get("error"):
-                    tqdm.write(result["error"])
-                results.append(result)
-            except Exception as exc:
-                sample_info = future_to_sample[future]
-                # Use tqdm.write for unhandled exceptions to avoid breaking the bar
-                tqdm.write(f'Sample {sample_info[1]} generated an unhandled exception: {exc}')
-    
-    # Sort all results by index to ensure order before writing
-    results.sort(key=lambda r: r['idx'])
-    with open(results_file, "w") as f:
-        for result in results:
+    # --- Sequential Processing with a for-loop (MODIFIED) ---
+    progress_bar = tqdm(unprocessed_samples, desc="Processing Samples", unit="sample")
+    for sample, idx in progress_bar:
+        try:
+            # Directly call the processing function
+            result = process_sample(
+                sample, idx, model_name, api_key, max_tokens, temperature, format_prompt, sleep_time
+            )
+            
+            # Log any errors that occurred inside process_sample
+            if result.get("error"):
+                tqdm.write(result["error"])
+                
+            # Append to in-memory list for final summary calculation
+            results.append(result)
+
+            # --- SAVE IMMEDIATELY TO FILE ---
             # Create a copy and remove the temporary 'error' key before writing
             result_to_write = result.copy()
             result_to_write.pop('error', None)
-            f.write(json.dumps(result_to_write) + "\n")
+            
+            # Open the file in APPEND mode ('a') and write the single result
+            with open(results_file, "a") as f:
+                f.write(json.dumps(result_to_write) + "\n")
+
+        except Exception as exc:
+            # Catch any unexpected exceptions from the function call itself
+            tqdm.write(f'Sample {idx} generated an unhandled exception: {exc}')
+
+    # --- Storing Results block has been removed, as we now save in real-time ---
 
     execution_time = time.time() - start_time
+    
+    # Sort results list in memory before calculating summary stats, just in case
+    results.sort(key=lambda r: r['idx'])
     
     run_summary = {
         "experiment_id": experiment_id,
@@ -189,8 +199,7 @@ def evaluate_model(
             "dataset_name": dataset_name,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "num_workers": num_workers,
-            "sleep_time": sleep_time
+            "format_prompt": format_prompt,
         },
         "total_samples": len(results),
         "successful_api_calls": sum(1 for r in results if r["successful_api_call"]),
@@ -217,11 +226,10 @@ def evaluate_model(
 if __name__ == "__main__":
     evaluate_model(
         dataset_name="medqa",
-        model_name="Qwen/Qwen3-32B",
+        model_name="meta-llama/Llama-4-Scout-17B-16E-Instruct",
         api_key="hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB",
-        max_tokens=2048,
+        max_tokens=15000,
         temperature=0.7,
-        num_workers=4,
-        sleep_time=0.5,
         use_cache=True
     )
+    

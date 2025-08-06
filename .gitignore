@@ -39,3 +39,5 @@ secrets.toml
 *.ipynb
 
 datasets/
+
+*.jsonl

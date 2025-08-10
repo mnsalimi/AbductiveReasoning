@@ -1,0 +1,31 @@
+
+    Analysis Report for medqa - Experiment 4
+    Config:
+
+    {'model_name': 'Qwen/Qwen2.5-72B-Instruct', 'dataset_name': 'medqa', 'max_tokens': 15000, 'temperature': 0.7, 'format_prompt': 'Only and only answer with the following format:\nYour answer of choice should be wrapped around <a> and </a> tags.\nValid outputs:\n- <a>A</a>\n- <a>B</a>\n- <a>C</a>\n- <a>D</a>\nOutput no explanation, no other text, no other format. Output just two tags and the answer within them.\n'}
+    ======================================================
+
+    1. Total Samples: 1273
+
+    2. Unsuccessful API Calls:
+       - Count: 0
+       - Percentage: 0.00%
+
+    3. Wrong Formatting:
+       - Count: 0
+       - Percentage: 0.00%
+
+    4. Classification Metrics (for successful and correctly formatted samples):
+    ----------------------------------------------------------------------
+                  precision    recall  f1-score   support
+
+           A       0.77      0.75      0.76       353
+           B       0.70      0.78      0.73       309
+           C       0.74      0.78      0.76       346
+           D       0.73      0.59      0.65       265
+
+    accuracy                           0.73      1273
+   macro avg       0.73      0.73      0.73      1273
+weighted avg       0.73      0.73      0.73      1273
+
+    

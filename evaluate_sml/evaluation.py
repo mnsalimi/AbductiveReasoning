@@ -66,24 +66,22 @@ def evaluate_model(
     """
     Main function to run the model evaluation pipeline sequentially.
     """
-    with open("evaluate_sml/config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-    sleep_time = config['sleep_time']
-
     start_time = time.time()
     run_timestamp = datetime.now()
 
     with open("evaluate_sml/config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
+    sleep_time = config['sleep_time']
     dataset_config = config["datasets"][dataset_name]
     format_prompt = dataset_config["format_prompt"]
     
+    # --- Experiment Setup ---
     output_base_dir = dataset_config["output_dir"]
     os.makedirs(output_base_dir, exist_ok=True)
     
-    existing_experiments = [d for d in os.listdir(output_base_dir) if d.isdigit()]
-    experiment_id = int(max(existing_experiments)) + 1 if existing_experiments else 1
+    existing_experiments = [int(d) for d in os.listdir(output_base_dir) if d.isdigit()]
+    experiment_id = max(existing_experiments) + 1 if existing_experiments else 1
     
     experiment_dir = os.path.join(output_base_dir, str(experiment_id))
     os.makedirs(experiment_dir, exist_ok=True)
@@ -94,11 +92,29 @@ def evaluate_model(
     print(f"Starting Experiment ID: {experiment_id}")
     print(f"Results will be saved in: {experiment_dir}")
 
+    # --- FIX 1: WRITE INITIAL RUN DETAILS AT THE START ---
+    # This file signals that a run has started and stores its configuration.
+    # It allows us to check the config of a crashed run.
+    initial_run_details = {
+        "experiment_id": experiment_id,
+        "status": "running",
+        "run_time_start": run_timestamp.isoformat(),
+        "config": {
+            "model_name": model_name,
+            "dataset_name": dataset_name,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "format_prompt": format_prompt,
+        }
+    }
+    with open(run_details_file, "w") as f:
+        json.dump(initial_run_details, f, indent=4)
+
+    # --- Caching Logic (FIXED) ---
     results = []
     processed_indices = set()
     cached_exp_dir_to_delete = None
     
-    # --- Caching Logic (MODIFIED) ---
     if use_cache:
         latest_exp_id = experiment_id - 1
         if latest_exp_id > 0:
@@ -106,32 +122,39 @@ def evaluate_model(
             prev_run_details_file = os.path.join(prev_exp_dir, "run_details.json")
             prev_results_file = os.path.join(prev_exp_dir, "results.jsonl")
 
-            if os.path.exists(prev_run_details_file):
+            # Check if the previous run's details and results exist
+            if os.path.exists(prev_run_details_file) and os.path.exists(prev_results_file):
                 with open(prev_run_details_file, "r") as f:
                     prev_run_details = json.load(f)
                 
+                # Compare the config from the previous run with the current one
                 is_same_config = (
                     prev_run_details["config"].get("model_name") == model_name and
                     prev_run_details["config"].get("max_tokens") == max_tokens and
-                    prev_run_details["config"].get("temperature") == temperature
+                    prev_run_details["config"].get("temperature") == temperature and 
+                    prev_run_details["config"].get("format_prompt") == format_prompt
                 )
 
-                if is_same_config and os.path.exists(prev_results_file):
+                if is_same_config:
                     print(f"Found matching cache in experiment {latest_exp_id}. Resuming...")
-                    with open(prev_results_file, "r") as f:
+                    # Consolidate cache by copying old results into the new experiment directory
+                    shutil.copy(prev_results_file, results_file)
+                    
+                    with open(results_file, "r") as f:
                         for line in f:
                             cached_result = json.loads(line)
-                            # ONLY cache samples that were successful and correctly formatted
+                            # Only trust successful results from the cache
                             if cached_result.get("successful_api_call") and cached_result.get("right_format"):
                                 results.append(cached_result)
                                 processed_indices.add(cached_result["idx"])
                     
+                    # Mark the old directory for deletion upon successful completion
                     cached_exp_dir_to_delete = prev_exp_dir
                     print(f"Loaded {len(results)} valid results from cache. Failed/invalid samples will be re-processed.")
                 else:
-                    print("Config mismatch or cache invalid. Starting from scratch.")
+                    print("Previous run has a different config. Starting from scratch.")
             else:
-                print("No previous run details found. Starting from scratch.")
+                print("No valid cache found from the previous run. Starting from scratch.")
     else:
         print("`use_cache` is False. Starting from scratch.")
 
@@ -144,72 +167,59 @@ def evaluate_model(
     unprocessed_samples = [(sample, idx) for idx, sample in enumerate(dataset) if idx not in processed_indices]
     print(f"Total samples: {len(dataset)}. Processed from cache: {len(processed_indices)}. Remaining: {len(unprocessed_samples)}")
 
-    if not unprocessed_samples:
-        print("All samples have been processed. Exiting.")
-        # Need to handle the case where we just copy over the cache and finish
-        if cached_exp_dir_to_delete:
-            shutil.copy(os.path.join(cached_exp_dir_to_delete, "results.jsonl"), results_file)
-            shutil.copy(os.path.join(cached_exp_dir_to_delete, "run_details.json"), run_details_file)
-            shutil.rmtree(cached_exp_dir_to_delete)
-            print("Copied all cached results to new experiment directory and cleaned up old one.")
-        return
-
-    # --- Sequential Processing with a for-loop (MODIFIED) ---
+    if not unprocessed_samples and cached_exp_dir_to_delete:
+        print("All samples were processed in the cached run.")
+        # The finalization step below will handle summary and cleanup
+    
+    # --- Sequential Processing ---
     progress_bar = tqdm(unprocessed_samples, desc="Processing Samples", unit="sample")
     for sample, idx in progress_bar:
         try:
-            # Directly call the processing function
             result = process_sample(
                 sample, idx, model_name, api_key, max_tokens, temperature, format_prompt, sleep_time
             )
             
-            # Log any errors that occurred inside process_sample
             if result.get("error"):
                 tqdm.write(result["error"])
-                
-            # Append to in-memory list for final summary calculation
+
+            # Add to the in-memory list for final summary calculation
             results.append(result)
 
-            # --- SAVE IMMEDIATELY TO FILE ---
-            # Create a copy and remove the temporary 'error' key before writing
+            # --- FIX 2: SAVE EACH RESULT IMMEDIATELY TO THE FILE ---
+            # This ensures progress is saved even if the script crashes.
             result_to_write = result.copy()
-            result_to_write.pop('error', None)
+            result_to_write.pop('error', None) # Don't save temporary error key to file
             
-            # Open the file in APPEND mode ('a') and write the single result
             with open(results_file, "a") as f:
                 f.write(json.dumps(result_to_write) + "\n")
 
         except Exception as exc:
-            # Catch any unexpected exceptions from the function call itself
             tqdm.write(f'Sample {idx} generated an unhandled exception: {exc}')
 
-    # --- Storing Results block has been removed, as we now save in real-time ---
-
+    # --- Finalization and Summary ---
     execution_time = time.time() - start_time
     
-    # Sort results list in memory before calculating summary stats, just in case
+    # Sort results for consistency before creating the summary
     results.sort(key=lambda r: r['idx'])
     
     run_summary = {
-        "experiment_id": experiment_id,
-        "run_time": run_timestamp.isoformat(),
+        **initial_run_details, # Start with the initial details
+        "status": "completed",
+        "run_time_end": datetime.now().isoformat(),
         "execution_time_seconds": round(execution_time, 2),
-        "config": {
-            "model_name": model_name,
-            "dataset_name": dataset_name,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "format_prompt": format_prompt,
-        },
-        "total_samples": len(results),
-        "successful_api_calls": sum(1 for r in results if r["successful_api_call"]),
-        "correctly_formatted_answers": sum(1 for r in results if r["right_format"]),
+        "summary": {
+            "total_samples": len(dataset),
+            "processed_samples": len(results),
+            "successful_api_calls": sum(1 for r in results if r["successful_api_call"]),
+            "correctly_formatted_answers": sum(1 for r in results if r["right_format"]),
+        }
     }
 
+    # Overwrite the initial run_details.json with the final complete summary
     with open(run_details_file, "w") as f:
         json.dump(run_summary, f, indent=4)
         
-    # --- Finalization and Cleanup ---
+    # --- Cleanup ---
     if cached_exp_dir_to_delete:
         print(f"\nRun complete. Deleting old cache directory: {cached_exp_dir_to_delete}")
         try:
@@ -232,4 +242,3 @@ if __name__ == "__main__":
         temperature=0.7,
         use_cache=True
     )
-    

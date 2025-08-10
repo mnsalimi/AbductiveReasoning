@@ -4,11 +4,11 @@ datasets:
   medqa:
     file_path: "datasets/MedQA/phrases_no_exclude_test.jsonl"
     format_prompt: |
-      Think step by step and thoroughly.
+      Think step by step and thoroughly. Use abductive reasoning process to reason about the question and the answer choices.
       Output your reasoning and then the final answer of choice.
       The final answer should be in the following format:
       Your answer of choice should be wrapped around <a> and </a> tags.
-      Valid outputs:
+      Valid final answers:
       - <a>A</a>
       - <a>B</a>
       - <a>C</a>

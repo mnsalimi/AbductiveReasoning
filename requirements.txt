@@ -2,3 +2,7 @@ datasets
 tqdm
 PyYAML
 scikit-learn
+matplotlib
+statsmodels
+seaborn
+jinja2

@@ -6,8 +6,8 @@ def get_model_response(
     model_name: str,
     api_key: str,
     input_text: str,
-    max_tokens: int = 512,
-    temperature: float = 0.7,
+    max_tokens: int,
+    temperature: float,
     retries: int = 3,
     timeout: int = 20
 ):

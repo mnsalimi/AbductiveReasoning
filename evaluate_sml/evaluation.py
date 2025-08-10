@@ -7,20 +7,28 @@ import shutil
 from datetime import datetime
 from tqdm import tqdm
 
-from loader import load_med_qa_dataset
+from loader import load_med_qa_dataset, load_med_mcqa_dataset
 from api_handler import get_model_response
 
-def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, format_prompt, sleep_time):
+def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name):
     """
     Processes a single data sample: formats prompt, calls API, parses result.
     This function runs sequentially.
     """
-    # Sleep to respect API rate limits
     time.sleep(sleep_time)
+
+    if dataset_name == "medqa":
+        input_text = sample["question"] + "\n" + str(sample["options"]) + "\n" + prompt_content
+    elif dataset_name == "medmcqa":
+        options = {
+            "A": sample["opa"],
+            "B": sample["opb"],
+            "C": sample["opc"],
+            "D": sample["opd"],
+        }
+        input_text = sample["question"] + "\n" + str(options) + "\n" + prompt_content
     
-    input_text = sample["question"] + "\n" + str(sample["options"]) + "\n" + format_prompt
-    
-    error_message = None  # To store potential error messages
+    error_message = None
     model_output = None
     successful_api_call = False
 
@@ -28,39 +36,50 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, fo
         model_output = get_model_response(model_name, api_key, input_text, max_tokens, temperature)
         successful_api_call = True
     except Exception as e:
-        # Capture the error message
         error_message = f"API call failed for sample {idx}: {e}"
 
-    # Initialize parsing-related variables
     right_format = False
-    extracted_letter = None
 
-    # Only attempt to parse if the API call was successful
-    if successful_api_call:
-        pattern = r"<a>([A-D])</a>"
-        match = re.search(pattern, model_output)
-        if match:
-            extracted_letter = match.group(1)
-            right_format = True
+    if dataset_name == "medqa" or dataset_name == "medmcqa":
+        extracted_letter = None
+        if successful_api_call:
+            if thinking:
+                cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL)
+            else:
+                cleaned_text = model_output
+            pattern = r"<a>([A-D])</a>"
+            matches = re.findall(pattern, cleaned_text)
+            if matches:
+                extracted_letter = matches[-1]
+
+            if extracted_letter:
+                right_format = True
+
+        cop_to_idx = {
+            0: "A",
+            1: "B",
+            2: "C",
+            3: "D",
+        }
+        correct_answer = cop_to_idx[sample["cop"]] if dataset_name == "medmcqa" else sample["answer_idx"]
     
-    return {
-        "idx": idx,
-        "raw_data": sample,
-        "successful_api_call": successful_api_call,
-        "right_format": right_format,
-        "input_text": input_text,
-        "model_output": model_output,
-        "model_answer": extracted_letter,
-        "correct_answer": sample["answer_idx"],
-        "error": error_message, 
-    }
+        return {
+            "idx": idx,
+            "raw_data": sample,
+            "successful_api_call": successful_api_call,
+            "right_format": right_format,
+            "input_text": input_text,
+            "model_output": model_output,
+            "model_answer": extracted_letter,
+            "correct_answer": correct_answer,
+            "error": error_message, 
+        }
 
 def evaluate_model(
     dataset_name: str, 
     model_name: str, 
+    prompt_type: str,
     api_key: str, 
-    max_tokens: int, 
-    temperature: float,
     use_cache: bool
 ):
     """
@@ -71,12 +90,22 @@ def evaluate_model(
 
     with open("evaluate_sml/config.yaml", "r") as f:
         config = yaml.safe_load(f)
+    
+    thinking = config["models"][model_name]["thinking"]
 
     sleep_time = config['sleep_time']
     dataset_config = config["datasets"][dataset_name]
-    format_prompt = dataset_config["format_prompt"]
+    prompt_content = None
+    for prompt in dataset_config["prompts"]:
+        if prompt["type"] == prompt_type:
+            prompt_content = prompt["content"]
+            break
+    if prompt_content is None:
+        raise ValueError(f"Prompt type {prompt_type} not found in dataset {dataset_name}")
     
-    # --- Experiment Setup ---
+    max_tokens = config["models"][model_name]["max_tokens_by_prompt_type"][prompt_type]
+    temperature = config["models"][model_name]["temperature"]
+
     output_base_dir = dataset_config["output_dir"]
     os.makedirs(output_base_dir, exist_ok=True)
     
@@ -92,9 +121,6 @@ def evaluate_model(
     print(f"Starting Experiment ID: {experiment_id}")
     print(f"Results will be saved in: {experiment_dir}")
 
-    # --- FIX 1: WRITE INITIAL RUN DETAILS AT THE START ---
-    # This file signals that a run has started and stores its configuration.
-    # It allows us to check the config of a crashed run.
     initial_run_details = {
         "experiment_id": experiment_id,
         "status": "running",
@@ -102,15 +128,15 @@ def evaluate_model(
         "config": {
             "model_name": model_name,
             "dataset_name": dataset_name,
+            "prompt_type": prompt_type,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "format_prompt": format_prompt,
+            "prompt_content": prompt_content,
         }
     }
     with open(run_details_file, "w") as f:
         json.dump(initial_run_details, f, indent=4)
 
-    # --- Caching Logic (FIXED) ---
     results = []
     processed_indices = set()
     cached_exp_dir_to_delete = None
@@ -122,33 +148,29 @@ def evaluate_model(
             prev_run_details_file = os.path.join(prev_exp_dir, "run_details.json")
             prev_results_file = os.path.join(prev_exp_dir, "results.jsonl")
 
-            # Check if the previous run's details and results exist
             if os.path.exists(prev_run_details_file) and os.path.exists(prev_results_file):
                 with open(prev_run_details_file, "r") as f:
                     prev_run_details = json.load(f)
                 
-                # Compare the config from the previous run with the current one
                 is_same_config = (
                     prev_run_details["config"].get("model_name") == model_name and
+                    prev_run_details["config"].get("prompt_type") == prompt_type and
                     prev_run_details["config"].get("max_tokens") == max_tokens and
                     prev_run_details["config"].get("temperature") == temperature and 
-                    prev_run_details["config"].get("format_prompt") == format_prompt
+                    prev_run_details["config"].get("prompt_content") == prompt_content
                 )
 
                 if is_same_config:
                     print(f"Found matching cache in experiment {latest_exp_id}. Resuming...")
-                    # Consolidate cache by copying old results into the new experiment directory
                     shutil.copy(prev_results_file, results_file)
                     
                     with open(results_file, "r") as f:
                         for line in f:
                             cached_result = json.loads(line)
-                            # Only trust successful results from the cache
                             if cached_result.get("successful_api_call") and cached_result.get("right_format"):
                                 results.append(cached_result)
                                 processed_indices.add(cached_result["idx"])
                     
-                    # Mark the old directory for deletion upon successful completion
                     cached_exp_dir_to_delete = prev_exp_dir
                     print(f"Loaded {len(results)} valid results from cache. Failed/invalid samples will be re-processed.")
                 else:
@@ -158,9 +180,10 @@ def evaluate_model(
     else:
         print("`use_cache` is False. Starting from scratch.")
 
-    # --- Data Loading ---
     if dataset_name == "medqa":
-        dataset = list(load_med_qa_dataset())
+        dataset = load_med_qa_dataset()
+    elif dataset_name == "medmcqa":
+        dataset = load_med_mcqa_dataset(n_samples=1000)
     else:
         raise ValueError(f"Dataset '{dataset_name}' not supported.")
 
@@ -169,26 +192,21 @@ def evaluate_model(
 
     if not unprocessed_samples and cached_exp_dir_to_delete:
         print("All samples were processed in the cached run.")
-        # The finalization step below will handle summary and cleanup
     
-    # --- Sequential Processing ---
     progress_bar = tqdm(unprocessed_samples, desc="Processing Samples", unit="sample")
     for sample, idx in progress_bar:
         try:
             result = process_sample(
-                sample, idx, model_name, api_key, max_tokens, temperature, format_prompt, sleep_time
+                sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name
             )
             
             if result.get("error"):
                 tqdm.write(result["error"])
 
-            # Add to the in-memory list for final summary calculation
             results.append(result)
 
-            # --- FIX 2: SAVE EACH RESULT IMMEDIATELY TO THE FILE ---
-            # This ensures progress is saved even if the script crashes.
             result_to_write = result.copy()
-            result_to_write.pop('error', None) # Don't save temporary error key to file
+            result_to_write.pop('error', None)
             
             with open(results_file, "a") as f:
                 f.write(json.dumps(result_to_write) + "\n")
@@ -196,14 +214,12 @@ def evaluate_model(
         except Exception as exc:
             tqdm.write(f'Sample {idx} generated an unhandled exception: {exc}')
 
-    # --- Finalization and Summary ---
     execution_time = time.time() - start_time
     
-    # Sort results for consistency before creating the summary
     results.sort(key=lambda r: r['idx'])
     
     run_summary = {
-        **initial_run_details, # Start with the initial details
+        **initial_run_details,
         "status": "completed",
         "run_time_end": datetime.now().isoformat(),
         "execution_time_seconds": round(execution_time, 2),
@@ -215,11 +231,9 @@ def evaluate_model(
         }
     }
 
-    # Overwrite the initial run_details.json with the final complete summary
     with open(run_details_file, "w") as f:
         json.dump(run_summary, f, indent=4)
         
-    # --- Cleanup ---
     if cached_exp_dir_to_delete:
         print(f"\nRun complete. Deleting old cache directory: {cached_exp_dir_to_delete}")
         try:

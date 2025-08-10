@@ -1,17 +1,16 @@
 from evaluation import evaluate_model
 from analyze import analyze_results
 
-model = "Qwen/Qwen2.5-72B-Instruct"
-dataset_name = "medqa"
+model = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+dataset_name = "medmcqa"
 api_key = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
 
 evaluate_model(
     dataset_name=dataset_name,
     model_name=model,
+    prompt_type="Only Final Answer",
     api_key=api_key,
-    max_tokens=15000,
-    temperature=0.7,
-    use_cache=True
+    use_cache=False
 )
 
-analyze_results("medqa", 8)
+analyze_results("medmcqa", 1)

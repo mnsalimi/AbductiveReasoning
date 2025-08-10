@@ -1,7 +1,3 @@
-# Medical
-https://github.com/jind11/MedQA
-https://github.com/UCSC-VLAA/MedReason
-
-# Common Sense
-https://huggingface.co/datasets/allenai/art
-https://github.com/drwiner/COPA/tree/master/datasets
+https://github.com/jind11/MedQA -> phrases_no_exclude_test.jsonl
+https://huggingface.co/datasets/openlifescienceai/medmcqa -> validation split
+https://github.com/YuSheng-00/UniADILR/tree/main/data/UniADILR-HGc -> abduction

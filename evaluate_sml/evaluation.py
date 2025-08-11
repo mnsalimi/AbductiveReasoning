@@ -35,7 +35,7 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
     successful_api_call = False
 
     try:
-        model_output = get_model_response(model_name, api_key, input_text, max_tokens, temperature)
+        model_output, usage = get_model_response(model_name, api_key, input_text, max_tokens, temperature)
         successful_api_call = True
     except Exception as e:
         error_message = f"API call failed for sample {idx}: {e}"
@@ -75,6 +75,7 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
             "model_answer": extracted_letter,
             "correct_answer": correct_answer,
             "error": error_message, 
+            "token_usage": usage,
         }
     elif dataset_name == "uniadilr":
         sentence_ids = None
@@ -83,14 +84,17 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
                 cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL)
             else:
                 cleaned_text = model_output
-            matches = re.findall(r'sent(\d+)', cleaned_text)
+            matches = re.findall(r'<a>(.*?)</a>', cleaned_text)
             if matches:
-                sentence_ids = {int(num) for num in matches}
+                cleaned_text = matches[-1]
+                matches = re.findall(r'sent(\d+)', cleaned_text)
+                if matches:
+                    sentence_ids = [int(num) for num in matches]
 
             if sentence_ids:
                 right_format = True
         
-        correct_answer = {int(num) for num in re.findall(r'sent(\d+)', sample["proof"])}
+        correct_answer = [int(num) for num in re.findall(r'sent(\d+)', sample["proof"])]
 
         return {
             "idx": idx,
@@ -99,9 +103,10 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
             "right_format": right_format,
             "input_text": input_text,
             "model_output": model_output,
-            "model_answer": list(sentence_ids),
-            "correct_answer": list(correct_answer),
+            "model_answer": sentence_ids,
+            "correct_answer": correct_answer,
             "error": error_message, 
+            "token_usage": usage,
         }
 
 def evaluate_model(
@@ -282,7 +287,7 @@ if __name__ == "__main__":
     evaluate_model(
         dataset_name="uniadilr",
         model_name="meta-llama/Llama-4-Scout-17B-16E-Instruct",
-        prompt_type="Only Final Answer",
+        prompt_type="Chain of Thought",
         api_key="hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB",
         use_cache=False
     )

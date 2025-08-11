@@ -2,6 +2,7 @@ import yaml
 import json
 import os
 from sklearn.metrics import classification_report
+import numpy as np
 
 def analyze_results(dataset_name: str, exp: int):
     """
@@ -45,11 +46,18 @@ def analyze_results(dataset_name: str, exp: int):
     wrong_format = 0
     y_true = []
     y_pred = []
+    prompt_tokens_list = []
+    completion_tokens_list = []
 
     with open(results_file, "r") as f:
         for line in f:
             total_samples += 1
             data = json.loads(line)
+
+            usage = data.get("token_usage")
+            if usage:
+                prompt_tokens_list.append(usage.get('prompt_tokens', 0))
+                completion_tokens_list.append(usage.get('completion_tokens', 0))
 
             if not data.get("successful_api_call", False):
                 unsuccessful_api_calls += 1
@@ -70,6 +78,27 @@ def analyze_results(dataset_name: str, exp: int):
 
     percent_unsuccessful_api = (unsuccessful_api_calls / total_samples) * 100 if total_samples > 0 else 0
     percent_wrong_format = (wrong_format / total_samples) * 100 if total_samples > 0 else 0
+
+    token_usage_report = "Token usage data not available in results."
+    if prompt_tokens_list and completion_tokens_list:
+        prompt_mean = np.mean(prompt_tokens_list)
+        prompt_q1, prompt_median, prompt_q3 = np.percentile(prompt_tokens_list, [25, 50, 75])
+        
+        completion_mean = np.mean(completion_tokens_list)
+        completion_q1, completion_median, completion_q3 = np.percentile(completion_tokens_list, [25, 50, 75])
+        
+        token_usage_report = (
+            f"    Prompt Tokens:\n"
+            f"       - Mean: {prompt_mean:.2f}\n"
+            f"       - 25th Percentile (Q1): {prompt_q1}\n"
+            f"       - 50th Percentile (Median): {prompt_median}\n"
+            f"       - 75th Percentile (Q3): {prompt_q3}\n\n"
+            f"    Completion Tokens:\n"
+            f"       - Mean: {completion_mean:.2f}\n"
+            f"       - 25th Percentile (Q1): {completion_q1}\n"
+            f"       - 50th Percentile (Median): {completion_median}\n"
+            f"       - 75th Percentile (Q3): {completion_q3}"
+        )
 
     metrics_title = "Evaluation Metrics"
     metrics_report = "Not enough valid samples to generate metrics."
@@ -116,14 +145,18 @@ def analyze_results(dataset_name: str, exp: int):
     1. Total Samples: {total_samples}
 
     2. Unsuccessful API Calls:
-       - Count: {unsuccessful_api_calls}
-       - Percentage: {percent_unsuccessful_api:.2f}%
+        - Count: {unsuccessful_api_calls}
+        - Percentage: {percent_unsuccessful_api:.2f}%
 
     3. Wrong Formatting:
-       - Count: {wrong_format}
-       - Percentage: {percent_wrong_format:.2f}%
+        - Count: {wrong_format}
+        - Percentage: {percent_wrong_format:.2f}%
 
-    4. {metrics_title} (for successful and correctly formatted samples):
+    4. Token Usage Statistics:
+    ----------------------------------------------------------------------
+    {token_usage_report}
+
+    5. {metrics_title} (for successful and correctly formatted samples):
     ----------------------------------------------------------------------
     {metrics_report}
     """

@@ -52,18 +52,17 @@ def get_model_response(
             response = requests.post(
                 url, headers=headers, data=json.dumps(payload), timeout=timeout
             )
-            response.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()
             response_data = response.json()
             content = response_data['choices'][0]['message']['content']
-            return content
+            usage = response_data['usage']
+            return content, usage
         except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
             print(f"Attempt {attempt + 1}/{retries} failed: {e}")
             last_exception = e
             if attempt < retries - 1:
-                # Exponential backoff for retries
                 time.sleep(2 ** attempt)
             else:
-                # No need to sleep on the last attempt
                 continue
 
     raise RuntimeError(f"Failed to get a response after {retries} attempts") from last_exception
@@ -71,16 +70,37 @@ def get_model_response(
 
 if __name__ == "__main__":
     MY_API_KEY = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
-    MY_MODEL = "Qwen/Qwen3-32B"
-    MY_PROMPT = "Hi! How are you?"
+    # MY_MODEL = "Qwen/Qwen3-32B"
+    MY_MODEL = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+    # MY_PROMPT = "Hi! How are you?"
+    MY_PROMPT = "What's the chance of getting lung cancer if somking for 5 years. Your output should be only a number between 0 and 10, 0: no chance, 100: very high chance. No explanation, no other text, no other format."
 
-    model_output = get_model_response(
-        model_name=MY_MODEL,
-        api_key=MY_API_KEY,
-        input_text=MY_PROMPT,
-        max_tokens=256,
-        temperature=0.8
-    )
+    import numpy as np
 
-    print("--- Model Output ---")
-    print(model_output)
+    nums = []
+    for i in range(20):
+        model_output, usage = get_model_response(
+            model_name=MY_MODEL,
+            api_key=MY_API_KEY,
+            input_text=MY_PROMPT,
+            max_tokens=256,
+            temperature=0.8
+        )
+        print(model_output)
+        nums.append(int(model_output))
+    print(np.mean(nums))
+    print(np.std(nums))
+
+    # model_output, usage = get_model_response(
+    #     model_name=MY_MODEL,
+    #     api_key=MY_API_KEY,
+    #     input_text=MY_PROMPT,
+    #     max_tokens=256,
+    #     temperature=0.8
+    # )
+
+    # print("--- Model Output ---")
+    # print(model_output)
+
+    # print("--- Token Usage ---")
+    # print(usage)

@@ -286,7 +286,7 @@ def evaluate_model(
 if __name__ == "__main__":
     evaluate_model(
         dataset_name="uniadilr",
-        model_name="meta-llama/Llama-4-Scout-17B-16E-Instruct",
+        model_name="Qwen/Qwen3-32B",
         prompt_type="Chain of Thought",
         api_key="hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB",
         use_cache=False

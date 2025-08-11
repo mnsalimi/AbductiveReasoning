@@ -17,6 +17,14 @@ models:
       "Chain of Thought": 4096
       "Chain of Thought and Think Abductively": 4096
       "Chain of Thought and Only Think Abductively": 4096
+  Qwen/Qwen3-32B:
+    thinking: true
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 1024
+      "Chain of Thought": 4096
+      "Chain of Thought and Think Abductively": 4096
+      "Chain of Thought and Only Think Abductively": 4096
 
 datasets:
   medqa:
@@ -120,8 +128,9 @@ datasets:
       - type: "Only Final Answer"
         content: |
           Read the sentences and hypothesis above and output the set of sentences that you think can be account (proof) for the hypothesis.
-          Your output should be only the final answer with the following format: (No explanation, no other text, no other format)
+          Your output should be only the final answer with the following format: 
           <a>sent{first sentence number}&sent{second sentence number}&...</a>
+          No explanation, no other text, no other format
           Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
           In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
           Some examples of valid outputs:
@@ -132,6 +141,7 @@ datasets:
           Think step by step and thoroughly.
           Your output should be your reasoning and then the final answer with the following format:
           <a>sent{first sentence number}&sent{second sentence number}&...</a>
+          No explanation, no other text, no other format.
           Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
           In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
           Some examples of valid outputs:
@@ -142,6 +152,7 @@ datasets:
           Think step by step and thoroughly. Use abductive reasoning process to reason about the task.
           Your output should be your reasoning and then the final answer with the following format:
           <a>sent{first sentence number}&sent{second sentence number}&...</a>
+          No explanation, no other text, no other format.
           Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
           In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
           Some examples of valid outputs:
@@ -152,6 +163,7 @@ datasets:
           Think step by step and thoroughly. Use ONLY abductive reasoning to reason about the task. You're not allowed to use any other reasoning types (like deduction, induction, and etc).
           Your output should be your reasoning and then the final answer with the following format:
           <a>sent{first sentence number}&sent{second sentence number}&...</a>
+          No explanation, no other text, no other format.
           Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
           In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
           Some examples of valid outputs:

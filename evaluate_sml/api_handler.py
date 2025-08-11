@@ -70,37 +70,19 @@ def get_model_response(
 
 if __name__ == "__main__":
     MY_API_KEY = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
-    # MY_MODEL = "Qwen/Qwen3-32B"
-    MY_MODEL = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
-    # MY_PROMPT = "Hi! How are you?"
-    MY_PROMPT = "What's the chance of getting lung cancer if somking for 5 years. Your output should be only a number between 0 and 10, 0: no chance, 100: very high chance. No explanation, no other text, no other format."
+    MY_MODEL = "Qwen/Qwen3-32B"
+    MY_PROMPT = "Hi! How are you?"
 
-    import numpy as np
+    model_output, usage = get_model_response(
+        model_name=MY_MODEL,
+        api_key=MY_API_KEY,
+        input_text=MY_PROMPT,
+        max_tokens=512,
+        temperature=0.8
+    )
 
-    nums = []
-    for i in range(20):
-        model_output, usage = get_model_response(
-            model_name=MY_MODEL,
-            api_key=MY_API_KEY,
-            input_text=MY_PROMPT,
-            max_tokens=256,
-            temperature=0.8
-        )
-        print(model_output)
-        nums.append(int(model_output))
-    print(np.mean(nums))
-    print(np.std(nums))
+    print("--- Model Output ---")
+    print(model_output)
 
-    # model_output, usage = get_model_response(
-    #     model_name=MY_MODEL,
-    #     api_key=MY_API_KEY,
-    #     input_text=MY_PROMPT,
-    #     max_tokens=256,
-    #     temperature=0.8
-    # )
-
-    # print("--- Model Output ---")
-    # print(model_output)
-
-    # print("--- Token Usage ---")
-    # print(usage)
+    print("--- Token Usage ---")
+    print(usage)

@@ -1,0 +1,21 @@
+{
+    "experiment_id": 1,
+    "status": "completed",
+    "run_time_start": "2025-08-11T12:26:46.787447",
+    "config": {
+        "model_name": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+        "dataset_name": "uniadilr",
+        "prompt_type": "Only Final Answer",
+        "max_tokens": 100,
+        "temperature": 0.7,
+        "prompt_content": "Read the sentences and hypothesis above and output the set of sentences that you think can be account (proof) for the hypothesis.\nYour output should be only the final answer with the following format: (No explanation, no other text, no other format)\nsent{first sentence number}&sent{second sentence number}&...\nRemember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. \nIn addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.\nSome examples of valid outputs:\nsent1&sent2&sent3 / sent10 / sent12&sent3\n"
+    },
+    "run_time_end": "2025-08-11T12:38:58.165752",
+    "execution_time_seconds": 731.38,
+    "summary": {
+        "total_samples": 500,
+        "processed_samples": 500,
+        "successful_api_calls": 500,
+        "correctly_formatted_answers": 500
+    }
+}

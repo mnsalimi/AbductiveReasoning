@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime
 from tqdm import tqdm
 
-from loader import load_med_qa_dataset, load_med_mcqa_dataset
+from loader import load_med_qa_dataset, load_med_mcqa_dataset, load_uniadilr_hgc_dataset
 from api_handler import get_model_response
 
 def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name):
@@ -27,6 +27,8 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
             "D": sample["opd"],
         }
         input_text = sample["question"] + "\n" + str(options) + "\n" + prompt_content
+    elif dataset_name == "uniadilr":
+        input_text = "Sentences: " + str(sample["context"]) + "\n" + "Hypothesis: " + sample["hypothesis"] + "\n" + prompt_content
     
     error_message = None
     model_output = None
@@ -72,6 +74,33 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
             "model_output": model_output,
             "model_answer": extracted_letter,
             "correct_answer": correct_answer,
+            "error": error_message, 
+        }
+    elif dataset_name == "uniadilr":
+        sentence_ids = None
+        if successful_api_call:
+            if thinking:
+                cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL)
+            else:
+                cleaned_text = model_output
+            matches = re.findall(r'sent(\d+)', cleaned_text)
+            if matches:
+                sentence_ids = {int(num) for num in matches}
+
+            if sentence_ids:
+                right_format = True
+        
+        correct_answer = {int(num) for num in re.findall(r'sent(\d+)', sample["proof"])}
+
+        return {
+            "idx": idx,
+            "raw_data": sample,
+            "successful_api_call": successful_api_call,
+            "right_format": right_format,
+            "input_text": input_text,
+            "model_output": model_output,
+            "model_answer": list(sentence_ids),
+            "correct_answer": list(correct_answer),
             "error": error_message, 
         }
 
@@ -184,6 +213,8 @@ def evaluate_model(
         dataset = load_med_qa_dataset()
     elif dataset_name == "medmcqa":
         dataset = load_med_mcqa_dataset(n_samples=1000)
+    elif dataset_name == "uniadilr":
+        dataset = load_uniadilr_hgc_dataset()
     else:
         raise ValueError(f"Dataset '{dataset_name}' not supported.")
 
@@ -249,10 +280,9 @@ def evaluate_model(
 
 if __name__ == "__main__":
     evaluate_model(
-        dataset_name="medqa",
+        dataset_name="uniadilr",
         model_name="meta-llama/Llama-4-Scout-17B-16E-Instruct",
+        prompt_type="Only Final Answer",
         api_key="hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB",
-        max_tokens=15000,
-        temperature=0.7,
-        use_cache=True
+        use_cache=False
     )

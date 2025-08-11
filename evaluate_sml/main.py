@@ -8,9 +8,9 @@ api_key = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
 evaluate_model(
     dataset_name=dataset_name,
     model_name=model,
-    prompt_type="Only Final Answer",
+    prompt_type="Chain of Thought",
     api_key=api_key,
     use_cache=False
 )
 
-analyze_results("medmcqa", 1)
+analyze_results("medmcqa", 2)

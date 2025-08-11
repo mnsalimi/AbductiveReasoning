@@ -5,20 +5,23 @@ models:
     thinking: false
     temperature: 0.7
     max_tokens_by_prompt_type:
-      "Only Final Answer": 100
-      "Chain of Thought": 5000
-      "Chain of Thought and Think Abductively": 100
+      "Only Final Answer": 256
+      "Chain of Thought": 4096
+      "Chain of Thought and Think Abductively": 4096
+      "Chain of Thought and Only Think Abductively": 4096
   meta-llama/Llama-4-Scout-17B-16E-Instruct:
     thinking: false
     temperature: 0.7
     max_tokens_by_prompt_type:
-      "Only Final Answer": 100
-      "Chain of Thought": 5000
-      "Chain of Thought and Think Abductively": 5000
+      "Only Final Answer": 256
+      "Chain of Thought": 4096
+      "Chain of Thought and Think Abductively": 4096
+      "Chain of Thought and Only Think Abductively": 4096
 
 datasets:
   medqa:
     file_path: "datasets/MedQA/phrases_no_exclude_test.jsonl"
+    output_dir: "evaluate_sml/results/medqa/"
     prompts:
       - type: "Only Final Answer"
         content: |
@@ -52,9 +55,20 @@ datasets:
           - <a>B</a>
           - <a>C</a>
           - <a>D</a>
-    output_dir: "evaluate_sml/results/medqa/"
+      - type: "Chain of Thought and Only Think Abductively"
+        content: |
+          Think step by step and thoroughly. Use ONLY abductive reasoning to reason about the question and the answer choices. You're not allowed to use any other reasoning types (like deduction, induction, and etc).
+          Output your reasoning and then the final answer of choice.
+          The final answer should be in the following format:
+          Your answer of choice should be wrapped around <a> and </a> tags.
+          Valid final answers:
+          - <a>A</a>
+          - <a>B</a>
+          - <a>C</a>
+          - <a>D</a>
   medmcqa:
     hf_path: "openlifescienceai/medmcqa"
+    output_dir: "evaluate_sml/results/medmcqa/"
     prompts:
       - type: "Only Final Answer"
         content: |
@@ -88,4 +102,57 @@ datasets:
           - <a>B</a>
           - <a>C</a>
           - <a>D</a>
-    output_dir: "evaluate_sml/results/medmcqa/"
+      - type: "Chain of Thought and Only Think Abductively"
+        content: |
+          Think step by step and thoroughly. Use ONLY abductive reasoning to reason about the question and the answer choices. You're not allowed to use any other reasoning types (like deduction, induction, and etc).
+          Output your reasoning and then the final answer of choice.
+          The final answer should be in the following format:
+          Your answer of choice should be wrapped around <a> and </a> tags.
+          Valid final answers:
+          - <a>A</a>
+          - <a>B</a>
+          - <a>C</a>
+          - <a>D</a>
+  uniadilr:
+    file_path: "datasets/UniADILR-HGc/abduction.jsonl"
+    output_dir: "evaluate_sml/results/uniadilr_hgc/"
+    prompts:
+      - type: "Only Final Answer"
+        content: |
+          Read the sentences and hypothesis above and output the set of sentences that you think can be account (proof) for the hypothesis.
+          Your output should be only the final answer with the following format: (No explanation, no other text, no other format)
+          sent{first sentence number}&sent{second sentence number}&...
+          Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
+          In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
+          Some examples of valid outputs:
+          sent1&sent2&sent3 / sent10 / sent12&sent3
+      - type: "Chain of Thought"
+        content: |
+          Read the sentences and hypothesis above and output the set of sentences that you think can be account (proof) for the hypothesis.
+          Think step by step and thoroughly.
+          Your output should be your reasoning and then the final answer with the following format:
+          sent{first sentence number}&sent{second sentence number}&...
+          Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
+          In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
+          Some examples of valid outputs:
+          sent1&sent2&sent3 / sent10 / sent12&sent3
+      - type: "Chain of Thought and Think Abductively"
+        content: |
+          Read the sentences and hypothesis above and output the set of sentences that you think can be account (proof) for the hypothesis.
+          Think step by step and thoroughly. Use abductive reasoning process to reason about the task.
+          Your output should be your reasoning and then the final answer with the following format:
+          sent{first sentence number}&sent{second sentence number}&...
+          Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
+          In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
+          Some examples of valid outputs:
+          sent1&sent2&sent3 / sent10 / sent12&sent3
+      - type: "Chain of Thought and Only Think Abductively"
+        content: |
+          Read the sentences and hypothesis above and output the set of sentences that you think can be account (proof) for the hypothesis.
+          Think step by step and thoroughly. Use ONLY abductive reasoning to reason about the task. You're not allowed to use any other reasoning types (like deduction, induction, and etc).
+          Your output should be your reasoning and then the final answer with the following format:
+          sent{first sentence number}&sent{second sentence number}&...
+          Remember that the size of the ground truth set can vary from 1 to any arbitrary number and order of the sentences does not matter. 
+          In addition, there is only one correct answer; thus, any other set with smaller or bigger number of sentences is incorrect.
+          Some examples of valid outputs:
+          sent1&sent2&sent3 / sent10 / sent12&sent3

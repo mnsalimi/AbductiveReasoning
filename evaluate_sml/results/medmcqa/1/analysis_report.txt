@@ -1,0 +1,31 @@
+
+    Analysis Report for medmcqa - Experiment 1
+    Config:
+
+    {'model_name': 'meta-llama/Llama-4-Scout-17B-16E-Instruct', 'dataset_name': 'medmcqa', 'prompt_type': 'Only Final Answer', 'max_tokens': 100, 'temperature': 0.7, 'prompt_content': 'Only and only answer with the following format:\nYour answer of choice should be wrapped around <a> and </a> tags.\nValid outputs:\n- <a>A</a>\n- <a>B</a>\n- <a>C</a>\n- <a>D</a>\nOutput no explanation, no other text, no other format. Output just two tags and the answer within them.\n'}
+    ======================================================
+
+    1. Total Samples: 1000
+
+    2. Unsuccessful API Calls:
+       - Count: 0
+       - Percentage: 0.00%
+
+    3. Wrong Formatting:
+       - Count: 6
+       - Percentage: 0.60%
+
+    4. Classification Metrics (for successful and correctly formatted samples):
+    ----------------------------------------------------------------------
+                  precision    recall  f1-score   support
+
+           A       0.75      0.65      0.70       331
+           B       0.69      0.71      0.70       259
+           C       0.59      0.73      0.65       209
+           D       0.69      0.67      0.68       195
+
+    accuracy                           0.68       994
+   macro avg       0.68      0.69      0.68       994
+weighted avg       0.69      0.68      0.69       994
+
+    

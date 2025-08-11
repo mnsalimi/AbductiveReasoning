@@ -40,5 +40,25 @@ def load_med_mcqa_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
     else:
         return list(ds)[:n_samples]
 
+
+def load_uniadilr_hgc_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
+    """
+    Loads UniADILR-HGc dataset from the path specified in the config.
+    
+    Returns a list of samples (rows).
+    """
+    with open("evaluate_sml/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+
+    file_path = config["datasets"]["uniadilr"]["file_path"]
+    l = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            l.append(json.loads(line))
+    if n_samples == -1:
+        return l
+    else:
+        return l[:n_samples]
+
 if __name__ == "__main__":
-    print(load_med_mcqa_dataset(n_samples=1))
+    print(load_uniadilr_hgc_dataset(n_samples=1))

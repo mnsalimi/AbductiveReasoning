@@ -56,6 +56,8 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
 
             if extracted_letter:
                 right_format = True
+        else:
+            usage = None
 
         cop_to_idx = {
             0: "A",
@@ -93,7 +95,9 @@ def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, th
 
             if sentence_ids:
                 right_format = True
-        
+        else:
+            usage = None
+
         correct_answer = [int(num) for num in re.findall(r'sent(\d+)', sample["proof"])]
 
         return {

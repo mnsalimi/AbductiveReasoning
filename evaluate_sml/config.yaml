@@ -6,25 +6,25 @@ models:
     temperature: 0.7
     max_tokens_by_prompt_type:
       "Only Final Answer": 256
-      "Chain of Thought": 4096
-      "Chain of Thought and Think Abductively": 4096
-      "Chain of Thought and Only Think Abductively": 4096
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
   meta-llama/Llama-4-Scout-17B-16E-Instruct:
     thinking: false
     temperature: 0.7
     max_tokens_by_prompt_type:
       "Only Final Answer": 256
-      "Chain of Thought": 4096
-      "Chain of Thought and Think Abductively": 4096
-      "Chain of Thought and Only Think Abductively": 4096
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
   Qwen/Qwen3-32B:
     thinking: true
     temperature: 0.7
     max_tokens_by_prompt_type:
       "Only Final Answer": 1024
-      "Chain of Thought": 4096
-      "Chain of Thought and Think Abductively": 4096
-      "Chain of Thought and Only Think Abductively": 4096
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
 
 datasets:
   medqa:

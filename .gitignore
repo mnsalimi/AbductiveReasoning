@@ -37,6 +37,5 @@ secrets.toml
 
 .ipynb_checkpoints/
 
-datasets/
 
 *.jsonl

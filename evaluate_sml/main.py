@@ -4,6 +4,7 @@ import yaml
 import os
 
 def full_experiment():
+    api_key = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
     with open("evaluate_sml/config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
@@ -16,7 +17,7 @@ def full_experiment():
                     dataset_name=dataset_name,
                     model_name=model_name,
                     prompt_type=prompt_type,
-                    api_key=config["api_key"],
+                    api_key=api_key,
                     use_cache=False
                 )
     

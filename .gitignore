@@ -37,5 +37,4 @@ secrets.toml
 
 .ipynb_checkpoints/
 
-
-*.jsonl
+evaluate_sml/results_old/

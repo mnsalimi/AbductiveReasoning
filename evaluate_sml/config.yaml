@@ -52,7 +52,6 @@ models:
 datasets:
   medqa:
     file_path: "datasets/MedQA/phrases_no_exclude_test.jsonl"
-    output_dir: "evaluate_sml/results/medqa/"
     prompts:
       - type: "Only Final Answer"
         content: |
@@ -99,7 +98,6 @@ datasets:
           - <a>D</a>
   medmcqa:
     hf_path: "openlifescienceai/medmcqa"
-    output_dir: "evaluate_sml/results/medmcqa/"
     prompts:
       - type: "Only Final Answer"
         content: |
@@ -146,7 +144,6 @@ datasets:
           - <a>D</a>
   uniadilr:
     file_path: "datasets/UniADILR-HGc/abduction.jsonl"
-    output_dir: "evaluate_sml/results/uniadilr_hgc/"
     prompts:
       - type: "Only Final Answer"
         content: |

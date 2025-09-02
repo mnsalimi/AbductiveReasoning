@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from loader import load_med_qa_dataset, load_med_mcqa_dataset, load_uniadilr_hgc_dataset
 from api_handler import get_model_response
+from path_utils import create_experiment_path, ensure_experiment_dir, get_results_files
 
 def process_sample(sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name):
     """
@@ -158,23 +159,20 @@ def evaluate_model(
     max_tokens = config["models"][model_name]["max_tokens_by_prompt_type"][prompt_type]
     temperature = config["models"][model_name]["temperature"]
 
-    output_base_dir = dataset_config["output_dir"]
-    os.makedirs(output_base_dir, exist_ok=True)
+    # Create new structured experiment path: results/{dataset}/{model}/{prompt}
+    experiment_path = create_experiment_path(dataset_name, model_name, prompt_type)
+    experiment_dir = ensure_experiment_dir(experiment_path)
     
-    existing_experiments = [int(d) for d in os.listdir(output_base_dir) if d.isdigit()]
-    experiment_id = max(existing_experiments) + 1 if existing_experiments else 1
+    # Get standard file paths
+    result_files = get_results_files(experiment_dir)
+    results_file = result_files['results']
+    run_details_file = result_files['run_details']
     
-    experiment_dir = os.path.join(output_base_dir, str(experiment_id))
-    os.makedirs(experiment_dir, exist_ok=True)
-    
-    results_file = os.path.join(experiment_dir, "results.jsonl")
-    run_details_file = os.path.join(experiment_dir, "run_details.json")
-    
-    print(f"Starting Experiment ID: {experiment_id}")
+    print(f"Starting experiment: {dataset_name}/{model_name}/{prompt_type}")
     print(f"Results will be saved in: {experiment_dir}")
 
     initial_run_details = {
-        "experiment_id": experiment_id,
+        "experiment_path": experiment_path,
         "status": "running",
         "run_time_start": run_timestamp.isoformat(),
         "config": {
@@ -194,43 +192,48 @@ def evaluate_model(
     cached_exp_dir_to_delete = None
     
     if use_cache:
-        latest_exp_id = experiment_id - 1
-        if latest_exp_id > 0:
-            prev_exp_dir = os.path.join(output_base_dir, str(latest_exp_id))
-            prev_run_details_file = os.path.join(prev_exp_dir, "run_details.json")
-            prev_results_file = os.path.join(prev_exp_dir, "results.jsonl")
+        # Check if experiment already exists (cache is implicit with new structure)
+        if os.path.exists(results_file) and os.path.exists(run_details_file):
+            with open(run_details_file, "r") as f:
+                prev_run_details = json.load(f)
+            
+            is_same_config = (
+                prev_run_details["config"].get("model_name") == model_name and
+                prev_run_details["config"].get("prompt_type") == prompt_type and
+                prev_run_details["config"].get("max_tokens") == max_tokens and
+                prev_run_details["config"].get("temperature") == temperature and 
+                prev_run_details["config"].get("prompt_content") == prompt_content
+            )
 
-            if os.path.exists(prev_run_details_file) and os.path.exists(prev_results_file):
-                with open(prev_run_details_file, "r") as f:
-                    prev_run_details = json.load(f)
+            if is_same_config:
+                print(f"Found existing experiment with same config. Resuming...")
                 
-                is_same_config = (
-                    prev_run_details["config"].get("model_name") == model_name and
-                    prev_run_details["config"].get("prompt_type") == prompt_type and
-                    prev_run_details["config"].get("max_tokens") == max_tokens and
-                    prev_run_details["config"].get("temperature") == temperature and 
-                    prev_run_details["config"].get("prompt_content") == prompt_content
-                )
-
-                if is_same_config:
-                    print(f"Found matching cache in experiment {latest_exp_id}. Resuming...")
-                    shutil.copy(prev_results_file, results_file)
-                    
-                    with open(results_file, "r") as f:
-                        for line in f:
-                            cached_result = json.loads(line)
-                            if cached_result.get("successful_api_call") and cached_result.get("right_format"):
-                                results.append(cached_result)
-                                processed_indices.add(cached_result["idx"])
-                    
-                    cached_exp_dir_to_delete = prev_exp_dir
-                    print(f"Loaded {len(results)} valid results from cache. Failed/invalid samples will be re-processed.")
-                else:
-                    print("Previous run has a different config. Starting from scratch.")
+                with open(results_file, "r") as f:
+                    for line in f:
+                        cached_result = json.loads(line)
+                        if cached_result.get("successful_api_call") and cached_result.get("right_format"):
+                            results.append(cached_result)
+                            processed_indices.add(cached_result["idx"])
+                
+                print(f"Loaded {len(results)} valid results from cache. Failed/invalid samples will be re-processed.")
             else:
-                print("No valid cache found from the previous run. Starting from scratch.")
+                print("Existing experiment has different config. Creating backup and starting fresh.")
+                # Create backup of existing results
+                backup_dir = experiment_dir + "_backup_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+                shutil.copytree(experiment_dir, backup_dir)
+                print(f"Backup created at: {backup_dir}")
+        else:
+            print("No existing experiment found. Starting from scratch.")
     else:
         print("`use_cache` is False. Starting from scratch.")
+        # If not using cache but files exist, create backup
+        if os.path.exists(experiment_dir) and os.listdir(experiment_dir):
+            backup_dir = experiment_dir + "_backup_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+            shutil.copytree(experiment_dir, backup_dir)
+            print(f"Existing results backed up to: {backup_dir}")
+            # Clean the directory for fresh start
+            shutil.rmtree(experiment_dir)
+            os.makedirs(experiment_dir, exist_ok=True)
 
     if dataset_name == "medqa":
         dataset = load_med_qa_dataset(n_samples=n_samples)

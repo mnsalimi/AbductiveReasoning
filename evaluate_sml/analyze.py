@@ -3,32 +3,28 @@ import json
 import os
 from sklearn.metrics import classification_report
 import numpy as np
+from path_utils import create_experiment_path, find_experiments, get_results_files, parse_experiment_path
 
-def analyze_results(dataset_name: str, exp: int):
+def analyze_results_by_path(experiment_path: str):
     """
-    Analyzes model evaluation results. For multi-label tasks like 'uniadilr',
+    Analyzes model evaluation results by experiment path. For multi-label tasks like 'uniadilr',
     it calculates exact match accuracy and subset relationships. For standard
     classification tasks, it uses classification_report.
 
     Args:
-        dataset_name (str): The name of the dataset.
-        exp (int): The experiment number.
+        experiment_path (str): The path to the experiment directory.
     """
+    # Parse experiment path to get dataset info
     try:
-        with open("evaluate_sml/config.yaml", "r") as f:
-            config = yaml.safe_load(f)
-    except FileNotFoundError:
-        print("Error: config.yaml not found. Please ensure 'evaluate_sml/config.yaml' exists.")
+        dataset_name, model_name, prompt_name = parse_experiment_path(experiment_path)
+    except ValueError as e:
+        print(f"Error parsing experiment path: {e}")
         return
-    except Exception as e:
-        print(f"Error loading or parsing config.yaml: {e}")
-        return
-
-
-    dir_path = os.path.join(config['datasets'][dataset_name]['output_dir'], str(exp))
-    results_file = os.path.join(dir_path, "results.jsonl")
-
-    run_details_path = os.path.join(dir_path, "run_details.json")
+    
+    # Get result file paths
+    result_files = get_results_files(experiment_path)
+    results_file = result_files['results']
+    run_details_path = result_files['run_details']
     run_data = {}
     if os.path.exists(run_details_path):
         with open(run_details_path, 'r') as file:
@@ -136,7 +132,11 @@ def analyze_results(dataset_name: str, exp: int):
             metrics_report = classification_report(y_true, y_pred, zero_division=0)
 
     analysis_content = f"""
-    Analysis Report for {dataset_name} - Experiment {exp}
+    Analysis Report for {experiment_path}
+    Dataset: {dataset_name}
+    Model: {model_name}
+    Prompt: {prompt_name}
+    
     Config:
 
     {json.dumps(run_data.get('config', 'Not available'), indent=4)}
@@ -161,11 +161,61 @@ def analyze_results(dataset_name: str, exp: int):
     {metrics_report}
     """
 
-    report_path = os.path.join(dir_path, "analysis_report.txt")
+    report_path = result_files['analysis_report']
     with open(report_path, "w") as f:
         f.write(analysis_content)
     
-    print(f"Analysis complete. Report saved to {report_path}")
+    print(f"Analysis complete for {experiment_path}")
+    print(f"Report saved to {report_path}")
+
+def analyze_results(dataset_name: str, model_name: str, prompt_type: str):
+    """
+    Analyzes model evaluation results using the new directory structure.
+    
+    Args:
+        dataset_name (str): The name of the dataset.
+        model_name (str): The name of the model.
+        prompt_type (str): The type of prompt used.
+    """
+    experiment_path = create_experiment_path(dataset_name, model_name, prompt_type)
+    
+    if not os.path.exists(experiment_path):
+        print(f"Experiment not found: {experiment_path}")
+        return
+    
+    analyze_results_by_path(experiment_path)
+
+
+def analyze_all_experiments(base_dir: str = "results"):
+    """
+    Analyzes all experiments found in the results directory.
+    
+    Args:
+        base_dir (str): Base directory to search for experiments.
+    """
+    experiments = find_experiments(base_dir)
+    
+    if not experiments:
+        print(f"No experiments found in {base_dir}")
+        return
+    
+    print(f"Found {len(experiments)} experiments:")
+    for exp_path in experiments:
+        try:
+            dataset, model, prompt = parse_experiment_path(exp_path)
+            print(f"  - {dataset}/{model}/{prompt}")
+        except ValueError:
+            print(f"  - {exp_path} (invalid path format)")
+    
+    print("\nAnalyzing experiments...")
+    for exp_path in experiments:
+        try:
+            print(f"\nAnalyzing: {exp_path}")
+            analyze_results_by_path(exp_path)
+        except Exception as e:
+            print(f"Error analyzing {exp_path}: {e}")
+
 
 if __name__ == "__main__":
-    analyze_results("uniadilr", 1)
+    # Example usage
+    analyze_results("uniadilr", "Qwen3-32B", "Chain of Thought")

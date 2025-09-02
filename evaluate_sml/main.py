@@ -1,5 +1,5 @@
 from evaluation import evaluate_model
-from analyze import analyze_results
+from analyze import analyze_results, analyze_all_experiments
 import yaml
 import os
 
@@ -24,17 +24,9 @@ def full_experiment():
                     n_samples=-1  # Use all samples by default
                 )
     
-    for dataset_name, dataset_config in config["datasets"].items():
-        list_exp = os.listdir(dataset_config["output_dir"])
-        for exp in list_exp:
-            try:
-                print(f"Analyzing {dataset_name} experiment {exp} ...")
-                analyze_results(
-                    dataset_name=dataset_name,
-                    exp=int(exp)
-                )
-            except:
-                pass
+    # Analyze all experiments using the new directory structure
+    print("\n=== Analysis Phase ===")
+    analyze_all_experiments("results")
 
 
 if __name__ == "__main__":

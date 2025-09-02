@@ -4,7 +4,9 @@ import yaml
 import os
 
 def full_experiment():
-    with open("evaluate_sml/config.yaml", "r") as f:
+    # Find config.yaml relative to this file's location
+    config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     
     api_key = config["api"]["api_key"]

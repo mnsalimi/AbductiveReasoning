@@ -151,7 +151,18 @@ def evaluate_model(
     prompt_content = None
     for prompt in dataset_config["prompts"]:
         if prompt["type"] == prompt_type:
-            prompt_content = prompt["content"]
+            if "content" in prompt:
+                # Legacy format - direct content
+                prompt_content = prompt["content"]
+            elif "template" in prompt:
+                # New template-based format
+                template_name = prompt["template"]
+                if template_name in config["prompt_templates"]:
+                    prompt_content = config["prompt_templates"][template_name]
+                else:
+                    raise ValueError(f"Template {template_name} not found in prompt_templates")
+            else:
+                raise ValueError(f"Prompt {prompt_type} has neither content nor template")
             break
     if prompt_content is None:
         raise ValueError(f"Prompt type {prompt_type} not found in dataset {dataset_name}")
@@ -189,7 +200,6 @@ def evaluate_model(
 
     results = []
     processed_indices = set()
-    cached_exp_dir_to_delete = None
     
     if use_cache:
         # Check if experiment already exists (cache is implicit with new structure)
@@ -247,7 +257,7 @@ def evaluate_model(
     unprocessed_samples = [(sample, idx) for idx, sample in enumerate(dataset) if idx not in processed_indices]
     print(f"Total samples: {len(dataset)}. Processed from cache: {len(processed_indices)}. Remaining: {len(unprocessed_samples)}")
 
-    if not unprocessed_samples and cached_exp_dir_to_delete:
+    if not unprocessed_samples:
         print("All samples were processed in the cached run.")
     
     if parallel:
@@ -311,14 +321,6 @@ def evaluate_model(
 
     with open(run_details_file, "w") as f:
         json.dump(run_summary, f, indent=4)
-        
-    if cached_exp_dir_to_delete:
-        print(f"\nRun complete. Deleting old cache directory: {cached_exp_dir_to_delete}")
-        try:
-            shutil.rmtree(cached_exp_dir_to_delete)
-            print("Cache directory deleted successfully.")
-        except Exception as e:
-            print(f"Warning: Could not delete old cache directory. Error: {e}")
 
     print("\n--- Evaluation Complete ---")
     print(json.dumps(run_summary, indent=4))
@@ -327,7 +329,8 @@ def evaluate_model(
 
 if __name__ == "__main__":
     # Load config for test
-    with open("evaluate_sml/config.yaml", "r") as f:
+    config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     
     evaluate_model(

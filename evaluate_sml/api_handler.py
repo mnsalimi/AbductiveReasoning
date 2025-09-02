@@ -75,9 +75,10 @@ def get_model_response(
             print(f"Attempt {attempt + 1}/{retries} failed: {e}")
             last_exception = e
             if attempt < retries - 1:
-                time.sleep(2 ** attempt)
-            else:
-                continue
+                # Exponential backoff with jitter
+                sleep_time = (2 ** attempt) + (0.1 * attempt)
+                time.sleep(sleep_time)
+            # Remove the redundant 'else: continue' as the loop will continue naturally
 
     raise RuntimeError(f"Failed to get a response after {retries} attempts") from last_exception
 

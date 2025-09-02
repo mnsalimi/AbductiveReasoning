@@ -38,4 +38,12 @@ secrets.toml
 .ipynb_checkpoints/
 
 evaluate_sml/results_old
+evaluate_sml/results_old/
+evaluate_sml/results_old/*
+
+evaluate_sml/results/*
 evaluate_sml/results
+evaluate_sml/results/
+results/
+results/*
+results

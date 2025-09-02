@@ -122,10 +122,20 @@ def evaluate_model(
     api_key: str, 
     use_cache: bool,
     parallel: bool = False,
+    n_samples: int = -1,
 ):
     """
     Main function to run the model evaluation pipeline.
     Can run either sequentially or in parallel with up to 4 workers.
+    
+    Args:
+        dataset_name: Name of the dataset to evaluate on
+        model_name: Name of the model to evaluate
+        prompt_type: Type of prompt to use
+        api_key: API key for the model service
+        use_cache: Whether to use cached results from previous runs
+        parallel: Whether to run evaluation in parallel
+        n_samples: Number of samples to evaluate on (-1 for all samples)
     """
     start_time = time.time()
     run_timestamp = datetime.now()
@@ -223,11 +233,11 @@ def evaluate_model(
         print("`use_cache` is False. Starting from scratch.")
 
     if dataset_name == "medqa":
-        dataset = load_med_qa_dataset()
+        dataset = load_med_qa_dataset(n_samples=n_samples)
     elif dataset_name == "medmcqa":
-        dataset = load_med_mcqa_dataset(n_samples=1000)
+        dataset = load_med_mcqa_dataset(n_samples=n_samples)
     elif dataset_name == "uniadilr":
-        dataset = load_uniadilr_hgc_dataset()
+        dataset = load_uniadilr_hgc_dataset(n_samples=n_samples)
     else:
         raise ValueError(f"Dataset '{dataset_name}' not supported.")
 
@@ -313,11 +323,16 @@ def evaluate_model(
     print(f"Run summary saved to {run_details_file}")
 
 if __name__ == "__main__":
+    # Load config for test
+    with open("evaluate_sml/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    
     evaluate_model(
         dataset_name="uniadilr",
-        model_name="Qwen/Qwen3-32B",
+        model_name="Qwen3-32B",
         prompt_type="Chain of Thought",
-        api_key="hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB",
+        api_key=config["api"]["api_key"],
         use_cache=False,
-        parallel=True
+        parallel=True,
+        n_samples=10
     )

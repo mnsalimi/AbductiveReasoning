@@ -4,9 +4,10 @@ import yaml
 import os
 
 def full_experiment():
-    api_key = "sk-SVSNSJKVosankQ4kFjl1Qg"
     with open("evaluate_sml/config.yaml", "r") as f:
         config = yaml.safe_load(f)
+    
+    api_key = config["api"]["api_key"]
 
     for model_name, _ in config["models"].items():
         for dataset_name, dataset_config in config["datasets"].items():
@@ -19,7 +20,8 @@ def full_experiment():
                     prompt_type=prompt_type,
                     api_key=api_key,
                     use_cache=False,
-                    parallel=True
+                    parallel=True,
+                    n_samples=-1  # Use all samples by default
                 )
     
     for dataset_name, dataset_config in config["datasets"].items():
@@ -37,18 +39,3 @@ def full_experiment():
 
 if __name__ == "__main__":
     full_experiment()
-    
-
-# model = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
-# dataset_name = "medmcqa"
-# api_key = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
-
-# evaluate_model(
-#     dataset_name=dataset_name,
-#     model_name=model,
-#     prompt_type="Chain of Thought",
-#     api_key=api_key,
-#     use_cache=False
-# )
-
-# analyze_results("medmcqa", 2)

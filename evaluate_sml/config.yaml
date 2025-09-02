@@ -1,7 +1,14 @@
 sleep_time: 0.2
 
+# API Configuration
+api:
+  base_url: "https://gw.ai-platform.ir/v1/chat/completions"
+  api_key: "sk-SVSNSJKVosankQ4kFjl1Qg"
+  timeout: 20
+  retries: 3
+
 models:
-  Qwen/Qwen2.5-72B-Instruct:
+  DeepSeek-V3.1:
     thinking: false
     temperature: 0.7
     max_tokens_by_prompt_type:
@@ -9,19 +16,35 @@ models:
       "Chain of Thought": 2048
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048
-  meta-llama/Llama-4-Scout-17B-16E-Instruct:
-    thinking: false
-    temperature: 0.7
-    max_tokens_by_prompt_type:
-      "Only Final Answer": 256
-      "Chain of Thought": 2048
-      "Chain of Thought and Think Abductively": 2048
-      "Chain of Thought and Only Think Abductively": 2048
-  Qwen/Qwen3-32B:
+  Qwen3-32B:
     thinking: true
     temperature: 0.7
     max_tokens_by_prompt_type:
       "Only Final Answer": 1024
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  Qwen2.5-72B:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  gemma-3-27b-it:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  Llama4-Scout-17B-16E:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
       "Chain of Thought": 2048
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048

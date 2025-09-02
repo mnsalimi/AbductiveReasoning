@@ -1,6 +1,8 @@
 import requests
 import json
 import time
+import yaml
+import os
 
 def get_model_response(
     model_name: str,
@@ -8,8 +10,9 @@ def get_model_response(
     input_text: str,
     max_tokens: int,
     temperature: float,
-    retries: int = 3,
-    timeout: int = 20
+    retries: int = None,
+    timeout: int = None,
+    base_url: str = None
 ):
     """
     Sends a request to the specified model API and retrieves the response.
@@ -22,6 +25,7 @@ def get_model_response(
         temperature (float): The sampling temperature.
         retries (int): The number of times to retry the request in case of failure.
         timeout (int): The timeout for the request in seconds.
+        base_url (str): The base URL for the API endpoint.
 
     Returns:
         str: The content of the model's response.
@@ -29,7 +33,17 @@ def get_model_response(
     Raises:
         RuntimeError: If the request fails after all retries.
     """
-    url = "https://gw.ai-platform.ir/v1"
+    # Load config if parameters not provided
+    if retries is None or timeout is None or base_url is None:
+        config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+        
+        retries = retries or config["api"]["retries"]
+        timeout = timeout or config["api"]["timeout"]
+        base_url = base_url or config["api"]["base_url"]
+    
+    url = base_url
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -69,7 +83,12 @@ def get_model_response(
 
 
 if __name__ == "__main__":
-    MY_API_KEY = "hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB"
+    # Load config for test
+    config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    
+    MY_API_KEY = config["api"]["api_key"]
     MY_MODEL = "Qwen/Qwen3-32B"
     MY_PROMPT = "Hi! How are you?"
 

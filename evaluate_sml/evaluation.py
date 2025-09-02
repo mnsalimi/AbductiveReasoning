@@ -6,6 +6,8 @@ import time
 import shutil
 from datetime import datetime
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 from loader import load_med_qa_dataset, load_med_mcqa_dataset, load_uniadilr_hgc_dataset
 from api_handler import get_model_response
@@ -118,10 +120,12 @@ def evaluate_model(
     model_name: str, 
     prompt_type: str,
     api_key: str, 
-    use_cache: bool
+    use_cache: bool,
+    parallel: bool = False,
 ):
     """
-    Main function to run the model evaluation pipeline sequentially.
+    Main function to run the model evaluation pipeline.
+    Can run either sequentially or in parallel with up to 4 workers.
     """
     start_time = time.time()
     run_timestamp = datetime.now()
@@ -233,26 +237,47 @@ def evaluate_model(
     if not unprocessed_samples and cached_exp_dir_to_delete:
         print("All samples were processed in the cached run.")
     
-    progress_bar = tqdm(unprocessed_samples, desc="Processing Samples", unit="sample")
-    for sample, idx in progress_bar:
-        try:
-            result = process_sample(
-                sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name
-            )
-            
-            if result.get("error"):
-                tqdm.write(result["error"])
+    if parallel:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = {executor.submit(process_sample, sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name): (sample, idx) for sample, idx in unprocessed_samples}
+            for future in tqdm(as_completed(futures), desc="Processing Samples", unit="sample", total=len(unprocessed_samples)):
+                try:
+                    result = future.result()
+                    if result.get("error"):
+                        tqdm.write(result["error"])
+                    results.append(result)
 
-            results.append(result)
+                    result_to_write = result.copy()
+                    result_to_write.pop('error', None)
+                    
+                    with open(results_file, "a") as f:
+                        f.write(json.dumps(result_to_write) + "\n")
+                except Exception as exc:
+                    sample, idx = futures[future]
+                    tqdm.write(f'Sample {idx} generated an unhandled exception: {exc}')
 
-            result_to_write = result.copy()
-            result_to_write.pop('error', None)
-            
-            with open(results_file, "a") as f:
-                f.write(json.dumps(result_to_write) + "\n")
 
-        except Exception as exc:
-            tqdm.write(f'Sample {idx} generated an unhandled exception: {exc}')
+    else :
+        progress_bar = tqdm(unprocessed_samples, desc="Processing Samples", unit="sample")
+        for sample, idx in progress_bar:
+            try:
+                result = process_sample(
+                    sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name
+                )
+                
+                if result.get("error"):
+                    tqdm.write(result["error"])
+
+                results.append(result)
+
+                result_to_write = result.copy()
+                result_to_write.pop('error', None)
+                
+                with open(results_file, "a") as f:
+                    f.write(json.dumps(result_to_write) + "\n")
+
+            except Exception as exc:
+                tqdm.write(f'Sample {idx} generated an unhandled exception: {exc}')
 
     execution_time = time.time() - start_time
     
@@ -293,5 +318,6 @@ if __name__ == "__main__":
         model_name="Qwen/Qwen3-32B",
         prompt_type="Chain of Thought",
         api_key="hTQSRchoqsaXBEtFp4tG994VgvCVEaoBDuYTPUZTbYdhMFQ4Rc31xYWoHkRfxTAB",
-        use_cache=False
+        use_cache=False,
+        parallel=True
     )

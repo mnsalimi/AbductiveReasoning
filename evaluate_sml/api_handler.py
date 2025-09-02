@@ -29,7 +29,7 @@ def get_model_response(
     Raises:
         RuntimeError: If the request fails after all retries.
     """
-    url = "https://gw.ai-platform.ir/v1/chat/completions"
+    url = "https://gw.ai-platform.ir/v1"
 
     headers = {
         "Authorization": f"Bearer {api_key}",

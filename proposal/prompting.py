@@ -126,19 +126,21 @@ def _parse_context_and_question(dataset_name: str, sample: Dict[str, Any]) -> Tu
     else:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
 
-def _load_prompt_template(dataset_name: str, type: str):
+def _load_prompt_template(dataset_name: str, step: str, type: str):
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
     for prompt in config["datasets"][dataset_name]["prompts"]:
         if prompt["type"] == type:
-            return prompt["template"]
-    raise ValueError(f"No prompt template found for dataset {dataset_name}")
+            template_name = prompt["template"]
+            return config["prompt_templates"][template_name][step]
+    raise ValueError(f"No prompt template found for dataset {dataset_name}, step {step}, type {type}")
 
-def create_prompt_step1(dataset_name: str, sample: dict, type: str):
-    prompt_content = _load_prompt_template(dataset_name, type)
+def create_prompt_step1(dataset_name: str, sample: dict, type: str = "v1"):
+    prompt_content = _load_prompt_template(dataset_name, "step1", type)
     context, _ = _parse_context_and_question(dataset_name, sample)
     if dataset_name == "medqa":
         input_text = context + "\n" + prompt_content
     elif dataset_name == "uniadilr":
         input_text = str(context) + "\n" + prompt_content
+    return input_text
     

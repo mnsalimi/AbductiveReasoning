@@ -12,6 +12,8 @@ def full_experiment():
     api_key = config["api"]["api_key"]
 
     for model_name, _ in config["models"].items():
+        if model_name == "DeepSeek-V3.1":
+            continue
         for dataset_name, dataset_config in config["datasets"].items():
             for prompt in dataset_config["prompts"]:
                 prompt_type = prompt["type"]
@@ -23,7 +25,7 @@ def full_experiment():
                     api_key=api_key,
                     use_cache=False,
                     parallel=True,
-                    n_samples=-1  # Use all samples by default
+                    n_samples=2  # Use all samples by default
                 )
     
     # Analyze all experiments using the new directory structure

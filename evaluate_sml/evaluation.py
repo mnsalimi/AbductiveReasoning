@@ -141,7 +141,9 @@ def evaluate_model(
     start_time = time.time()
     run_timestamp = datetime.now()
 
-    with open("evaluate_sml/config.yaml", "r") as f:
+    # Find config.yaml relative to this file's location
+    config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     
     thinking = config["models"][model_name]["thinking"]
@@ -261,7 +263,9 @@ def evaluate_model(
         print("All samples were processed in the cached run.")
     
     if parallel:
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        # Load max_workers from config
+        max_workers = config["api"].get("max_workers", 3)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_sample, sample, idx, model_name, api_key, max_tokens, temperature, thinking, prompt_content, sleep_time, dataset_name): (sample, idx) for sample, idx in unprocessed_samples}
             for future in tqdm(as_completed(futures), desc="Processing Samples", unit="sample", total=len(unprocessed_samples)):
                 try:

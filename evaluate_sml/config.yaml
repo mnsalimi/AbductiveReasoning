@@ -1,11 +1,12 @@
-sleep_time: 0.2
+sleep_time: 0.1
 
 # API Configuration
 api:
   base_url: "https://gw.ai-platform.ir/v1/chat/completions"
   api_key: "sk-SVSNSJKVosankQ4kFjl1Qg"
-  timeout: 20
+  timeout: 30
   retries: 3
+  max_workers: 4
 
 models:
   DeepSeek-V3.1:

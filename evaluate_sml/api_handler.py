@@ -75,8 +75,9 @@ def get_model_response(
             print(f"Attempt {attempt + 1}/{retries} failed: {e}")
             last_exception = e
             if attempt < retries - 1:
-                # Exponential backoff with jitter
-                sleep_time = (2 ** attempt) + (0.1 * attempt)
+                # Linear backoff for timeout issues - less aggressive than exponential
+                sleep_time = config["api"].get("sleep_time", 0.5)
+                sleep_time = sleep_time + (2 * attempt)
                 time.sleep(sleep_time)
             # Remove the redundant 'else: continue' as the loop will continue naturally
 

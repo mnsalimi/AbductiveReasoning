@@ -16,8 +16,11 @@ def load_med_qa_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
         config = yaml.safe_load(f)
 
     file_path = config["datasets"]["medqa"]["file_path"]
+    # Make path relative to project root (parent of evaluate_sml)
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    absolute_file_path = os.path.join(project_root, file_path)
     dataset_samples = []
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(absolute_file_path, 'r', encoding='utf-8') as f:
         for line in f:
             dataset_samples.append(json.loads(line))
     if n_samples == -1:
@@ -58,8 +61,11 @@ def load_uniadilr_hgc_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
         config = yaml.safe_load(f)
 
     file_path = config["datasets"]["uniadilr"]["file_path"]
+    # Make path relative to project root (parent of evaluate_sml)
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    absolute_file_path = os.path.join(project_root, file_path)
     dataset_samples = []
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(absolute_file_path, 'r', encoding='utf-8') as f:
         for line in f:
             dataset_samples.append(json.loads(line))
     if n_samples == -1:

@@ -47,3 +47,5 @@ evaluate_sml/results/
 results/
 results/*
 results
+
+*.png

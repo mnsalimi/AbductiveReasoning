@@ -1,0 +1,123 @@
+sleep_time: 0.2
+
+# API Configuration
+api:
+  base_url: "https://gw.ai-platform.ir/v1/chat/completions"
+  api_key: "sk-SVSNSJKVosankQ4kFjl1Qg"
+  timeout: 20
+  retries: 3
+
+models:
+  DeepSeek-V3.1:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  Qwen3-32B:
+    thinking: true
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 1024
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  Qwen2.5-72B:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  gemma-3-27b-it:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+  Llama4-Scout-17B-16E:
+    thinking: false
+    temperature: 0.7
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+
+# Template definitions to reduce duplication
+prompt_templates:
+  medqa_template: |
+    You are a professional medical scientist and biologist.
+    You're given a medical context and background. 
+    You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
+    ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
+    Your output DAG should be in the exact following format:
+
+    <reasoning> your full reasoning comes here </reasoning>
+    <dag>
+    NODES: 
+    node1: node1_name
+    node2: node2_name
+    node3: node3_name
+    ...
+    node{last_node_number}: last_node_name
+    EDGES: 
+    edge1: node{i} -> node{j}
+    edge2: node{x} -> node{y}
+    edge3: node{z} -> node{w}
+    ...
+    edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
+    </dag>
+
+    ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
+    ** you should only output the DAG in the exact format above. No other text, no other format.
+    ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
+
+  uniadilr_template: |
+    You are a professional logician and reasoning master.
+      You're given some context and background sentences. 
+      You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
+      ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
+      Your output DAG should be in the exact following format:
+
+      <reasoning> your full reasoning comes here </reasoning>
+      <dag>
+      NODES: 
+      node1: node1_name
+      node2: node2_name
+      node3: node3_name
+      ...
+      node{last_node_number}: last_node_name
+      EDGES: 
+      edge1: node{i} -> node{j}
+      edge2: node{x} -> node{y}
+      edge3: node{z} -> node{w}
+      ...
+      edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
+      </dag>
+
+      ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
+      ** you should only output the DAG in the exact format above. No other text, no other format.
+      ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
+
+datasets:
+  medqa:
+    source: "https://github.com/jind11/MedQA"
+    file_path: "datasets/MedQA/phrases_no_exclude_test.jsonl"
+    prompts:
+      - type: "v1"
+        template: "medqa_template"
+        
+  uniadilr:
+    source: "https://github.com/YuSheng-00/UniADILR/tree/main/data/UniADILR-HGc"
+    file_path: "datasets/UniADILR-HGc/abduction.jsonl"
+    prompts:
+      - type: "v1"
+        template: "uniadilr_template"
+
+

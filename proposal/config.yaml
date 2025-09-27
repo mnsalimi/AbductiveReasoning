@@ -1,6 +1,5 @@
 sleep_time: 0.2
 
-# API Configuration
 api:
   base_url: "https://gw.ai-platform.ir/v1/chat/completions"
   api_key: "sk-SVSNSJKVosankQ4kFjl1Qg"
@@ -49,7 +48,6 @@ models:
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048
 
-# Template definitions to reduce duplication
 prompt_templates:
   medqa_template:
     step1: |
@@ -68,11 +66,11 @@ prompt_templates:
       <dag>
       NODES: 
       node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3)
+      node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
       node3: node3_name (binary)
-      node4: node4_name (categorical: mild, moderate, severe)
+      node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
       ...
-      node{last_node_number}: last_node_name (binary|categorical: categories)
+      node{last_node_number}: last_node_name (binary)
       EDGES: 
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}
@@ -101,7 +99,7 @@ prompt_templates:
       - Consider the specific answer choices to understand what diagnostic/reasoning paths are relevant
       - Identify any missing nodes that are medically relevant to the context and answer choices
       - Identify any missing edges (causal relationships) that should exist
-      - Add ONLY the missing nodes and edges (DO NOT delete or modify existing ones)
+      - Add ONLY the missing nodes and edges (YOU CANNOT delete or modify existing ones)
       - Ensure the refined schema is medically sound and comprehensive
       - For new nodes, specify if they are binary or categorical with their categories
 
@@ -111,11 +109,11 @@ prompt_templates:
       <refined_schema>
       NODES: 
       node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3)
+      node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
       node3: node3_name (binary)
-      node4: node4_name (categorical: mild, moderate, severe)
+      node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
       ...
-      node{last_node_number}: last_node_name (binary|categorical: categories)
+      node{last_node_number}: last_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
       EDGES: 
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}
@@ -148,11 +146,11 @@ prompt_templates:
         <dag>
         NODES: 
         node1: node1_name (binary)
-        node2: node2_name (categorical: category1, category2, category3)
+        node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
         node3: node3_name (binary)
-        node4: node4_name (categorical: low, medium, high)
+        node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
         ...
-        node{last_node_number}: last_node_name (binary|categorical: categories)
+        node{last_node_number}: last_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
         EDGES: 
         edge1: node{i} -> node{j}
         edge2: node{x} -> node{y}
@@ -179,7 +177,7 @@ prompt_templates:
       - Carefully analyze the existing BN Schema from Step 1
       - Identify any missing nodes that are logically relevant to the context
       - Identify any missing edges (causal relationships) that should exist
-      - Add ONLY the missing nodes and edges (DO NOT delete or modify existing ones)
+      - Add ONLY the missing nodes and edges (YOU CANNOT delete or modify existing ones)
       - Ensure the refined schema is logically sound and comprehensive
       - For new nodes, specify if they are binary or categorical with their categories
 
@@ -189,11 +187,11 @@ prompt_templates:
       <refined_schema>
       NODES: 
       node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3)
+      node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
       node3: node3_name (binary)
-      node4: node4_name (categorical: low, medium, high)
+      node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
       ...
-      node{last_node_number}: last_node_name (binary|categorical: categories)
+      node{last_node_number}: last_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
       EDGES: 
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}

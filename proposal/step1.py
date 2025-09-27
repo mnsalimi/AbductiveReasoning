@@ -1,7 +1,6 @@
 from prompting import create_prompt_step1, parse_model_answer_step1
 from api_handler import get_model_response
 import time
-import re
 
 def step1(sample, idx, model_name, api_key, max_tokens, temperature, thinking, sleep_time, dataset_name):
     """

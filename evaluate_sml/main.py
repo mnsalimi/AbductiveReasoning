@@ -12,11 +12,11 @@ def full_experiment():
     api_key = config["api"]["api_key"]
 
     for model_name, _ in config["models"].items():
-        if model_name == "DeepSeek-V3.1":
-            continue
         for dataset_name, dataset_config in config["datasets"].items():
             for prompt in dataset_config["prompts"]:
                 prompt_type = prompt["type"]
+                if prompt_type != "Chain of Thought":
+                    continue
                 print(f"Evaluating {dataset_name} with {model_name} and {prompt_type} ...")
                 evaluate_model(
                     dataset_name=dataset_name,

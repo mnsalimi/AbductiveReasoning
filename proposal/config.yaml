@@ -57,16 +57,22 @@ prompt_templates:
       You're given a medical context and background. 
       You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
       ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
+      
+      For each node, you must specify if it's binary or categorical:
+      - Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
+      - Categorical nodes: can have multiple specific categories/states
+      
       Your output DAG should be in the exact following format:
 
       <reasoning> your full reasoning comes here </reasoning>
       <dag>
       NODES: 
-      node1: node1_name
-      node2: node2_name
-      node3: node3_name
+      node1: node1_name (binary)
+      node2: node2_name (categorical: category1, category2, category3)
+      node3: node3_name (binary)
+      node4: node4_name (categorical: mild, moderate, severe)
       ...
-      node{last_node_number}: last_node_name
+      node{last_node_number}: last_node_name (binary|categorical: categories)
       EDGES: 
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}
@@ -76,8 +82,54 @@ prompt_templates:
       </dag>
 
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
+      ** for binary nodes: use format "node_name (binary)"
+      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
       ** you should only output the DAG in the exact format above. No other text, no other format.
       ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
+
+    step2: |
+      You are a professional medical scientist and biologist.
+      You previously created a Bayesian Network (BN) Schema representing causal relationships for a medical context. Now you need to refine and enhance this BN Schema by adding any missing nodes or edges that are necessary for a more complete representation.
+
+      You will be given:
+      1. The original medical context and question
+      2. The answer choices for the question
+      3. The BN Schema from Step 1
+
+      Your task is to:
+      - Carefully analyze the existing BN Schema from Step 1
+      - Consider the specific answer choices to understand what diagnostic/reasoning paths are relevant
+      - Identify any missing nodes that are medically relevant to the context and answer choices
+      - Identify any missing edges (causal relationships) that should exist
+      - Add ONLY the missing nodes and edges (DO NOT delete or modify existing ones)
+      - Ensure the refined schema is medically sound and comprehensive
+      - For new nodes, specify if they are binary or categorical with their categories
+
+      Your output should be in the exact following format:
+
+      <analysis> your detailed analysis of what is missing from the original BN Schema and why these additions are necessary </analysis>
+      <refined_schema>
+      NODES: 
+      node1: node1_name (binary)
+      node2: node2_name (categorical: category1, category2, category3)
+      node3: node3_name (binary)
+      node4: node4_name (categorical: mild, moderate, severe)
+      ...
+      node{last_node_number}: last_node_name (binary|categorical: categories)
+      EDGES: 
+      edge1: node{i} -> node{j}
+      edge2: node{x} -> node{y}
+      edge3: node{z} -> node{w}
+      ...
+      edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
+      </refined_schema>
+
+      ** the refined schema must include ALL nodes and edges from Step 1 PLUS any new additions
+      ** you are only allowed to ADD nodes/edges, never delete or modify existing ones
+      ** for binary nodes: use format "node_name (binary)"
+      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** the order of tags and nodes and edges must be strictly followed
+      ** obviously, all nodes mentioned in edges must be included in the NODES section
 
   uniadilr_template:
     step1: |
@@ -85,16 +137,22 @@ prompt_templates:
         You're given some context and background sentences. 
         You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
         ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
+        
+        For each node, you must specify if it's binary or categorical:
+        - Binary nodes: can only have two states (true/false, present/absent, yes/no)
+        - Categorical nodes: can have multiple specific categories/states
+        
         Your output DAG should be in the exact following format:
 
         <reasoning> your full reasoning comes here </reasoning>
         <dag>
         NODES: 
-        node1: node1_name
-        node2: node2_name
-        node3: node3_name
+        node1: node1_name (binary)
+        node2: node2_name (categorical: category1, category2, category3)
+        node3: node3_name (binary)
+        node4: node4_name (categorical: low, medium, high)
         ...
-        node{last_node_number}: last_node_name
+        node{last_node_number}: last_node_name (binary|categorical: categories)
         EDGES: 
         edge1: node{i} -> node{j}
         edge2: node{x} -> node{y}
@@ -104,8 +162,52 @@ prompt_templates:
         </dag>
 
         ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
+        ** for binary nodes: use format "node_name (binary)"
+        ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
         ** you should only output the DAG in the exact format above. No other text, no other format.
         ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
+
+    step2: |
+      You are a professional logician and reasoning master.
+      You previously created a Bayesian Network (BN) Schema representing causal relationships for a logical reasoning context. Now you need to refine and enhance this BN Schema by adding any missing nodes or edges that are necessary for a more complete representation.
+
+      You will be given:
+      1. The original logical context and hypothesis
+      2. The BN Schema from Step 1
+
+      Your task is to:
+      - Carefully analyze the existing BN Schema from Step 1
+      - Identify any missing nodes that are logically relevant to the context
+      - Identify any missing edges (causal relationships) that should exist
+      - Add ONLY the missing nodes and edges (DO NOT delete or modify existing ones)
+      - Ensure the refined schema is logically sound and comprehensive
+      - For new nodes, specify if they are binary or categorical with their categories
+
+      Your output should be in the exact following format:
+
+      <analysis> your detailed analysis of what is missing from the original BN Schema and why these additions are necessary </analysis>
+      <refined_schema>
+      NODES: 
+      node1: node1_name (binary)
+      node2: node2_name (categorical: category1, category2, category3)
+      node3: node3_name (binary)
+      node4: node4_name (categorical: low, medium, high)
+      ...
+      node{last_node_number}: last_node_name (binary|categorical: categories)
+      EDGES: 
+      edge1: node{i} -> node{j}
+      edge2: node{x} -> node{y}
+      edge3: node{z} -> node{w}
+      ...
+      edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
+      </refined_schema>
+
+      ** the refined schema must include ALL nodes and edges from Step 1 PLUS any new additions
+      ** you are only allowed to ADD nodes/edges, never delete or modify existing ones
+      ** for binary nodes: use format "node_name (binary)"
+      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** the order of tags and nodes and edges must be strictly followed
+      ** obviously, all nodes mentioned in edges must be included in the NODES section
 
 datasets:
   medqa:

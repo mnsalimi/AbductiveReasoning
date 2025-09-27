@@ -152,7 +152,7 @@ def _parse_refined_schema_content_strictly(schema_content: str) -> Tuple[Optiona
     return parsed_nodes, parsed_edges
 
 
-def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successful_api_call: bool, thinking: bool) -> str:
+def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successful_api_call: bool, thinking: bool) -> Dict[str, Any]:
     right_format = False
     extracted_reasoning = None
     parsed_nodes = None

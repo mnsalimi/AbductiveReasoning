@@ -136,38 +136,41 @@ prompt_templates:
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
       
-      You are given a Bayesian Network node and its context. Your task is to provide conditional probability distributions (CPDs) for this node given its parent nodes.
+      You are given a Bayesian Network node and a SPECIFIC condition of its parent nodes. Your task is to provide the conditional probability distribution for this node given this specific parent condition.
       
       You will be provided with:
       1. The target node information (name, type, possible states/categories)
       2. Parent nodes information (if any)
-      3. The original context that led to this Bayesian network
+      3. The SPECIFIC parent condition/states you need to analyze
+      4. The original context that led to this Bayesian network
       
-      For each possible combination of parent states, you need to estimate the conditional probability of each state of the target node.
+      For the given parent condition, you need to estimate the conditional probability of each state of the target node.
       
       IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
-      - "very_low" (for probabilities around 0.05 or less)
-      - "low" (for probabilities around 0.15-0.25)
-      - "moderate" (for probabilities around 0.35-0.5)
-      - "high" (for probabilities around 0.65-0.75)
-      - "very_high" (for probabilities around 0.85 or more)
+      - "very_low"
+      - "low"
+      - "moderate" 
+      - "high" 
+      - "very_high" 
       
       Your output must be in the exact following format:
       
-      <reasoning> your detailed reasoning about the conditional dependencies and probability estimates </reasoning>
-      <cpd>
+      <reasoning> your detailed reasoning about why this specific parent condition leads to these probability estimates for the target node </reasoning>
+      <cpd_row>
       NODE: target_node_name
-      PARENTS: parent1_name, parent2_name, ...
+      CONDITION: specific_parent_condition
       STATES: state1, state2, state3, ...
       
-      CONDITIONAL_PROBABILITIES:
-      parent1_state1, parent2_state1, ... => target_state1: probability_level, target_state2: probability_level, ...
-      parent1_state1, parent2_state2, ... => target_state1: probability_level, target_state2: probability_level, ...
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
       ...
-      </cpd>
+      </cpd_row>
       
-      ** For nodes with no parents, just provide: "NO_PARENTS => target_state1: probability_level, target_state2: probability_level, ..."
+      ** For root nodes with no parents, use: "CONDITION: NO_PARENTS"
       ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
+      ** Focus on this specific condition only - do not provide probabilities for other parent combinations
 
   uniadilr_template:
     step1: |
@@ -250,38 +253,41 @@ prompt_templates:
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
       
-      You are given a Bayesian Network node and its logical reasoning context. Your task is to provide conditional probability distributions (CPDs) for this node given its parent nodes.
+      You are given a Bayesian Network node and a SPECIFIC condition of its parent nodes. Your task is to provide the conditional probability distribution for this node given this specific parent condition based on logical reasoning principles.
       
       You will be provided with:
       1. The target node information (name, type, possible states/categories)
       2. Parent nodes information (if any)
-      3. The original logical context that led to this Bayesian network
+      3. The SPECIFIC parent condition/states you need to analyze
+      4. The original logical context that led to this Bayesian network
       
-      For each possible combination of parent states, you need to estimate the conditional probability of each state of the target node based on logical reasoning principles.
+      For the given parent condition, you need to estimate the conditional probability of each state of the target node based on logical reasoning principles.
       
       IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
-      - "very_low" (for probabilities around 0.05 or less)
-      - "low" (for probabilities around 0.15-0.25)
-      - "moderate" (for probabilities around 0.35-0.5)
-      - "high" (for probabilities around 0.65-0.75)
-      - "very_high" (for probabilities around 0.85 or more)
+      - "very_low" 
+      - "low"
+      - "moderate" 
+      - "high" 
+      - "very_high"
       
       Your output must be in the exact following format:
       
-      <reasoning> your detailed reasoning about the conditional dependencies and probability estimates based on logical principles </reasoning>
-      <cpd>
+      <reasoning> your detailed reasoning about why this specific parent condition leads to these probability estimates for the target node based on logical principles </reasoning>
+      <cpd_row>
       NODE: target_node_name
-      PARENTS: parent1_name, parent2_name, ...
+      CONDITION: specific_parent_condition
       STATES: state1, state2, state3, ...
       
-      CONDITIONAL_PROBABILITIES:
-      parent1_state1, parent2_state1, ... => target_state1: probability_level, target_state2: probability_level, ...
-      parent1_state1, parent2_state2, ... => target_state1: probability_level, target_state2: probability_level, ...
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
       ...
-      </cpd>
+      </cpd_row>
       
-      ** For nodes with no parents, just provide: "NO_PARENTS => target_state1: probability_level, target_state2: probability_level, ..."
+      ** For root nodes with no parents, use: "CONDITION: NO_PARENTS"
       ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
+      ** Focus on this specific condition only - do not provide probabilities for other parent combinations
 
 datasets:
   medqa:

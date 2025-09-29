@@ -15,6 +15,7 @@ models:
       "Chain of Thought": 2048
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048
+      "CPT Creation": 1024
   Qwen3-32B:
     thinking: true
     temperature: 0.7
@@ -31,6 +32,7 @@ models:
       "Chain of Thought": 2048
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048
+      "CPT Creation": 1024
   gemma-3-27b-it:
     thinking: false
     temperature: 0.7
@@ -39,6 +41,7 @@ models:
       "Chain of Thought": 2048
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048
+      "CPT Creation": 1024
   Llama4-Scout-17B-16E:
     thinking: false
     temperature: 0.7
@@ -47,6 +50,7 @@ models:
       "Chain of Thought": 2048
       "Chain of Thought and Think Abductively": 2048
       "Chain of Thought and Only Think Abductively": 2048
+      "CPT Creation": 1024
 
 prompt_templates:
   medqa_template:
@@ -129,6 +133,42 @@ prompt_templates:
       ** the order of tags and nodes and edges must be strictly followed
       ** obviously, all nodes mentioned in edges must be included in the NODES section
 
+    step4: |
+      You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
+      
+      You are given a Bayesian Network node and its context. Your task is to provide conditional probability distributions (CPDs) for this node given its parent nodes.
+      
+      You will be provided with:
+      1. The target node information (name, type, possible states/categories)
+      2. Parent nodes information (if any)
+      3. The original context that led to this Bayesian network
+      
+      For each possible combination of parent states, you need to estimate the conditional probability of each state of the target node.
+      
+      IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
+      - "very_low" (for probabilities around 0.05 or less)
+      - "low" (for probabilities around 0.15-0.25)
+      - "moderate" (for probabilities around 0.35-0.5)
+      - "high" (for probabilities around 0.65-0.75)
+      - "very_high" (for probabilities around 0.85 or more)
+      
+      Your output must be in the exact following format:
+      
+      <reasoning> your detailed reasoning about the conditional dependencies and probability estimates </reasoning>
+      <cpd>
+      NODE: target_node_name
+      PARENTS: parent1_name, parent2_name, ...
+      STATES: state1, state2, state3, ...
+      
+      CONDITIONAL_PROBABILITIES:
+      parent1_state1, parent2_state1, ... => target_state1: probability_level, target_state2: probability_level, ...
+      parent1_state1, parent2_state2, ... => target_state1: probability_level, target_state2: probability_level, ...
+      ...
+      </cpd>
+      
+      ** For nodes with no parents, just provide: "NO_PARENTS => target_state1: probability_level, target_state2: probability_level, ..."
+      ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
+
   uniadilr_template:
     step1: |
       You are a professional logician and reasoning master.
@@ -205,7 +245,43 @@ prompt_templates:
       ** for binary nodes: use format "node_name (binary)"
       ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
       ** the order of tags and nodes and edges must be strictly followed
-      ** obviously, all nodes mentioned in edges must be included in the NODES section
+        ** obviously, all nodes mentioned in edges must be included in the NODES section
+
+    step4: |
+      You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
+      
+      You are given a Bayesian Network node and its logical reasoning context. Your task is to provide conditional probability distributions (CPDs) for this node given its parent nodes.
+      
+      You will be provided with:
+      1. The target node information (name, type, possible states/categories)
+      2. Parent nodes information (if any)
+      3. The original logical context that led to this Bayesian network
+      
+      For each possible combination of parent states, you need to estimate the conditional probability of each state of the target node based on logical reasoning principles.
+      
+      IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
+      - "very_low" (for probabilities around 0.05 or less)
+      - "low" (for probabilities around 0.15-0.25)
+      - "moderate" (for probabilities around 0.35-0.5)
+      - "high" (for probabilities around 0.65-0.75)
+      - "very_high" (for probabilities around 0.85 or more)
+      
+      Your output must be in the exact following format:
+      
+      <reasoning> your detailed reasoning about the conditional dependencies and probability estimates based on logical principles </reasoning>
+      <cpd>
+      NODE: target_node_name
+      PARENTS: parent1_name, parent2_name, ...
+      STATES: state1, state2, state3, ...
+      
+      CONDITIONAL_PROBABILITIES:
+      parent1_state1, parent2_state1, ... => target_state1: probability_level, target_state2: probability_level, ...
+      parent1_state1, parent2_state2, ... => target_state1: probability_level, target_state2: probability_level, ...
+      ...
+      </cpd>
+      
+      ** For nodes with no parents, just provide: "NO_PARENTS => target_state1: probability_level, target_state2: probability_level, ..."
+      ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
 
 datasets:
   medqa:

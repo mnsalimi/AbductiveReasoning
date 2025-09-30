@@ -1,5 +1,8 @@
 import time
+import os
 from typing import Dict, Any, Optional, List, Tuple
+import matplotlib.pyplot as plt
+import networkx as nx
 
 def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_time: float = 0.0) -> Dict[str, Any]:
     """
@@ -352,3 +355,118 @@ def _has_cycles(registered_dag: Dict[str, Any]) -> bool:
                 return True
     
     return False
+
+
+def plot_dag(registered_dag: Dict[str, Any], output_path: str, sample_idx: int = 0) -> None:
+    """
+    Plot the registered DAG and save it to a file.
+    
+    Args:
+        registered_dag: The registered DAG structure from step3
+        output_path: Path where to save the plot (without extension)
+        sample_idx: Index of the sample being processed
+    """
+    from matplotlib.patches import FancyArrowPatch, Patch
+    import numpy as np
+    
+    # Create a directed graph
+    G = nx.DiGraph()
+    
+    # Add nodes with their names
+    node_labels = {}
+    node_colors = []
+    
+    for node_id, node_info in registered_dag["nodes"].items():
+        G.add_node(node_id)
+        node_labels[node_id] = f"{node_info['name']}\n({node_info['type']})"
+        
+        # Color nodes based on type
+        if node_info['type'] == 'binary':
+            node_colors.append('#87CEEB')  # Sky blue for binary
+        else:
+            node_colors.append('#FFB347')  # Orange for categorical
+    
+    # Add edges
+    for edge_info in registered_dag["edges"]:
+        G.add_edge(edge_info["source"], edge_info["target"])
+    
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(18, 14))
+    
+    # Use hierarchical layout for DAG visualization
+    try:
+        # Try to use a hierarchical layout if possible
+        pos = nx.spring_layout(G, k=3, iterations=100, seed=42)
+    except:
+        pos = nx.circular_layout(G)
+    
+    # Draw nodes
+    node_size = 4000
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_size, 
+                          alpha=0.9, edgecolors='black', linewidths=2.5, ax=ax)
+    
+    # Draw labels
+    nx.draw_networkx_labels(G, pos, node_labels, font_size=9, font_weight='bold', ax=ax)
+    
+    # Draw edges manually with proper arrow positioning
+    # Calculate node radius in data coordinates
+    node_radius = 0.08  # Approximate radius based on node_size
+    
+    for edge in G.edges():
+        source, target = edge
+        x1, y1 = pos[source]
+        x2, y2 = pos[target]
+        
+        # Calculate direction vector
+        dx = x2 - x1
+        dy = y2 - y1
+        dist = np.sqrt(dx**2 + dy**2)
+        
+        if dist > 0:
+            # Normalize direction
+            dx_norm = dx / dist
+            dy_norm = dy / dist
+            
+            # Adjust start and end points to be outside the nodes
+            x1_adj = x1 + dx_norm * node_radius
+            y1_adj = y1 + dy_norm * node_radius
+            x2_adj = x2 - dx_norm * node_radius
+            y2_adj = y2 - dy_norm * node_radius
+            
+            # Draw arrow
+            arrow = FancyArrowPatch(
+                (x1_adj, y1_adj), (x2_adj, y2_adj),
+                arrowstyle='-|>',
+                mutation_scale=30,
+                linewidth=2.5,
+                color='#333333',
+                alpha=0.7,
+                connectionstyle='arc3,rad=0.15',
+                zorder=1
+            )
+            ax.add_patch(arrow)
+    
+    # Add title and legend
+    plt.title(f"Bayesian Network DAG - Sample {sample_idx}\n"
+             f"Nodes: {registered_dag['num_nodes']}, Edges: {registered_dag['num_edges']}", 
+             fontsize=16, fontweight='bold', pad=20)
+    
+    # Create legend
+    legend_elements = [
+        Patch(facecolor='#87CEEB', edgecolor='black', label='Binary Node'),
+        Patch(facecolor='#FFB347', edgecolor='black', label='Categorical Node')
+    ]
+    plt.legend(handles=legend_elements, loc='upper right', fontsize=12, framealpha=0.9)
+    
+    ax.axis('off')
+    plt.tight_layout()
+    
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Save the figure
+    plt.savefig(f"{output_path}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{output_path}.pdf", bbox_inches='tight')
+    plt.close()
+    
+    print(f"  💾 DAG visualization saved to: {output_path}.png and {output_path}.pdf")

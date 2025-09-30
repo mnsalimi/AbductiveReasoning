@@ -563,7 +563,9 @@ def _get_node_states(node_info: Dict[str, Any]) -> List[str]:
     if node_info["type"] == "binary":
         return ["yes", "no"]  # Standard binary states
     elif node_info["type"] == "categorical":
-        return node_info.get("categories", [])
+        categories = node_info.get("categories", [])
+        # Ensure we always return a list, even if categories is False or None
+        return categories if isinstance(categories, list) and categories else []
     else:
         return ["unknown"]
 

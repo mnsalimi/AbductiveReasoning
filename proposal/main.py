@@ -3,7 +3,7 @@ import os
 from loader import load_med_qa_dataset, load_uniadilr_hgc_dataset
 from step1 import step1
 from step2 import step2
-from step3 import step3
+from step3 import step3, plot_dag
 from step4 import step4
 from step5 import step5
 from step6 import step6
@@ -30,7 +30,7 @@ def main():
     # Configuration parameters
     model_name = "Llama4-Scout-17B-16E"
     dataset_name = "medqa"  # or "uniadilr"
-    n_samples = 1
+    n_samples = 2
     
     # Get model-specific configuration
     model_config = config["models"][model_name]
@@ -56,13 +56,15 @@ def main():
     
     # Process each sample through the complete pipeline
     for idx, sample in enumerate(dataset):
+        if idx==0:
+            continue
         print_separator(f"PROCESSING SAMPLE {idx + 1}/{len(dataset)}")
         
         # Print sample information
         print("📄 SAMPLE INFORMATION:")
         if dataset_name == "medqa":
-            print("Context:",sample["question"].replace(sample["question"].split(".")[-1], "")[:200])
-            print("Question:",sample["question"].split(".")[-1][:200])
+            print(f"  Context: {sample.get('context', '')[:200]}...")
+            print(f"  Question: {sample.get('question', '')[:200]}...")
             print(f"  Correct Answer: {sample.get('answer_idx', 'N/A')}")
         else:
             print(f"  Context: {sample.get('context', '')[:200]}...")
@@ -126,6 +128,11 @@ def main():
             validation = step3_result.get("validation_result", {})
             if validation.get("warnings"):
                 print(f"  ⚠️  Warnings: {len(validation['warnings'])}")
+            
+            # Plot and save the DAG visualization
+            output_dir = os.path.join(os.path.dirname(__file__), "dag_visualizations", dataset_name, model_name)
+            output_path = os.path.join(output_dir, f"dag_sample_{idx}")
+            plot_dag(dag, output_path, idx)
         else:
             print(f"✗ Step 3 failed: {step3_result.get('error', 'Unknown error')}")
             continue

@@ -3,6 +3,7 @@ tqdm
 PyYAML
 scikit-learn
 matplotlib
+networkx
 statsmodels
 seaborn
 jinja2

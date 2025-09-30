@@ -1,5 +1,6 @@
 import time
 import statistics
+import traceback
 from typing import Dict, Any, List, Tuple, Optional, Set
 import itertools
 
@@ -92,6 +93,12 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
         }
         
     except Exception as e:
+        print("\n" + "="*80)
+        print("ERROR IN STEP 5 - FULL TRACEBACK:")
+        print("="*80)
+        traceback.print_exc()
+        print("="*80 + "\n")
+        
         return {
             "raw_data": sample,
             "successful_api_call": True,  # Previous steps succeeded
@@ -126,23 +133,37 @@ def _construct_bayesian_network(cpts: Dict[str, Any], step4_result: Dict[str, An
     # Create node registry with enhanced information
     nodes = {}
     for node_id, cpt in cpts.items():
-        node_data = registered_dag["nodes"][node_id]
-        
-        # Create comprehensive node structure
-        nodes[node_id] = {
-            "id": node_id,
-            "name": cpt["node_name"],
-            "type": cpt["node_type"],
-            "states": cpt["states"],
-            "state_count": len(cpt["states"]),
-            "index": node_data["index"],
-            "parents": _extract_parent_info(cpt, registered_dag),
-            "children": _extract_children_info(node_id, registered_dag),
-            "cpt": cpt["numerical_cpt"],
-            "cpt_shape": _calculate_cpt_shape(cpt),
-            "is_root": len(registered_dag["adjacency_list"][node_id]["parents"]) == 0,
-            "is_leaf": len(registered_dag["adjacency_list"][node_id]["children"]) == 0
-        }
+        try:
+            node_data = registered_dag["nodes"][node_id]
+            
+            # Debug: Check CPT states
+            if not isinstance(cpt["states"], list):
+                raise ValueError(f"CPT states is not a list! Type: {type(cpt['states'])}, Value: {cpt['states']}")
+            
+            # Create comprehensive node structure
+            nodes[node_id] = {
+                "id": node_id,
+                "name": cpt["node_name"],
+                "type": cpt["node_type"],
+                "states": cpt["states"],
+                "state_count": len(cpt["states"]),
+                "index": node_data["index"],
+                "parents": _extract_parent_info(cpt, registered_dag),
+                "children": _extract_children_info(node_id, registered_dag),
+                "cpt": cpt["numerical_cpt"],
+                "cpt_shape": _calculate_cpt_shape(cpt),
+                "is_root": len(registered_dag["adjacency_list"][node_id]["parents"]) == 0,
+                "is_leaf": len(registered_dag["adjacency_list"][node_id]["children"]) == 0
+            }
+        except Exception as e:
+            print(f"\n{'='*80}")
+            print(f"ERROR constructing node {node_id} ({cpt.get('node_name', 'unknown')})")
+            print(f"Node type: {cpt.get('node_type', 'unknown')}")
+            print(f"CPT states: {cpt.get('states', 'N/A')} (type: {type(cpt.get('states', 'N/A'))})")
+            print(f"DAG node data: {node_data}")
+            print(f"Original error: {e}")
+            print(f"{'='*80}\n")
+            raise ValueError(f"Failed to construct node {node_id} ({cpt.get('node_name', 'unknown')}). Error: {e}")
     
     # Create edge information with probability implications
     edges = _construct_network_edges(registered_dag, nodes)
@@ -177,20 +198,31 @@ def _construct_bayesian_network(cpts: Dict[str, Any], step4_result: Dict[str, An
 def _extract_parent_info(cpt: Dict[str, Any], registered_dag: Dict[str, Any]) -> Dict[str, Any]:
     """Extract and organize parent information for a node."""
     node_id = cpt["node_id"]
-    parent_ids = registered_dag["adjacency_list"][node_id]["parents"]
     
-    if not parent_ids:
+    # Handle the parent info structure from Step 4
+    cpt_parent_info = cpt.get("parents", {})
+    
+    # Step 4 uses structure: {"has_parents": bool, "parents": {...}}
+    if isinstance(cpt_parent_info, dict) and "has_parents" in cpt_parent_info:
+        has_parents = cpt_parent_info["has_parents"]
+        cpt_parents_dict = cpt_parent_info.get("parents", {})
+    else:
+        # Fallback for direct dict format
+        has_parents = bool(cpt_parent_info)
+        cpt_parents_dict = cpt_parent_info
+    
+    if not has_parents or not cpt_parents_dict:
         return {}
     
+    # Use the parent information from the CPT which already has states
     parents = {}
-    for parent_id in parent_ids:
-        parent_node = registered_dag["nodes"][parent_id]
+    for parent_id, parent_data in cpt_parents_dict.items():
         parents[parent_id] = {
             "id": parent_id,
-            "name": parent_node["name"],
-            "type": parent_node["type"],
-            "states": _get_node_states_from_dag(parent_node),
-            "index": parent_node["index"]
+            "name": parent_data["name"],
+            "type": parent_data["type"],
+            "states": parent_data["states"],
+            "index": registered_dag["nodes"][parent_id]["index"]
         }
     
     return parents
@@ -206,11 +238,16 @@ def _extract_children_info(node_id: str, registered_dag: Dict[str, Any]) -> Dict
     children = {}
     for child_id in child_ids:
         child_node = registered_dag["nodes"][child_id]
+        try:
+            states = _get_node_states_from_dag(child_node)
+        except Exception as e:
+            raise ValueError(f"Failed to get states for child node {child_id} ({child_node.get('name', 'unknown')}): {e}. Node info: {child_node}")
+        
         children[child_id] = {
             "id": child_id,
             "name": child_node["name"],
             "type": child_node["type"],
-            "states": _get_node_states_from_dag(child_node),
+            "states": states,
             "index": child_node["index"]
         }
     
@@ -222,26 +259,63 @@ def _get_node_states_from_dag(node_info: Dict[str, Any]) -> List[str]:
     if node_info["type"] == "binary":
         return ["yes", "no"]
     elif node_info["type"] == "categorical":
-        return node_info.get("categories", [])
+        categories = node_info.get("categories", [])
+        # Ensure we always return a list, even if categories is False or None
+        return categories if isinstance(categories, list) and categories else []
     else:
         return ["unknown"]
 
 
 def _calculate_cpt_shape(cpt: Dict[str, Any]) -> Tuple[int, ...]:
     """Calculate the shape of the CPT tensor."""
-    if not cpt.get("parents"):
-        # Root node - just the number of states
-        return (len(cpt["states"]),)
-    
-    # Get parent state counts
-    parent_shapes = []
-    for parent_info in cpt["parents"].values():
-        parent_shapes.append(len(parent_info["states"]))
-    
-    # Add target node states
-    parent_shapes.append(len(cpt["states"]))
-    
-    return tuple(parent_shapes)
+    try:
+        # Handle the parent info structure from Step 4
+        parent_info = cpt.get("parents", {})
+        
+        # Step 4 uses structure: {"has_parents": bool, "parents": {...}}
+        # We need to extract the actual parents dict
+        if isinstance(parent_info, dict) and "has_parents" in parent_info:
+            has_parents = parent_info["has_parents"]
+            parents_dict = parent_info.get("parents", {})
+        else:
+            # Fallback for direct dict format
+            has_parents = bool(parent_info)
+            parents_dict = parent_info
+        
+        if not has_parents or not parents_dict:
+            # Root node - just the number of states
+            states = cpt["states"]
+            if not isinstance(states, list):
+                raise TypeError(f"CPT states is not a list! Type: {type(states)}, Value: {states}")
+            return (len(states),)
+        
+        # Get parent state counts
+        parent_shapes = []
+        for parent_id, parent_data in parents_dict.items():
+            parent_states = parent_data["states"]
+            if not isinstance(parent_states, list):
+                raise TypeError(f"Parent {parent_id} states is not a list! Type: {type(parent_states)}, Value: {parent_states}")
+            parent_shapes.append(len(parent_states))
+        
+        # Add target node states
+        states = cpt["states"]
+        if not isinstance(states, list):
+            raise TypeError(f"CPT states is not a list! Type: {type(states)}, Value: {states}")
+        parent_shapes.append(len(states))
+        
+        return tuple(parent_shapes)
+    except Exception as e:
+        print(f"\n{'='*80}")
+        print(f"ERROR in _calculate_cpt_shape for node {cpt.get('node_id', 'unknown')} ({cpt.get('node_name', 'unknown')})")
+        print(f"CPT structure:")
+        print(f"  - node_id: {cpt.get('node_id', 'N/A')}")
+        print(f"  - node_name: {cpt.get('node_name', 'N/A')}")
+        print(f"  - node_type: {cpt.get('node_type', 'N/A')}")
+        print(f"  - states: {cpt.get('states', 'N/A')} (type: {type(cpt.get('states', 'N/A'))})")
+        print(f"  - parents structure: {cpt.get('parents', 'N/A')}")
+        print(f"Original error: {e}")
+        print(f"{'='*80}\n")
+        raise
 
 
 def _construct_network_edges(registered_dag: Dict[str, Any], nodes: Dict[str, Any]) -> List[Dict[str, Any]]:

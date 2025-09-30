@@ -12,7 +12,7 @@ def load_med_qa_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
     """
     # Find config.yaml relative to this file's location
     config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     file_path = config["datasets"]["medqa"]["file_path"]
@@ -36,7 +36,7 @@ def load_med_mcqa_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
     """
     # Find config.yaml relative to this file's location
     config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     hf_path = config["datasets"]["medmcqa"]["hf_path"]
@@ -57,7 +57,7 @@ def load_uniadilr_hgc_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
     """
     # Find config.yaml relative to this file's location
     config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     file_path = config["datasets"]["uniadilr"]["file_path"]

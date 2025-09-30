@@ -143,7 +143,7 @@ def evaluate_model(
 
     # Find config.yaml relative to this file's location
     config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     
     thinking = config["models"][model_name]["thinking"]
@@ -334,7 +334,7 @@ def evaluate_model(
 if __name__ == "__main__":
     # Load config for test
     config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     
     evaluate_model(

@@ -61,8 +61,8 @@ def main():
         # Print sample information
         print("📄 SAMPLE INFORMATION:")
         if dataset_name == "medqa":
-            print(f"  Context: {sample.get('context', '')[:200]}...")
-            print(f"  Question: {sample.get('question', '')[:200]}...")
+            print("Context:",sample["question"].replace(sample["question"].split(".")[-1], "")[:200])
+            print("Question:",sample["question"].split(".")[-1][:200])
             print(f"  Correct Answer: {sample.get('answer_idx', 'N/A')}")
         else:
             print(f"  Context: {sample.get('context', '')[:200]}...")

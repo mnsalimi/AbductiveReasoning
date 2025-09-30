@@ -36,7 +36,7 @@ def get_model_response(
     # Load config if parameters not provided
     if retries is None or timeout is None or base_url is None:
         config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
         
         retries = retries or config["api"]["retries"]
@@ -86,7 +86,7 @@ def get_model_response(
 if __name__ == "__main__":
     # Load config for test
     config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     
     MY_API_KEY = config["api"]["api_key"]

@@ -26,6 +26,7 @@ def step2(sample, idx, model_name, api_key, max_tokens, temperature, thinking, s
 
     # Check if step1 was successful and has a valid format
     if not step1_result.get("successful_api_call") or not step1_result.get("right_format"):
+        print(f"successful_api_call: {step1_result.get('successful_api_call')}, right_format: {step1_result.get('right_format')}")
         return {
             "raw_data": sample,
             "successful_api_call": False,

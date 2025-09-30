@@ -1,6 +1,7 @@
 import yaml
 from typing import Dict, Any, Tuple
 import re
+import os
 
 import re
 from typing import Dict, Any, Optional, Tuple
@@ -252,7 +253,8 @@ def _get_answer_choices(dataset_name: str, sample: Dict[str, Any]) -> str:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
 
 def _load_prompt_template(dataset_name: str, step: str, type: str):
-    with open("config.yaml", "r") as f:
+    config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+    with open("config.yaml", "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     for prompt in config["datasets"][dataset_name]["prompts"]:
         if prompt["type"] == type:

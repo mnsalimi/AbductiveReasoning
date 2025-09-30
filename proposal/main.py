@@ -30,7 +30,7 @@ def main():
     # Configuration parameters
     model_name = "Llama4-Scout-17B-16E"
     dataset_name = "medqa"  # or "uniadilr"
-    n_samples = 2
+    n_samples = 1
     
     # Get model-specific configuration
     model_config = config["models"][model_name]

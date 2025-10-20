@@ -64,14 +64,21 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
         }
     
     try:
+        print(f"\n  🏗️  Constructing Bayesian Network from {len(cpts)} CPTs...")
+        
         # Construct the Bayesian Network
         bayesian_network = _construct_bayesian_network(cpts, step4_result)
+        
+        print(f"      ✅ Network structure built successfully")
+        print(f"      🔍 Validating network...")
         
         # Validate the constructed network
         validation_result = _validate_bayesian_network(bayesian_network)
         
         if not validation_result["is_valid"]:
-            raise ValueError(f"Bayesian Network validation failed: {validation_result['errors']}")
+            # Format detailed error message
+            error_msg = _format_network_validation_error(validation_result, bayesian_network, step4_result)
+            raise ValueError(error_msg)
         
         # Create metadata about the network
         network_metadata = _create_network_metadata(bayesian_network, step4_result)
@@ -116,6 +123,89 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
         }
 
 
+def _format_network_validation_error(validation_result: Dict[str, Any], bayesian_network: Dict[str, Any],
+                                    step4_result: Dict[str, Any]) -> str:
+    """
+    Format a detailed error message for Bayesian Network validation failure.
+    
+    Args:
+        validation_result: Result from _validate_bayesian_network
+        bayesian_network: The network that failed validation
+        step4_result: Result from step4 for context
+        
+    Returns:
+        str: Formatted error message with full context
+    """
+    lines = ["\n" + "="*80]
+    lines.append("BAYESIAN NETWORK VALIDATION FAILED")
+    lines.append("="*80)
+    
+    # Show the errors
+    errors = validation_result.get("errors", [])
+    warnings = validation_result.get("warnings", [])
+    
+    lines.append(f"\nFound {len(errors)} error(s) and {len(warnings)} warning(s):\n")
+    
+    if errors:
+        lines.append("ERRORS:")
+        for i, error in enumerate(errors, 1):
+            lines.append(f"  {i}. {error}")
+    
+    if warnings:
+        lines.append("\nWARNINGS:")
+        for i, warning in enumerate(warnings, 1):
+            lines.append(f"  {i}. {warning}")
+    
+    # Show network statistics
+    lines.append("\n" + "-"*80)
+    lines.append("NETWORK STATISTICS:")
+    lines.append("-"*80)
+    
+    nodes = bayesian_network.get("nodes", {})
+    edges = bayesian_network.get("edges", [])
+    network_props = bayesian_network.get("network_properties", {})
+    
+    lines.append(f"Total nodes: {len(nodes)}")
+    lines.append(f"Total edges: {len(edges)}")
+    lines.append(f"Root nodes: {len(network_props.get('root_nodes', []))}")
+    lines.append(f"Leaf nodes: {len(network_props.get('leaf_nodes', []))}")
+    lines.append(f"Max parents: {network_props.get('max_parents', 0)}")
+    lines.append(f"Total parameters: {network_props.get('total_parameters', 0)}")
+    
+    # Show problematic nodes
+    lines.append("\n" + "-"*80)
+    lines.append("NODE DETAILS:")
+    lines.append("-"*80)
+    
+    for node_id, node in nodes.items():
+        # Check if this node has issues
+        has_issues = any(node_id in str(error) for error in errors)
+        status = "❌" if has_issues else "✅"
+        
+        lines.append(f"\n{status} {node_id}: '{node['name']}' ({node['type']})")
+        lines.append(f"   States: {node.get('states', [])}")
+        lines.append(f"   Parents: {len(node.get('parents', {}))}")
+        lines.append(f"   Children: {len(node.get('children', {}))}")
+        lines.append(f"   CPT shape: {node.get('cpt_shape', 'N/A')}")
+        
+        # Show CPT info
+        cpt = node.get('cpt', {})
+        if cpt:
+            lines.append(f"   CPT entries: {len(cpt)}")
+            # Check for problematic CPT entries
+            for condition, probs in cpt.items():
+                if isinstance(probs, dict):
+                    prob_sum = sum(probs.values())
+                    if abs(prob_sum - 1.0) > 0.01:
+                        lines.append(f"   ⚠️  CPT row {condition} sums to {prob_sum:.4f} (not 1.0)")
+        else:
+            lines.append(f"   ❌ NO CPT DATA!")
+    
+    lines.append("="*80 + "\n")
+    
+    return "\n".join(lines)
+
+
 def _construct_bayesian_network(cpts: Dict[str, Any], step4_result: Dict[str, Any]) -> Dict[str, Any]:
     """
     Construct a complete Bayesian Network from CPTs.
@@ -130,9 +220,11 @@ def _construct_bayesian_network(cpts: Dict[str, Any], step4_result: Dict[str, An
     # Get the original DAG structure from step3
     registered_dag = step4_result["step3_result"]["registered_dag"]
     
+    print(f"      Building network nodes from {len(cpts)} CPTs...")
+    
     # Create node registry with enhanced information
     nodes = {}
-    for node_id, cpt in cpts.items():
+    for node_idx, (node_id, cpt) in enumerate(cpts.items(), 1):
         try:
             node_data = registered_dag["nodes"][node_id]
             

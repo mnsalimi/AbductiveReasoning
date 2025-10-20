@@ -54,7 +54,9 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
         validation_result = _validate_registered_dag(registered_dag)
         
         if not validation_result["is_valid"]:
-            raise ValueError(f"DAG validation failed: {validation_result['errors']}")
+            # Format a detailed error message
+            error_msg = _format_validation_error(validation_result, registered_dag, step2_result)
+            raise ValueError(error_msg)
         
         return {
             "raw_data": sample,
@@ -99,9 +101,16 @@ def _register_dag_structure(model_answer: Dict[str, Any]) -> Dict[str, Any]:
     nodes = model_answer.get("nodes", [])
     edges = model_answer.get("edges", [])
     
+    print(f"\n  📋 Registering DAG structure:")
+    print(f"    Total nodes to register: {len(nodes)}")
+    print(f"    Total edges to register: {len(edges)}")
+    
     # Create node registry with proper indexing
     node_registry = {}
     indexed_nodes = {}
+    
+    binary_count = 0
+    categorical_count = 0
     
     for i, node in enumerate(nodes):
         node_id = f"node{i+1}"
@@ -115,6 +124,14 @@ def _register_dag_structure(model_answer: Dict[str, Any]) -> Dict[str, Any]:
                 "categories": node.get("categories"),
                 "index": i
             }
+            
+            if node_info["type"] == "binary":
+                binary_count += 1
+            elif node_info["type"] == "categorical":
+                categorical_count += 1
+                categories = node_info.get("categories")
+                num_cats = len(categories) if isinstance(categories, list) else 0
+                print(f"    {node_id}: '{node_info['name']}' (categorical, {num_cats} categories: {categories})")
         else:
             # Old format (backward compatibility) - assume binary
             node_info = {
@@ -124,9 +141,12 @@ def _register_dag_structure(model_answer: Dict[str, Any]) -> Dict[str, Any]:
                 "categories": None,
                 "index": i
             }
+            binary_count += 1
         
         node_registry[node_id] = node_info
         indexed_nodes[i] = node_info
+    
+    print(f"    Node types: {binary_count} binary, {categorical_count} categorical")
     
     # Process edges and create adjacency structures
     edge_list = []
@@ -268,6 +288,7 @@ def _validate_registered_dag(registered_dag: Dict[str, Any]) -> Dict[str, Any]:
     """
     errors = []
     warnings = []
+    detailed_errors = []  # Store detailed error information
     
     # Check basic structure
     required_keys = ["nodes", "edges", "adjacency_list", "adjacency_matrix", "num_nodes", "num_edges"]
@@ -276,7 +297,7 @@ def _validate_registered_dag(registered_dag: Dict[str, Any]) -> Dict[str, Any]:
             errors.append(f"Missing required key: {key}")
     
     if errors:
-        return {"is_valid": False, "errors": errors, "warnings": warnings}
+        return {"is_valid": False, "errors": errors, "warnings": warnings, "detailed_errors": detailed_errors}
     
     # Validate node consistency
     if len(registered_dag["nodes"]) != registered_dag["num_nodes"]:
@@ -308,17 +329,124 @@ def _validate_registered_dag(registered_dag: Dict[str, Any]) -> Dict[str, Any]:
     if _has_cycles(registered_dag):
         warnings.append("DAG contains cycles - this may be intentional for some Bayesian networks")
     
-    # Validate categorical node categories
+    # Validate categorical node categories (with enhanced error messages)
     for node_info in registered_dag["nodes"].values():
         if node_info["type"] == "categorical":
-            if not node_info["categories"] or len(node_info["categories"]) < 2:
-                errors.append(f"Categorical node {node_info['id']} must have at least 2 categories")
+            categories = node_info.get("categories")
+            num_categories = len(categories) if isinstance(categories, list) else 0
+            
+            if not categories or num_categories < 2:
+                # Create detailed error message
+                error_detail = {
+                    "error_type": "insufficient_categories",
+                    "node_id": node_info['id'],
+                    "node_name": node_info['name'],
+                    "node_type": node_info['type'],
+                    "current_categories": categories if categories else [],
+                    "num_categories": num_categories,
+                    "required_minimum": 2,
+                    "node_index": node_info['index']
+                }
+                detailed_errors.append(error_detail)
+                
+                # Create human-readable error message
+                if not categories:
+                    error_msg = (f"Categorical node {node_info['id']} ('{node_info['name']}', index={node_info['index']}) "
+                                f"has NO categories defined. Categorical nodes require at least 2 categories. "
+                                f"Current value: {categories}")
+                elif num_categories == 0:
+                    error_msg = (f"Categorical node {node_info['id']} ('{node_info['name']}', index={node_info['index']}) "
+                                f"has EMPTY categories list. Categorical nodes require at least 2 categories. "
+                                f"Current value: {categories}")
+                elif num_categories == 1:
+                    error_msg = (f"Categorical node {node_info['id']} ('{node_info['name']}', index={node_info['index']}) "
+                                f"has only 1 category: {categories}. Categorical nodes require at least 2 categories.")
+                else:
+                    error_msg = (f"Categorical node {node_info['id']} ('{node_info['name']}', index={node_info['index']}) "
+                                f"has {num_categories} categories: {categories}. This should not happen in this branch.")
+                
+                errors.append(error_msg)
     
     return {
         "is_valid": len(errors) == 0,
         "errors": errors,
-        "warnings": warnings
+        "warnings": warnings,
+        "detailed_errors": detailed_errors
     }
+
+
+def _format_validation_error(validation_result: Dict[str, Any], registered_dag: Dict[str, Any], 
+                            step2_result: Dict[str, Any]) -> str:
+    """
+    Format a detailed, human-readable validation error message.
+    
+    Args:
+        validation_result: Result from _validate_registered_dag
+        registered_dag: The DAG that failed validation
+        step2_result: Result from step2 for context
+        
+    Returns:
+        str: Formatted error message with full context
+    """
+    lines = ["\n" + "="*80]
+    lines.append("DAG VALIDATION FAILED")
+    lines.append("="*80)
+    
+    # Show the errors
+    errors = validation_result.get("errors", [])
+    lines.append(f"\nFound {len(errors)} error(s):\n")
+    
+    for i, error in enumerate(errors, 1):
+        lines.append(f"{i}. {error}")
+    
+    # Show detailed information for each problematic node
+    detailed_errors = validation_result.get("detailed_errors", [])
+    if detailed_errors:
+        lines.append("\n" + "-"*80)
+        lines.append("DETAILED NODE INFORMATION:")
+        lines.append("-"*80)
+        
+        for detail in detailed_errors:
+            lines.append(f"\n🔴 Node: {detail['node_id']} ('{detail['node_name']}')")
+            lines.append(f"   Type: {detail['node_type']}")
+            lines.append(f"   Index: {detail['node_index']}")
+            lines.append(f"   Current categories: {detail['current_categories']}")
+            lines.append(f"   Number of categories: {detail['num_categories']}")
+            lines.append(f"   Required minimum: {detail['required_minimum']}")
+            
+            # Try to trace where this node came from
+            step2_nodes = step2_result.get("model_answer", {}).get("nodes", [])
+            if detail['node_index'] < len(step2_nodes):
+                original_node = step2_nodes[detail['node_index']]
+                lines.append(f"   Original node from Step 2: {original_node}")
+            
+            # Check if it was also in step1
+            step1_result = step2_result.get("step1_result", {})
+            step1_nodes = step1_result.get("model_answer", {}).get("nodes", [])
+            if detail['node_index'] < len(step1_nodes):
+                step1_node = step1_nodes[detail['node_index']]
+                lines.append(f"   Original node from Step 1: {step1_node}")
+    
+    # Show all nodes for context
+    lines.append("\n" + "-"*80)
+    lines.append("ALL NODES IN DAG:")
+    lines.append("-"*80)
+    
+    for node_id, node_info in registered_dag.get("nodes", {}).items():
+        status = "✅" if node_info["type"] == "binary" else "🔶"
+        if node_info["type"] == "categorical":
+            cats = node_info.get("categories", [])
+            num_cats = len(cats) if isinstance(cats, list) else 0
+            if num_cats < 2:
+                status = "❌"
+        
+        lines.append(f"{status} {node_id}: '{node_info['name']}' ({node_info['type']})")
+        if node_info["type"] == "categorical":
+            lines.append(f"     Categories: {node_info.get('categories', 'None')}")
+    
+    lines.append("="*80 + "\n")
+    
+    return "\n".join(lines)
 
 
 def _has_cycles(registered_dag: Dict[str, Any]) -> bool:

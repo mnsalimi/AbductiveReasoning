@@ -69,10 +69,21 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
         total_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
         # Process each node in the DAG
-        for node_id, node_info in registered_dag["nodes"].items():
+        total_nodes = len(registered_dag["nodes"])
+        print(f"\n  🔧 Starting CPT generation for {total_nodes} nodes...")
+        
+        for node_idx, (node_id, node_info) in enumerate(registered_dag["nodes"].items(), 1):
             time.sleep(sleep_time)
             
-            print(f"Generating CPT for node {node_id}: {node_info['name']}")
+            # Get parent information for logging
+            parent_ids = registered_dag["adjacency_list"][node_id]["parents"]
+            num_parents = len(parent_ids)
+            
+            print(f"\n  [{node_idx}/{total_nodes}] Generating CPT for {node_id}: '{node_info['name']}'")
+            print(f"      Type: {node_info['type']}")
+            if node_info['type'] == 'categorical':
+                print(f"      Categories: {node_info.get('categories', [])}")
+            print(f"      Parents: {num_parents} ({parent_ids if parent_ids else 'none - root node'})")
             
             # Generate CPT for this node
             cpt_result = _generate_node_cpt(
@@ -95,6 +106,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                         total_token_usage[key] += cpt_result["token_usage"].get(key, 0)
                 
                 total_api_calls += 1
+                print(f"      ✅ Success! Generated {len(cpt_result['cpt'].get('numerical_cpt', {}))} CPT row(s)")
             else:
                 cpt_generation_log.append({
                     "node_id": node_id,
@@ -102,6 +114,12 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                     "success": False,
                     "error": cpt_result["error"]
                 })
+                
+                # Format detailed error message
+                error_msg = _format_cpt_generation_error(
+                    node_id, node_info, cpt_result, registered_dag, 
+                    step3_result, cpt_generation_log
+                )
                 
                 # If any CPT generation fails, return error
                 return {
@@ -112,7 +130,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                     "cpt_metadata": None,
                     "correct_answer": sample.get("answer_idx"),
                     "idx": idx,
-                    "error": f"CPT generation failed for node {node_id}: {cpt_result['error']}",
+                    "error": error_msg,
                     "cpt_generation_log": cpt_generation_log,
                     "step1_result": step3_result.get("step1_result"),
                     "step2_result": step3_result.get("step2_result"),
@@ -152,6 +170,91 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "step2_result": step3_result.get("step2_result"),
             "step3_result": step3_result
         }
+
+
+def _format_cpt_generation_error(node_id: str, node_info: Dict[str, Any], cpt_result: Dict[str, Any],
+                                registered_dag: Dict[str, Any], step3_result: Dict[str, Any],
+                                cpt_generation_log: List[Dict]) -> str:
+    """
+    Format a detailed error message for CPT generation failure.
+    
+    Args:
+        node_id: ID of the node that failed
+        node_info: Information about the node
+        cpt_result: Result from _generate_node_cpt (with error)
+        registered_dag: The complete DAG
+        step3_result: Result from step3
+        cpt_generation_log: Log of all CPT generations so far
+        
+    Returns:
+        str: Formatted error message with full context
+    """
+    lines = ["\n" + "="*80]
+    lines.append("CPT GENERATION FAILED")
+    lines.append("="*80)
+    
+    # Node information
+    lines.append(f"\n❌ Failed Node: {node_id}")
+    lines.append(f"   Name: '{node_info['name']}'")
+    lines.append(f"   Type: {node_info['type']}")
+    lines.append(f"   Index: {node_info['index']}")
+    
+    if node_info['type'] == 'categorical':
+        categories = node_info.get('categories', [])
+        lines.append(f"   Categories: {categories} (count: {len(categories) if categories else 0})")
+    
+    # Parent information
+    parent_ids = registered_dag["adjacency_list"][node_id]["parents"]
+    lines.append(f"   Parents: {len(parent_ids)}")
+    
+    if parent_ids:
+        lines.append("\n   Parent Details:")
+        for parent_id in parent_ids:
+            parent_node = registered_dag["nodes"][parent_id]
+            lines.append(f"     • {parent_id}: '{parent_node['name']}' ({parent_node['type']})")
+            if parent_node['type'] == 'categorical':
+                lines.append(f"       Categories: {parent_node.get('categories', [])}")
+    
+    # Error details
+    lines.append(f"\n🔴 Error: {cpt_result.get('error', 'Unknown error')}")
+    
+    # If raw responses are available, show them
+    if 'raw_responses' in cpt_result:
+        lines.append("\n📝 Raw API Responses:")
+        for i, resp in enumerate(cpt_result['raw_responses'][:3], 1):  # Show first 3
+            lines.append(f"\n   Response {i} (condition: {resp.get('condition', 'N/A')}):")
+            response_text = resp.get('response', '')
+            lines.append(f"   {response_text[:200]}..." if len(response_text) > 200 else f"   {response_text}")
+    
+    # Show progress so far
+    lines.append("\n" + "-"*80)
+    lines.append("GENERATION PROGRESS:")
+    lines.append("-"*80)
+    
+    successful = sum(1 for log in cpt_generation_log if log['success'])
+    failed = len(cpt_generation_log) - successful
+    total = len(registered_dag["nodes"])
+    
+    lines.append(f"✅ Successful: {successful}/{total}")
+    lines.append(f"❌ Failed: {failed}/{total}")
+    lines.append(f"⏳ Remaining: {total - len(cpt_generation_log)}/{total}")
+    
+    # List all nodes and their status
+    lines.append("\nNode Status:")
+    processed_nodes = {log['node_id']: log['success'] for log in cpt_generation_log}
+    
+    for nid, ninfo in registered_dag["nodes"].items():
+        if nid in processed_nodes:
+            status = "✅" if processed_nodes[nid] else "❌"
+        elif nid == node_id:
+            status = "❌"
+        else:
+            status = "⏳"
+        lines.append(f"{status} {nid}: '{ninfo['name']}' ({ninfo['type']})")
+    
+    lines.append("="*80 + "\n")
+    
+    return "\n".join(lines)
 
 
 def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], registered_dag: Dict[str, Any],

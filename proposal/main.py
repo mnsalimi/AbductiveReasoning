@@ -121,6 +121,13 @@ def main():
             print(f"  🔵 Binary nodes: {node_stats.get('binary_nodes', 0)}")
             print(f"  🔶 Categorical nodes: {node_stats.get('categorical_nodes', 0)}")
             
+            # Show categorical node details
+            categorical_details = node_stats.get("categorical_details", [])
+            if categorical_details:
+                print(f"  📋 Categorical nodes:")
+                for cat_node in categorical_details:
+                    print(f"      • {cat_node['id']} ('{cat_node['name']}'): {cat_node['num_categories']} categories")
+            
             graph_structure = metadata.get("graph_structure", {})
             print(f"  🌳 Root nodes: {len(graph_structure.get('root_nodes', []))}")
             print(f"  🍃 Leaf nodes: {len(graph_structure.get('leaf_nodes', []))}")
@@ -128,13 +135,25 @@ def main():
             validation = step3_result.get("validation_result", {})
             if validation.get("warnings"):
                 print(f"  ⚠️  Warnings: {len(validation['warnings'])}")
+                for warning in validation.get("warnings", []):
+                    print(f"      - {warning}")
             
             # Plot and save the DAG visualization
             output_dir = os.path.join(os.path.dirname(__file__), "dag_visualizations", dataset_name, model_name)
             output_path = os.path.join(output_dir, f"dag_sample_{idx}")
             plot_dag(dag, output_path, idx)
         else:
-            print(f"✗ Step 3 failed: {step3_result.get('error', 'Unknown error')}")
+            error_msg = step3_result.get('error', 'Unknown error')
+            print(f"✗ Step 3 failed")
+            print(f"\n{error_msg}")
+            
+            # Show validation details if available
+            validation = step3_result.get("validation_result", {})
+            if validation and validation.get("detailed_errors"):
+                print("\n  📋 Quick Summary:")
+                for detail in validation["detailed_errors"]:
+                    print(f"      ❌ {detail['node_id']} ('{detail['node_name']}'): "
+                          f"{detail['num_categories']} categories (need {detail['required_minimum']})")
             continue
         
         # STEP 4: CPT Creator
@@ -162,7 +181,15 @@ def main():
                 total_tokens = step4_result['token_usage'].get('total_tokens', 0)
                 print(f"  🔢 Total tokens used: {total_tokens}")
         else:
-            print(f"✗ Step 4 failed: {step4_result.get('error', 'Unknown error')}")
+            error_msg = step4_result.get('error', 'Unknown error')
+            print(f"✗ Step 4 failed")
+            print(f"\n{error_msg}")
+            
+            # Show generation log summary if available
+            gen_log = step4_result.get("cpt_generation_log", [])
+            if gen_log:
+                successful = sum(1 for log in gen_log if log.get('success', False))
+                print(f"\n  📊 Progress: {successful}/{len(gen_log)} nodes completed before failure")
             continue
         
         # STEP 5: Bayesian Network Construction
@@ -194,8 +221,22 @@ def main():
             factorization = inference_readiness.get("factorization", "")
             if factorization:
                 print(f"  📐 Factorization: {factorization[:100]}..." if len(factorization) > 100 else f"  📐 Factorization: {factorization}")
+            
+            # Show validation warnings if any
+            validation = step5_result.get("validation_result", {})
+            if validation and validation.get("warnings"):
+                print(f"  ⚠️  Warnings: {len(validation['warnings'])}")
+                for warning in validation.get("warnings", [])[:3]:  # Show first 3
+                    print(f"      - {warning}")
         else:
-            print(f"✗ Step 5 failed: {step5_result.get('error', 'Unknown error')}")
+            error_msg = step5_result.get('error', 'Unknown error')
+            print(f"✗ Step 5 failed")
+            print(f"\n{error_msg}")
+            
+            # Show validation details if available
+            validation = step5_result.get("validation_result", {})
+            if validation and validation.get("errors"):
+                print(f"\n  📋 Validation errors: {len(validation['errors'])}")
             continue
         
         # STEP 6: MPE Algorithm
@@ -253,8 +294,22 @@ def main():
             entropy = prob_analysis.get("entropy", 0.0)
             print(f"    Entropy: {entropy:.4f}")
             
+            # Show validation warnings if any
+            validation = step6_result.get("validation_result", {})
+            if validation and validation.get("warnings"):
+                print(f"\n  ⚠️  Warnings: {len(validation['warnings'])}")
+                for warning in validation.get("warnings", [])[:3]:  # Show first 3
+                    print(f"      - {warning}")
         else:
-            print(f"✗ Step 6 failed: {step6_result.get('error', 'Unknown error')}")
+            error_msg = step6_result.get('error', 'Unknown error')
+            print(f"✗ Step 6 failed: {error_msg}")
+            
+            # Show validation details if available
+            validation = step6_result.get("validation_result", {})
+            if validation and validation.get("errors"):
+                print(f"\n  📋 Validation errors:")
+                for error in validation.get("errors", [])[:5]:  # Show first 5
+                    print(f"      • {error}")
             continue
         
         print_separator("PIPELINE COMPLETED FOR SAMPLE")

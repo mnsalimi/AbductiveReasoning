@@ -62,7 +62,25 @@ prompt_templates:
       
       For each node, you must specify if it's binary or categorical:
       - Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
-      - Categorical nodes: can have multiple specific categories/states
+      - Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories, otherwise use binary)
+      
+      CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
+      
+      EXAMPLES OF CORRECT NODE DEFINITIONS:
+      ✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
+      ✗ WRONG: Patient_Age_Group (categorical: elderly) ← Only one category!
+      
+      ✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination)
+      ✗ WRONG: Treatment_Type (categorical: chemotherapy) ← Only one category!
+      
+      ✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical)
+      ✗ WRONG: Disease_Severity (categorical: moderate) ← Only one category!
+      
+      ✓ CORRECT: Smoking_Status (binary)  ← Only two states: smoker/non-smoker
+      ✗ WRONG: Smoking_Status (categorical: smoker) ← Should be binary!
+      
+      ✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic)
+      ✗ WRONG: Drug_Class (categorical: antibiotic) ← Only one category!
       
       Your output DAG should be in the exact following format:
 
@@ -85,7 +103,9 @@ prompt_templates:
 
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
       ** for binary nodes: use format "node_name (binary)"
-      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+      ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
+      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** you should only output the DAG in the exact format above. No other text, no other format.
       ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
 
@@ -105,7 +125,22 @@ prompt_templates:
       - Identify any missing edges (causal relationships) that should exist
       - Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema)
       - Ensure your additions are medically sound and comprehensive
-      - For new nodes, specify if they are binary or categorical with their categories
+      - For new nodes, specify if they are binary or categorical with their categories (categorical nodes MUST have at least 2 categories, otherwise use binary)
+      
+      CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
+      
+      EXAMPLES OF CORRECT NODE DEFINITIONS:
+      ✓ CORRECT: Imaging_Result (categorical: normal, mild_abnormality, moderate_abnormality, severe_abnormality)
+      ✗ WRONG: Imaging_Result (categorical: normal) ← Only one category!
+      
+      ✓ CORRECT: Blood_Pressure_Level (categorical: hypotensive, normal, prehypertensive, hypertensive)
+      ✗ WRONG: Blood_Pressure_Level (categorical: hypertensive) ← Only one category!
+      
+      ✓ CORRECT: Diabetes_Present (binary)  ← Only two states: present/absent
+      ✗ WRONG: Diabetes_Present (categorical: present) ← Should be binary!
+      
+      ✓ CORRECT: Cancer_Stage (categorical: stage_I, stage_II, stage_III, stage_IV)
+      ✗ WRONG: Cancer_Stage (categorical: stage_III) ← Only one category!
 
       Your output should be in the exact following format:
 
@@ -129,7 +164,9 @@ prompt_templates:
       ** M is the total number of edges from Step 1, so your new edges should start at edge{M+1}
       ** Node numbering in new edges can reference both existing nodes (node1 to nodeN) and new nodes (node{N+1} onwards)
       ** For binary nodes: use format "node_name (binary)"
-      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+      ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
+      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
       ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
 
@@ -181,7 +218,25 @@ prompt_templates:
         
         For each node, you must specify if it's binary or categorical:
         - Binary nodes: can only have two states (true/false, present/absent, yes/no)
-        - Categorical nodes: can have multiple specific categories/states
+        - Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories, otherwise use binary)
+        
+        CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
+        
+        EXAMPLES OF CORRECT NODE DEFINITIONS:
+        ✓ CORRECT: Entity_Type (categorical: person, place, object, concept, event)
+        ✗ WRONG: Entity_Type (categorical: person) ← Only one category!
+        
+        ✓ CORRECT: Truth_Value (categorical: definitely_true, probably_true, uncertain, probably_false, definitely_false)
+        ✗ WRONG: Truth_Value (categorical: definitely_true) ← Only one category!
+        
+        ✓ CORRECT: Temporal_Order (categorical: before, simultaneous, after)
+        ✗ WRONG: Temporal_Order (categorical: before) ← Only one category!
+        
+        ✓ CORRECT: Proposition_Valid (binary)  ← Only two states: valid/invalid
+        ✗ WRONG: Proposition_Valid (categorical: valid) ← Should be binary!
+        
+        ✓ CORRECT: Relationship_Type (categorical: causal, temporal, spatial, logical, conditional)
+        ✗ WRONG: Relationship_Type (categorical: causal) ← Only one category!
         
         Your output DAG should be in the exact following format:
 
@@ -204,7 +259,9 @@ prompt_templates:
 
         ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
         ** for binary nodes: use format "node_name (binary)"
-        ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+        ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+        ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
+        ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
         ** you should only output the DAG in the exact format above. No other text, no other format.
         ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
 
@@ -222,7 +279,22 @@ prompt_templates:
       - Identify any missing edges (causal relationships) that should exist
       - Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema)
       - Ensure your additions are logically sound and comprehensive
-      - For new nodes, specify if they are binary or categorical with their categories
+      - For new nodes, specify if they are binary or categorical with their categories (categorical nodes MUST have at least 2 categories, otherwise use binary)
+      
+      CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
+      
+      EXAMPLES OF CORRECT NODE DEFINITIONS:
+      ✓ CORRECT: Logical_Operator (categorical: AND, OR, NOT, XOR, IMPLIES)
+      ✗ WRONG: Logical_Operator (categorical: AND) ← Only one category!
+      
+      ✓ CORRECT: Confidence_Level (categorical: very_low, low, medium, high, very_high)
+      ✗ WRONG: Confidence_Level (categorical: high) ← Only one category!
+      
+      ✓ CORRECT: Statement_Consistent (binary)  ← Only two states: consistent/inconsistent
+      ✗ WRONG: Statement_Consistent (categorical: consistent) ← Should be binary!
+      
+      ✓ CORRECT: Evidence_Quality (categorical: weak, moderate, strong, conclusive)
+      ✗ WRONG: Evidence_Quality (categorical: strong) ← Only one category!
 
       Your output should be in the exact following format:
 
@@ -246,7 +318,9 @@ prompt_templates:
       ** M is the total number of edges from Step 1, so your new edges should start at edge{M+1}
       ** Node numbering in new edges can reference both existing nodes (node1 to nodeN) and new nodes (node{N+1} onwards)
       ** For binary nodes: use format "node_name (binary)"
-      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+      ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
+      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
       ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
 

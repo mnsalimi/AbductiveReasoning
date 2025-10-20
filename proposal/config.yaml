@@ -91,7 +91,7 @@ prompt_templates:
 
     step2: |
       You are a professional medical scientist and biologist.
-      You previously created a Bayesian Network (BN) Schema representing causal relationships for a medical context. Now you need to refine and enhance this BN Schema by adding any missing nodes or edges that are necessary for a more complete representation.
+      You previously created a Bayesian Network (BN) Schema representing causal relationships for a medical context. Now you need to refine and enhance this BN Schema by identifying and specifying any missing nodes or edges that should be added.
 
       You will be given:
       1. The original medical context and question
@@ -103,35 +103,35 @@ prompt_templates:
       - Consider the specific answer choices to understand what diagnostic/reasoning paths are relevant
       - Identify any missing nodes that are medically relevant to the context and answer choices
       - Identify any missing edges (causal relationships) that should exist
-      - Add ONLY the missing nodes and edges (YOU CANNOT delete or modify existing ones)
-      - Ensure the refined schema is medically sound and comprehensive
+      - Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema)
+      - Ensure your additions are medically sound and comprehensive
       - For new nodes, specify if they are binary or categorical with their categories
 
       Your output should be in the exact following format:
 
       <analysis> your detailed analysis of what is missing from the original BN Schema and why these additions are necessary </analysis>
-      <refined_schema>
-      NODES: 
-      node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
-      node3: node3_name (binary)
-      node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
+      <additions>
+      NEW_NODES: 
+      node{N+1}: new_node1_name (binary)
+      node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name)
       ...
-      node{last_node_number}: last_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
-      EDGES: 
-      edge1: node{i} -> node{j}
-      edge2: node{x} -> node{y}
-      edge3: node{z} -> node{w}
+      node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
+      NEW_EDGES: 
+      edge{M+1}: node{i} -> node{j}
+      edge{M+2}: node{x} -> node{y}
       ...
-      edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
-      </refined_schema>
+      edge{last_new_edge_number}: node{last_node_number} -> node{first_node_number}
+      </additions>
 
-      ** the refined schema must include ALL nodes and edges from Step 1 PLUS any new additions
-      ** you are only allowed to ADD nodes/edges, never delete or modify existing ones
-      ** for binary nodes: use format "node_name (binary)"
-      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
-      ** the order of tags and nodes and edges must be strictly followed
-      ** obviously, all nodes mentioned in edges must be included in the NODES section
+      ** If there are NO new nodes to add, write "NEW_NODES: None" under the NEW_NODES section
+      ** If there are NO new edges to add, write "NEW_EDGES: None" under the NEW_EDGES section
+      ** N is the total number of nodes from Step 1, so your new nodes should start at node{N+1}
+      ** M is the total number of edges from Step 1, so your new edges should start at edge{M+1}
+      ** Node numbering in new edges can reference both existing nodes (node1 to nodeN) and new nodes (node{N+1} onwards)
+      ** For binary nodes: use format "node_name (binary)"
+      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
+      ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
 
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
@@ -210,7 +210,7 @@ prompt_templates:
 
     step2: |
       You are a professional logician and reasoning master.
-      You previously created a Bayesian Network (BN) Schema representing causal relationships for a logical reasoning context. Now you need to refine and enhance this BN Schema by adding any missing nodes or edges that are necessary for a more complete representation.
+      You previously created a Bayesian Network (BN) Schema representing causal relationships for a logical reasoning context. Now you need to refine and enhance this BN Schema by identifying and specifying any missing nodes or edges that should be added.
 
       You will be given:
       1. The original logical context and hypothesis
@@ -220,35 +220,35 @@ prompt_templates:
       - Carefully analyze the existing BN Schema from Step 1
       - Identify any missing nodes that are logically relevant to the context
       - Identify any missing edges (causal relationships) that should exist
-      - Add ONLY the missing nodes and edges (YOU CANNOT delete or modify existing ones)
-      - Ensure the refined schema is logically sound and comprehensive
+      - Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema)
+      - Ensure your additions are logically sound and comprehensive
       - For new nodes, specify if they are binary or categorical with their categories
 
       Your output should be in the exact following format:
 
       <analysis> your detailed analysis of what is missing from the original BN Schema and why these additions are necessary </analysis>
-      <refined_schema>
-      NODES: 
-      node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
-      node3: node3_name (binary)
-      node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
+      <additions>
+      NEW_NODES: 
+      node{N+1}: new_node1_name (binary)
+      node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name)
       ...
-      node{last_node_number}: last_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
-      EDGES: 
-      edge1: node{i} -> node{j}
-      edge2: node{x} -> node{y}
-      edge3: node{z} -> node{w}
+      node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
+      NEW_EDGES: 
+      edge{M+1}: node{i} -> node{j}
+      edge{M+2}: node{x} -> node{y}
       ...
-      edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
-      </refined_schema>
+      edge{last_new_edge_number}: node{last_node_number} -> node{first_node_number}
+      </additions>
 
-      ** the refined schema must include ALL nodes and edges from Step 1 PLUS any new additions
-      ** you are only allowed to ADD nodes/edges, never delete or modify existing ones
-      ** for binary nodes: use format "node_name (binary)"
-      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
-      ** the order of tags and nodes and edges must be strictly followed
-        ** obviously, all nodes mentioned in edges must be included in the NODES section
+      ** If there are NO new nodes to add, write "NEW_NODES: None" under the NEW_NODES section
+      ** If there are NO new edges to add, write "NEW_EDGES: None" under the NEW_EDGES section
+      ** N is the total number of nodes from Step 1, so your new nodes should start at node{N+1}
+      ** M is the total number of edges from Step 1, so your new edges should start at edge{M+1}
+      ** Node numbering in new edges can reference both existing nodes (node1 to nodeN) and new nodes (node{N+1} onwards)
+      ** For binary nodes: use format "node_name (binary)"
+      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)"
+      ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
+      ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
 
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.

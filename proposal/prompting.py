@@ -98,59 +98,59 @@ def _parse_node_with_type(node_line: str) -> Optional[dict]:
     # If neither pattern matches, return None (parsing failed)
     return None
 
-def _parse_refined_schema_content_strictly(schema_content: str) -> Tuple[Optional[list], Optional[list]]:
+def _parse_additions_content_strictly(additions_content: str) -> Tuple[Optional[list], Optional[list]]:
     """
-    Parses the content of a <refined_schema> block strictly.
-    Requires NODES: header, then EDGES: header.
-    Returns (parsed_nodes, parsed_edges) tuple.
+    Parses the content of an <additions> block strictly.
+    Requires NEW_NODES: header, then NEW_EDGES: header.
+    Returns (parsed_new_nodes, parsed_new_edges) tuple.
     
-    Now handles both binary and categorical nodes like _parse_dag_content_strictly.
+    Handles both binary and categorical nodes, and also handles "None" values
+    when there are no additions in a section.
     """
-    parsed_nodes = None
-    parsed_edges = None
+    parsed_new_nodes = []
+    parsed_new_edges = []
 
-    # 1. Check for the existence and order of NODES: and EDGES: headers.
-    # We use re.IGNORECASE to be slightly tolerant of "nodes:" vs "NODES:".
-    nodes_header_match = re.search(r"NODES:", schema_content, re.IGNORECASE)
-    edges_header_match = re.search(r"EDGES:", schema_content, re.IGNORECASE)
+    # 1. Check for the existence and order of NEW_NODES: and NEW_EDGES: headers.
+    nodes_header_match = re.search(r"NEW_NODES:", additions_content, re.IGNORECASE)
+    edges_header_match = re.search(r"NEW_EDGES:", additions_content, re.IGNORECASE)
 
     if not nodes_header_match or not edges_header_match:
         # If either header is missing, parsing fails.
         return None, None
 
     if nodes_header_match.start() >= edges_header_match.start():
-        # If NODES: does not appear before EDGES:, parsing fails.
+        # If NEW_NODES: does not appear before NEW_EDGES:, parsing fails.
         return None, None
         
-    # 2. Split the schema content into two parts based on the headers.
-    # The node_text is the content between "NODES:" and "EDGES:".
-    node_text = schema_content[nodes_header_match.end():edges_header_match.start()]
-    # The edge_text is the content after "EDGES:".
-    edge_text = schema_content[edges_header_match.end():]
+    # 2. Split the additions content into two parts based on the headers.
+    node_text = additions_content[nodes_header_match.end():edges_header_match.start()]
+    edge_text = additions_content[edges_header_match.end():]
 
-    # 3. Parse nodes from the node_text section with type information.
-    nodes_pattern = r"node\d+:\s*(.*)"
-    node_matches = re.findall(nodes_pattern, node_text)
-    if node_matches:
-        parsed_nodes = []
-        for node_line in node_matches:
-            node_line = node_line.strip()
-            # Parse the node with type information
-            node_info = _parse_node_with_type(node_line)
-            if node_info:
-                parsed_nodes.append(node_info)
+    # 3. Parse new nodes from the node_text section with type information.
+    # Check if the section contains "None" (case-insensitive)
+    if re.search(r"^\s*None\s*$", node_text.strip(), re.IGNORECASE):
+        parsed_new_nodes = []
+    else:
+        nodes_pattern = r"node\d+:\s*(.*)"
+        node_matches = re.findall(nodes_pattern, node_text)
+        if node_matches:
+            for node_line in node_matches:
+                node_line = node_line.strip()
+                # Parse the node with type information
+                node_info = _parse_node_with_type(node_line)
+                if node_info:
+                    parsed_new_nodes.append(node_info)
 
-    # 4. Parse edges from the edge_text section.
-    edges_pattern = r"edge\d+:\s*node\d+\s*->\s*node\d+"
-    edge_matches = re.findall(edges_pattern, edge_text)
-    if edge_matches:
-        # We need to extract just the 'nodeX -> nodeY' part.
-        # A refined regex can do this in one step.
+    # 4. Parse new edges from the edge_text section.
+    # Check if the section contains "None" (case-insensitive)
+    if re.search(r"^\s*None\s*$", edge_text.strip(), re.IGNORECASE):
+        parsed_new_edges = []
+    else:
         edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
         captured_edges = re.findall(edge_capture_pattern, edge_text)
-        parsed_edges = [edge.strip() for edge in captured_edges]
+        parsed_new_edges = [edge.strip() for edge in captured_edges]
 
-    return parsed_nodes, parsed_edges
+    return parsed_new_nodes, parsed_new_edges
 
 
 def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successful_api_call: bool, thinking: bool) -> Dict[str, Any]:
@@ -368,22 +368,24 @@ EDGES:
 
 def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successful_api_call: bool, thinking: bool, step1_result: dict) -> dict:
     """
-    Parse the model's response for Step 2 (BN Schema refinement)
+    Parse the model's response for Step 2 (BN Schema refinement with additions only)
     
     Args:
         sample: Original data sample
         model_output: Raw model response
         successful_api_call: Whether API call succeeded
         thinking: Whether model supports <think> blocks
-        step1_result: Result from step1 to validate refinement
+        step1_result: Result from step1 to merge additions with
     
     Returns:
-        dict: Parsed result with refined BN Schema
+        dict: Parsed result with merged BN Schema (step1 + additions)
     """
     right_format = False
     extracted_analysis = None
-    parsed_nodes = None
-    parsed_edges = None
+    parsed_new_nodes = None
+    parsed_new_edges = None
+    merged_nodes = None
+    merged_edges = None
 
     if not successful_api_call:
         return {
@@ -400,53 +402,45 @@ def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successf
 
     # 2. Define regex patterns for the main blocks
     analysis_pattern = r"<analysis>(.*?)</analysis>"
-    refined_schema_pattern = r"<refined_schema>(.*?)</refined_schema>"
+    additions_pattern = r"<additions>(.*?)</additions>"
 
-    # 3. Enforce order: Find <analysis> first, then find <refined_schema> *after* it.
+    # 3. Enforce order: Find <analysis> first, then find <additions> *after* it.
     analysis_match = re.search(analysis_pattern, cleaned_text, flags=re.DOTALL)
     
     if analysis_match:
         extracted_analysis = analysis_match.group(1).strip()
         
-        # Search for the <refined_schema> block *only in the text following the analysis block*.
+        # Search for the <additions> block *only in the text following the analysis block*.
         text_after_analysis = cleaned_text[analysis_match.end():]
-        schema_match = re.search(refined_schema_pattern, text_after_analysis, flags=re.DOTALL)
+        additions_match = re.search(additions_pattern, text_after_analysis, flags=re.DOTALL)
 
-        if schema_match:
-            schema_content = schema_match.group(1).strip()
+        if additions_match:
+            additions_content = additions_match.group(1).strip()
             
-            # 4. Use the strict function to parse the <refined_schema> content
-            parsed_nodes, parsed_edges = _parse_refined_schema_content_strictly(schema_content)
+            # 4. Use the strict function to parse the <additions> content
+            parsed_new_nodes, parsed_new_edges = _parse_additions_content_strictly(additions_content)
 
     # 5. Determine if the format is correct based on the strict parsing results
-    # The format is correct only if all components were found in the correct order.
-    if extracted_analysis is not None and parsed_nodes and parsed_edges:
+    # The format is correct if both parsed lists are not None (they can be empty lists though)
+    if extracted_analysis is not None and parsed_new_nodes is not None and parsed_new_edges is not None:
         right_format = True
 
-    # 6. Validate that the refined schema includes all original nodes/edges from step1
+    # 6. Merge additions with original schema from step1
     validation_passed = False
     if right_format and step1_result.get("model_answer"):
         original_nodes = step1_result["model_answer"].get("nodes", [])
         original_edges = step1_result["model_answer"].get("edges", [])
         
-        # For nodes, we need to compare node names since they now have type information
-        if parsed_nodes and original_nodes:
-            # Extract names from parsed_nodes (which are now dicts)
-            parsed_node_names = [node["name"] for node in parsed_nodes]
-            # original_nodes might be strings (from old format) or dicts (from new format)
-            if original_nodes and isinstance(original_nodes[0], dict):
-                original_node_names = [node["name"] for node in original_nodes]
-            else:
-                original_node_names = original_nodes  # backward compatibility
-            
-            nodes_preserved = all(node_name in parsed_node_names for node_name in original_node_names)
-        else:
-            nodes_preserved = False
-            
-        # Check if all original edges are present in refined schema
-        edges_preserved = all(edge in parsed_edges for edge in original_edges) if parsed_edges and original_edges else False
+        # Merge nodes: original + new
+        merged_nodes = original_nodes.copy()
+        merged_nodes.extend(parsed_new_nodes)
         
-        validation_passed = nodes_preserved and edges_preserved
+        # Merge edges: original + new
+        merged_edges = original_edges.copy()
+        merged_edges.extend(parsed_new_edges)
+        
+        # Validation is successful if we have merged schema (even if no additions were made)
+        validation_passed = True
 
     # 7. Structure the final model answer
     model_answer = None
@@ -454,20 +448,22 @@ def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successf
         original_nodes_count = len(step1_result["model_answer"].get("nodes", []))
         original_edges_count = len(step1_result["model_answer"].get("edges", []))
         
-        # Calculate node type statistics
-        binary_nodes = [node for node in parsed_nodes if node["type"] == "binary"]
-        categorical_nodes = [node for node in parsed_nodes if node["type"] == "categorical"]
+        # Calculate node type statistics for merged schema
+        binary_nodes = [node for node in merged_nodes if node["type"] == "binary"]
+        categorical_nodes = [node for node in merged_nodes if node["type"] == "categorical"]
         
         model_answer = {
             "analysis": extracted_analysis,
-            "nodes": parsed_nodes,
-            "edges": parsed_edges,
+            "nodes": merged_nodes,  # Complete merged schema
+            "edges": merged_edges,  # Complete merged schema
+            "new_nodes": parsed_new_nodes,  # Only new additions
+            "new_edges": parsed_new_edges,  # Only new additions
             "original_nodes_count": original_nodes_count,
             "original_edges_count": original_edges_count,
-            "added_nodes_count": len(parsed_nodes) - original_nodes_count,
-            "added_edges_count": len(parsed_edges) - original_edges_count,
-            "total_nodes_count": len(parsed_nodes),
-            "total_edges_count": len(parsed_edges),
+            "added_nodes_count": len(parsed_new_nodes),
+            "added_edges_count": len(parsed_new_edges),
+            "total_nodes_count": len(merged_nodes),
+            "total_edges_count": len(merged_edges),
             "binary_nodes_count": len(binary_nodes),
             "categorical_nodes_count": len(categorical_nodes),
             "node_type_distribution": {

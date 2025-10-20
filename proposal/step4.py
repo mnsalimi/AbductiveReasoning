@@ -309,13 +309,10 @@ def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_
 def _create_cpt_row_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
                           condition: Any, registered_dag: Dict[str, Any], dataset_name: str) -> str:
     """Create prompt for generating a single CPT row."""
-    from prompting import _load_prompt_template, _parse_context_and_question
+    from prompting import _load_prompt_template
     
     # Load the appropriate template
     prompt_template = _load_prompt_template(dataset_name, "step4", "v1")
-    
-    # Get context and question
-    context, question = _parse_context_and_question(dataset_name, sample)
     
     # Get node states
     node_states = _get_node_states(node_info)
@@ -364,19 +361,8 @@ SPECIFIC PARENT CONDITION TO ANALYZE:
 - NO_PARENTS (this is a root node)
 """
     
-    # Build context section
-    context_section = f"""
-ORIGINAL CONTEXT:
-{context}
-
-QUESTION:
-{question}
-"""
-    
     # Build complete prompt
     complete_prompt = f"""{prompt_template}
-
-{context_section}
 
 {node_section}
 
@@ -506,13 +492,10 @@ def _convert_qualitative_row_to_numerical(qualitative_probs: Dict[str, str]) -> 
 def _create_cpt_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], 
                       registered_dag: Dict[str, Any], dataset_name: str) -> str:
     """Create prompt for CPT generation."""
-    from prompting import _load_prompt_template, _parse_context_and_question
+    from prompting import _load_prompt_template
     
     # Load the appropriate template
     prompt_template = _load_prompt_template(dataset_name, "step4", "v1")
-    
-    # Get context and question
-    context, question = _parse_context_and_question(dataset_name, sample)
     
     # Get node states
     node_states = _get_node_states(node_info)
@@ -537,17 +520,7 @@ PARENT NODES INFORMATION:
     else:
         parent_section = "\nPARENT NODES INFORMATION:\n- This node has no parents (root node)\n"
     
-    context_section = f"""
-ORIGINAL CONTEXT:
-{context}
-
-QUESTION:
-{question}
-"""
-    
     complete_prompt = f"""{prompt_template}
-
-{context_section}
 
 {node_section}
 

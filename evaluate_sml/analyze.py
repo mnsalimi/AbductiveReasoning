@@ -102,29 +102,61 @@ def analyze_results_by_path(experiment_path: str):
 
     if num_valid_samples > 0:
         if dataset_name == "uniadilr":
-            exact_matches = 0
-            pred_is_proper_subset = 0
-            true_is_proper_subset = 0
+            precision_scores = []
+            recall_scores = []
+            f1_scores = []
+            em_scores = []
 
             for true_set, pred_set in zip(y_true, y_pred):
-                if pred_set == true_set:
-                    exact_matches += 1
-                elif pred_set.issubset(true_set):
-                    pred_is_proper_subset += 1
-                elif true_set.issubset(pred_set):
-                    true_is_proper_subset += 1
+                # Calculate intersection
+                intersection = pred_set.intersection(true_set)
+                intersection_size = len(intersection)
+                pred_size = len(pred_set)
+                true_size = len(true_set)
+                
+                # Precision: |P ∩ G| / |P|
+                if pred_size == 0:
+                    # Edge case: if model predicts nothing
+                    precision = 1.0 if true_size == 0 else 0.0
+                else:
+                    precision = intersection_size / pred_size
+                
+                # Recall: |P ∩ G| / |G|
+                if true_size == 0:
+                    # Edge case: if golden set is empty
+                    recall = 1.0 if pred_size == 0 else 0.0
+                else:
+                    recall = intersection_size / true_size
+                
+                # F1-Score: 2 * (Precision * Recall) / (Precision + Recall)
+                if precision + recall == 0:
+                    f1 = 0.0
+                else:
+                    f1 = 2 * (precision * recall) / (precision + recall)
+                
+                # Exact Match: 1 if P = G, else 0
+                em = 1.0 if pred_set == true_set else 0.0
+                
+                precision_scores.append(precision)
+                recall_scores.append(recall)
+                f1_scores.append(f1)
+                em_scores.append(em)
             
-            accuracy = (exact_matches / num_valid_samples)
-            percent_pred_subset = (pred_is_proper_subset / num_valid_samples)
-            percent_true_subset = (true_is_proper_subset / num_valid_samples)
-
+            # Calculate averages across all samples
+            avg_precision = np.mean(precision_scores)
+            avg_recall = np.mean(recall_scores)
+            avg_f1 = np.mean(f1_scores)
+            avg_em = np.mean(em_scores)
+            
             metrics_report = (
-                f"1. Simple Accuracy (Exact Match): {accuracy:.2%}\n"
-                f"   - The model's answer was exactly correct.\n\n"
-                f"2. Prediction is Subset of Truth: {percent_pred_subset:.2%}\n"
-                f"   - The model's answer was correct but incomplete (e.g., predicted {{A}} when it should be {{A, B}}).\n\n"
-                f"3. Truth is Subset of Prediction: {percent_true_subset:.2%}\n"
-                f"   - The model's answer included the correct answer plus extra incorrect items (e.g., predicted {{A, B, C}} when it should be {{A, B}})."
+                f"1. Precision: {avg_precision:.4f} ({avg_precision*100:.2f}%)\n"
+                f"   - Of all the sentences the model predicted as relevant, what fraction were actually relevant.\n\n"
+                f"2. Recall: {avg_recall:.4f} ({avg_recall*100:.2f}%)\n"
+                f"   - Of all the sentences that were actually relevant, what fraction did the model find.\n\n"
+                f"3. F1-Score: {avg_f1:.4f} ({avg_f1*100:.2f}%)\n"
+                f"   - Harmonic mean of Precision and Recall, balancing both concerns.\n\n"
+                f"4. Exact Match (EM): {avg_em:.4f} ({avg_em*100:.2f}%)\n"
+                f"   - Percentage of questions where the model's predicted set matched the golden set perfectly."
             )
 
         elif dataset_name == "medqa" or dataset_name == "medmcqa":

@@ -28,17 +28,18 @@ def full_experiment():
     #                 n_samples=2  # Use all samples by default
     #             )
     models = ["GPT-OSS-120B","DeepSeek-V3.1"]
-    for model_name in models:
-        evaluate_model(
-            dataset_name="uniadilr",
-            model_name=model_name,
-            prompt_type="Chain of Thought",
-            api_key=api_key,
-            use_cache=False,
-            parallel=True,
-            n_samples=-1  # Use all samples by default
-        )
-        analyze_all_experiments("results")
+    for i in range(5):
+        for model_name in models:
+            evaluate_model(
+                dataset_name="uniadilr",
+                model_name=model_name,
+                prompt_type="Chain of Thought",
+                api_key=api_key,
+                use_cache=False,
+                parallel=True,
+                n_samples=1  # Use all samples by default
+            )
+            analyze_all_experiments("results")
 
     
     # Analyze all experiments using the new directory structure

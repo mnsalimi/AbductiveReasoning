@@ -1,8 +1,7 @@
-import requests
-import json
 import time
 import yaml
 import os
+from openai import OpenAI
 
 def get_model_response(
     model_name: str,
@@ -15,7 +14,7 @@ def get_model_response(
     base_url: str = None
 ):
     """
-    Sends a request to the specified model API and retrieves the response.
+    Sends a request to the specified model API and retrieves the response using OpenAI client.
 
     Args:
         model_name (str): The name of the model to use.
@@ -43,35 +42,34 @@ def get_model_response(
         timeout = timeout or config["api"]["timeout"]
         base_url = base_url or config["api"]["base_url"]
     
-    url = base_url
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": model_name,
-        "messages": [
-            {"role": "user", "content": input_text}
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens
-    }
+    # Initialize OpenAI client
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        timeout=timeout
+    )
 
     last_exception = None
 
     for attempt in range(retries):
         try:
-            response = requests.post(
-                url, headers=headers, data=json.dumps(payload), timeout=timeout
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "user", "content": input_text}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
             )
-            response.raise_for_status()
-            response_data = response.json()
-            content = response_data['choices'][0]['message']['content']
-            usage = response_data['usage']
+            
+            content = response.choices[0].message.content
+            usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
             return content, usage
-        except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
+        except Exception as e:
             print(f"Attempt {attempt + 1}/{retries} failed: {e}")
             last_exception = e
             if attempt < retries - 1:
@@ -91,15 +89,16 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
     
     MY_API_KEY = config["api"]["api_key"]
-    MY_MODEL = "Qwen/Qwen3-32B"
+    MY_MODEL = "DeepSeek-V3.1"
     MY_PROMPT = "Hi! How are you?"
+    MY_PROMPT = "Let $\mathcal{B}$ be the set of rectangular boxes with surface area $54$ and volume $23$. Let $r$ be the radius of the smallest sphere that can contain each of the rectangular boxes that are elements of $\mathcal{B}$. The value of $r^2$ can be written as $\rac{p}{q}$, where $p$ and $q$ are relatively prime positive integers. Find $p+q$."
 
     model_output, usage = get_model_response(
         model_name=MY_MODEL,
         api_key=MY_API_KEY,
         input_text=MY_PROMPT,
         max_tokens=512,
-        temperature=0.8
+        temperature=0.0
     )
 
     print("--- Model Output ---")
@@ -107,3 +106,4 @@ if __name__ == "__main__":
 
     print("--- Token Usage ---")
     print(usage)
+

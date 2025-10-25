@@ -31,9 +31,11 @@ def main():
     config = load_config()
     
     # Configuration parameters
-    model_name = "Llama4-Scout-17B-16E"
+    # model_name = "Llama4-Scout-17B-16E"
+    model_name = "GPT-OSS-120B"
+
     dataset_name = "medqa"  # or "uniadilr"
-    n_samples = 2
+    n_samples = 20
     
     # Get model-specific configuration
     model_config = config["models"][model_name]
@@ -69,8 +71,6 @@ def main():
     
     # Process each sample through the complete pipeline
     for idx, sample in enumerate(dataset):
-        if idx==0:
-            continue
         print_separator(f"PROCESSING SAMPLE {idx + 1}/{len(dataset)}")
         
         # Print sample information
@@ -247,7 +247,7 @@ def main():
         # STEP 4: CPT Creator
         print_separator("STEP 4: CPT Creator")
         step4_result = step4(sample, idx, model_name, api_key, max_tokens, temperature,
-                           thinking, sleep_time, dataset_name, step3_result, step3dot5_result)
+                           thinking, sleep_time, dataset_name, step3_result, step3dot5_result, batch_size=5)
         
         if step4_result.get("successful_api_call") and step4_result.get("right_format"):
             print("✓ Step 4 completed successfully")

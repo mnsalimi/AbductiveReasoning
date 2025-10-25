@@ -2,10 +2,11 @@ import time
 import itertools
 from typing import Dict, Any, List, Tuple, Optional
 from api_handler import get_model_response
+from tqdm import tqdm
 
 def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_tokens: int, 
           temperature: float, thinking: bool, sleep_time: float, dataset_name: str, 
-          step3_result: Dict[str, Any], step3dot5_result: Dict[str, Any] = None) -> Dict[str, Any]:
+          step3_result: Dict[str, Any], step3dot5_result: Dict[str, Any] = None, batch_size: int = 1) -> Dict[str, Any]:
     """
     Step 4: CPT Creator - Generate Conditional Probability Tables for all nodes using LLMs.
     
@@ -92,7 +93,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             # Generate CPT for this node
             cpt_result = _generate_node_cpt(
                 sample, node_info, registered_dag, model_name, api_key, 
-                max_tokens, temperature, thinking, dataset_name, visible_nodes
+                max_tokens, temperature, thinking, dataset_name, visible_nodes, batch_size
             )
             
             if cpt_result["success"]:
@@ -258,7 +259,7 @@ def _format_cpt_generation_error(node_id: str, node_info: Dict[str, Any], cpt_re
 
 def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], registered_dag: Dict[str, Any],
                       model_name: str, api_key: str, max_tokens: int, temperature: float, 
-                      thinking: bool, dataset_name: str, visible_nodes: Dict[str, str] = None) -> Dict[str, Any]:
+                      thinking: bool, dataset_name: str, visible_nodes: Dict[str, str] = None, batch_size: int = 1) -> Dict[str, Any]:
     """
     Generate CPT for a single node using LLM with row-by-row approach.
     
@@ -292,39 +293,96 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
         if num_skipped > 0:
             print(f"      ⚡ Optimizing: {len(valid_combinations)} combinations to query, {num_skipped} skipped (contradict evidence)")
         
-        # Generate CPT row by row
+        # Generate CPT row by row or in batches
         qualitative_cpt = {}
         numerical_cpt = {}
         all_raw_responses = []
         total_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
-        # Query only valid combinations
-        for combination in valid_combinations:
-            # Generate CPT row for this specific parent combination
-            row_result = _generate_cpt_row(
-                sample, node_info, parent_info, combination, registered_dag,
-                model_name, api_key, max_tokens, temperature, thinking, dataset_name
-            )
+        # Create batches of combinations
+        batches = []
+        for i in range(0, len(valid_combinations), batch_size):
+            batch = valid_combinations[i:i+batch_size]
+            batches.append(batch)
+        
+        # Query batches with progress bar
+        unit_name = "batch" if batch_size > 1 else "row"
+        desc_suffix = f"({batch_size} rows/batch)" if batch_size > 1 else ""
+        pbar = tqdm(batches, 
+                   desc=f"      CPT {unit_name}s for {node_info['id']} {desc_suffix}", 
+                   unit=unit_name,
+                   leave=False,
+                   ncols=100)
+        
+        for batch in pbar:
+            # Update progress bar with batch info
+            if batch[0] != "NO_PARENTS":
+                pbar.set_postfix_str(f"Processing {len(batch)} condition(s)")
             
-            if row_result["success"]:
-                # Store the row result
-                qualitative_cpt[combination] = row_result["qualitative_probs"]
-                numerical_cpt[combination] = row_result["numerical_probs"]
-                all_raw_responses.append({
-                    "condition": combination,
-                    "response": row_result["raw_response"]
-                })
+            # Generate CPT for this batch
+            if batch_size == 1:
+                # Single row generation (original behavior)
+                combination = batch[0]
+                batch_result = _generate_cpt_row(
+                    sample, node_info, parent_info, combination, registered_dag,
+                    model_name, api_key, max_tokens, temperature, thinking, dataset_name
+                )
                 
-                # Accumulate token usage
-                if row_result.get("token_usage"):
-                    for key in total_token_usage:
-                        total_token_usage[key] += row_result["token_usage"].get(key, 0)
+                if batch_result["success"]:
+                    # Store single row result
+                    qualitative_cpt[combination] = batch_result["qualitative_probs"]
+                    numerical_cpt[combination] = batch_result["numerical_probs"]
+                    all_raw_responses.append({
+                        "condition": combination,
+                        "response": batch_result["raw_response"]
+                    })
+                    
+                    # Accumulate token usage
+                    if batch_result.get("token_usage"):
+                        for key in total_token_usage:
+                            total_token_usage[key] += batch_result["token_usage"].get(key, 0)
+                else:
+                    pbar.close()
+                    return {
+                        "success": False,
+                        "error": f"Failed to generate CPT row for condition {combination}: {batch_result['error']}",
+                        "raw_responses": all_raw_responses
+                    }
             else:
-                return {
-                    "success": False,
-                    "error": f"Failed to generate CPT row for condition {combination}: {row_result['error']}",
-                    "raw_responses": all_raw_responses
-                }
+                # Batch generation (multiple rows at once)
+                batch_result = _generate_cpt_batch(
+                    sample, node_info, parent_info, batch, registered_dag,
+                    model_name, api_key, max_tokens, temperature, thinking, dataset_name
+                )
+                
+                if batch_result["success"]:
+                    # Store batch results
+                    for combination, qual_probs, num_probs in zip(
+                        batch, 
+                        batch_result["qualitative_probs_list"],
+                        batch_result["numerical_probs_list"]
+                    ):
+                        qualitative_cpt[combination] = qual_probs
+                        numerical_cpt[combination] = num_probs
+                    
+                    all_raw_responses.append({
+                        "conditions": batch,
+                        "response": batch_result["raw_response"]
+                    })
+                    
+                    # Accumulate token usage
+                    if batch_result.get("token_usage"):
+                        for key in total_token_usage:
+                            total_token_usage[key] += batch_result["token_usage"].get(key, 0)
+                else:
+                    pbar.close()
+                    return {
+                        "success": False,
+                        "error": f"Failed to generate CPT batch: {batch_result['error']}",
+                        "raw_responses": all_raw_responses
+                    }
+        
+        pbar.close()  # Ensure progress bar is closed
         
         # Track skipped combinations but DON'T add them to the CPT
         # (they represent impossible states given observed evidence)
@@ -479,6 +537,216 @@ def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_
         "error": f"CPT row generation failed after {max_retries} attempts. Last error: {last_error}",
         "attempts": max_retries
     }
+
+
+def _generate_cpt_batch(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
+                       conditions: List[Any], registered_dag: Dict[str, Any], model_name: str, api_key: str,
+                       max_tokens: int, temperature: float, thinking: bool, dataset_name: str) -> Dict[str, Any]:
+    """Generate multiple CPT rows in a single LLM call with retry logic."""
+    
+    # Retry logic: up to 3 attempts
+    max_retries = 3
+    retry_count = 0
+    last_error = None
+    
+    while retry_count < max_retries:
+        retry_count += 1
+        
+        try:
+            # Create prompt for this batch
+            prompt = _create_cpt_batch_prompt(sample, node_info, parent_info, conditions, registered_dag, dataset_name)
+            
+            # Get LLM response
+            model_output, usage = get_model_response(model_name, api_key, prompt, max_tokens, temperature)
+            
+            # Parse the response
+            parsed_batch = _parse_cpt_batch_response(model_output, node_info, conditions, thinking)
+            
+            if parsed_batch["success"]:
+                # Convert qualitative probabilities to numerical values
+                numerical_probs_list = []
+                for qual_probs in parsed_batch["qualitative_probs_list"]:
+                    numerical_probs = _convert_qualitative_row_to_numerical(qual_probs)
+                    numerical_probs_list.append(numerical_probs)
+                
+                return {
+                    "success": True,
+                    "qualitative_probs_list": parsed_batch["qualitative_probs_list"],
+                    "numerical_probs_list": numerical_probs_list,
+                    "raw_response": model_output,
+                    "token_usage": usage,
+                    "attempts": retry_count
+                }
+            else:
+                last_error = f"Failed to parse CPT batch response: {parsed_batch['error']}"
+                if retry_count < max_retries:
+                    print(f"        ⚠️  Attempt {retry_count} failed, retrying...")
+                    import time
+                    time.sleep(0.5)
+                continue
+                
+        except Exception as e:
+            last_error = f"CPT batch generation failed: {e}"
+            if retry_count < max_retries:
+                print(f"        ⚠️  Attempt {retry_count} failed: {e}, retrying...")
+                import time
+                time.sleep(0.5)
+            continue
+    
+    # All retries exhausted
+    return {
+        "success": False,
+        "error": f"CPT batch generation failed after {max_retries} attempts. Last error: {last_error}",
+        "attempts": max_retries
+    }
+
+
+def _create_cpt_batch_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
+                             conditions: List[Any], registered_dag: Dict[str, Any], dataset_name: str) -> str:
+    """Create prompt for generating multiple CPT rows in one call."""
+    from prompting import _load_prompt_template
+    
+    # Load the batch template
+    prompt_template = _load_prompt_template(dataset_name, "step4_batch", "v1")
+    
+    # Get node states
+    node_states = _get_node_states(node_info)
+    
+    # Build the node information section
+    node_section = f"""
+TARGET NODE INFORMATION:
+- Node Name: {node_info['name']}
+- Node Type: {node_info['type']}
+- Possible States: {', '.join(node_states)}
+"""
+    
+    # Build parent information
+    if parent_info["has_parents"]:
+        parent_section = f"""
+PARENT NODES INFORMATION:
+"""
+        for parent_id, parent_data in parent_info["parents"].items():
+            parent_section += f"- {parent_data['name']} ({parent_data['type']}): {', '.join(parent_data['states'])}\n"
+    else:
+        parent_section = "\nPARENT NODES INFORMATION:\n- This node has no parents (root node)\n"
+    
+    # Build conditions list
+    conditions_section = f"""
+PARENT CONDITIONS TO ANALYZE (generate CPD row for EACH):
+"""
+    for i, condition in enumerate(conditions, 1):
+        if condition == "NO_PARENTS":
+            conditions_section += f"{i}. NO_PARENTS (this is a root node)\n"
+        else:
+            if isinstance(condition, tuple):
+                # Multiple parents
+                parent_names = [parent_data['name'] for parent_data in parent_info["parents"].values()]
+                condition_pairs = [f"{name}={state}" for name, state in zip(parent_names, condition)]
+                condition_str = ", ".join(condition_pairs)
+            else:
+                # Single parent
+                parent_name = list(parent_info["parents"].values())[0]['name']
+                condition_str = f"{parent_name}={condition}"
+            
+            conditions_section += f"{i}. {condition_str}\n"
+    
+    # Build complete prompt
+    complete_prompt = f"""{prompt_template}
+
+{node_section}
+
+{parent_section}
+
+{conditions_section}
+
+Please provide the conditional probability distribution for '{node_info['name']}' for EACH of the {len(conditions)} parent conditions listed above."""
+    
+    return complete_prompt
+
+
+def _parse_cpt_batch_response(model_output: str, node_info: Dict[str, Any], conditions: List[Any], thinking: bool) -> Dict[str, Any]:
+    """Parse the LLM response for a batch of CPT rows."""
+    import re
+    
+    try:
+        # Clean the output if it contains <think> blocks
+        if thinking:
+            cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL).strip()
+        else:
+            cleaned_text = model_output.strip()
+        
+        # Extract reasoning and CPD rows sections
+        reasoning_pattern = r"<reasoning>(.*?)</reasoning>"
+        cpd_rows_pattern = r"<cpd_rows>(.*?)</cpd_rows>"
+        
+        reasoning_match = re.search(reasoning_pattern, cleaned_text, flags=re.DOTALL)
+        cpd_rows_match = re.search(cpd_rows_pattern, cleaned_text, flags=re.DOTALL)
+        
+        if not reasoning_match or not cpd_rows_match:
+            return {"success": False, "error": "Missing reasoning or cpd_rows sections"}
+        
+        reasoning = reasoning_match.group(1).strip()
+        cpd_rows_content = cpd_rows_match.group(1).strip()
+        
+        # Parse individual CPD rows
+        qualitative_probs_list = []
+        
+        # Split by ROW markers
+        row_pattern = r"ROW\s+\d+:(.*?)(?=ROW\s+\d+:|$)"
+        row_matches = re.findall(row_pattern, cpd_rows_content, flags=re.DOTALL)
+        
+        if len(row_matches) != len(conditions):
+            return {"success": False, "error": f"Expected {len(conditions)} rows, got {len(row_matches)}"}
+        
+        for row_content in row_matches:
+            row_data = _parse_cpd_row_content_batch(row_content.strip(), node_info)
+            if row_data["success"]:
+                qualitative_probs_list.append(row_data["probabilities"])
+            else:
+                return {"success": False, "error": f"Failed to parse row: {row_data['error']}"}
+        
+        return {
+            "success": True,
+            "qualitative_probs_list": qualitative_probs_list,
+            "reasoning": reasoning
+        }
+            
+    except Exception as e:
+        return {"success": False, "error": f"Parsing error: {e}"}
+
+
+def _parse_cpd_row_content_batch(row_content: str, node_info: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse a single CPD row content from batch response."""
+    import re
+    
+    try:
+        lines = [line.strip() for line in row_content.split('\n') if line.strip()]
+        
+        probabilities = {}
+        
+        for line in lines:
+            if line.startswith("CONDITION:") or line.startswith("NODE:") or line.startswith("STATES:"):
+                continue  # Skip metadata lines
+            elif line.startswith("PROBABILITIES:"):
+                continue  # Skip header
+            elif ":" in line:
+                # Parse probability line
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    state = parts[0].strip()
+                    prob_level = parts[1].strip()
+                    probabilities[state] = prob_level
+        
+        if not probabilities:
+            return {"success": False, "error": "No probabilities found in row"}
+        
+        return {
+            "success": True,
+            "probabilities": probabilities
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": f"Row content parsing error: {e}"}
 
 
 def _create_cpt_row_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],

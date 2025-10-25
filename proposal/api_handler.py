@@ -68,8 +68,23 @@ def get_model_response(
             )
             response.raise_for_status()
             response_data = response.json()
-            content = response_data['choices'][0]['message']['content']
-            usage = response_data['usage']
+            
+            # Debug: Print response structure if parsing fails
+            try:
+                content = response_data['choices'][0]['message']['content']
+                usage = response_data['usage']
+            except (KeyError, IndexError) as parse_error:
+                print(f"\n⚠️  Response parsing failed for model '{model_name}'")
+                print(f"Error: {parse_error}")
+                print(f"Response keys: {list(response_data.keys())}")
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    print(f"First choice keys: {list(response_data['choices'][0].keys())}")
+                    if 'message' in response_data['choices'][0]:
+                        print(f"Message keys: {list(response_data['choices'][0]['message'].keys())}")
+                else:
+                    print(f"Full response structure: {json.dumps(response_data, indent=2)[:1000]}")
+                raise
+            
             return content, usage
         except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
             print(f"Attempt {attempt + 1}/{retries} failed: {e}")

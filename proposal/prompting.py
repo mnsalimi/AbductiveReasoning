@@ -3,11 +3,11 @@ from typing import Dict, Any, Tuple, Optional, List
 import re
 import os
 
-def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optional[list]]:
+def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optional[list], Optional[str]]:
     """
     Parses the content of a <dag> block strictly.
     Requires NODES: header, then EDGES: header.
-    Returns (parsed_nodes, parsed_edges) tuple.
+    Returns (parsed_nodes, parsed_edges, error_message) tuple.
     
     Now handles both binary and categorical nodes:
     - "node_name (binary)" 
@@ -21,13 +21,14 @@ def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optio
     nodes_header_match = re.search(r"NODES:", dag_content, re.IGNORECASE)
     edges_header_match = re.search(r"EDGES:", dag_content, re.IGNORECASE)
 
-    if not nodes_header_match or not edges_header_match:
-        # If either header is missing, parsing fails.
-        return None, None
+    if not nodes_header_match:
+        return None, None, "Missing 'NODES:' header in DAG"
+    
+    if not edges_header_match:
+        return None, None, "Missing 'EDGES:' header in DAG"
 
     if nodes_header_match.start() >= edges_header_match.start():
-        # If NODES: does not appear before EDGES:, parsing fails.
-        return None, None
+        return None, None, "'NODES:' header must appear before 'EDGES:' header"
         
     # 2. Split the DAG content into two parts based on the headers.
     # The node_text is the content between "NODES:" and "EDGES:".
@@ -39,26 +40,42 @@ def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optio
     # Pattern matches: "node1: node_name (binary)" or "node1: node_name (categorical: cat1, cat2, cat3)"
     nodes_pattern = r"node\d+:\s*(.*)"
     node_matches = re.findall(nodes_pattern, node_text)
-    if node_matches:
-        parsed_nodes = []
-        for node_line in node_matches:
-            node_line = node_line.strip()
-            # Parse the node with type information
-            node_info = _parse_node_with_type(node_line)
-            if node_info:
-                parsed_nodes.append(node_info)
+    
+    if not node_matches:
+        return None, None, "No nodes found in NODES section. Expected format: 'node1: NodeName (binary)' or 'node1: NodeName (categorical: cat1, cat2)'"
+    
+    parsed_nodes = []
+    failed_nodes = []
+    for i, node_line in enumerate(node_matches, 1):
+        node_line = node_line.strip()
+        # Parse the node with type information
+        node_info = _parse_node_with_type(node_line)
+        if node_info:
+            parsed_nodes.append(node_info)
+        else:
+            failed_nodes.append(f"node{i}: '{node_line}'")
+    
+    if failed_nodes:
+        return None, None, f"Failed to parse {len(failed_nodes)} node(s). Invalid format: {', '.join(failed_nodes[:3])}{'...' if len(failed_nodes) > 3 else ''}. Expected: 'NodeName (binary)' or 'NodeName (categorical: cat1, cat2, ...)'"
+
+    if not parsed_nodes:
+        return None, None, "No valid nodes parsed from NODES section"
 
     # 4. Parse edges from the edge_text section.
     edges_pattern = r"edge\d+:\s*node\d+\s*->\s*node\d+"
     edge_matches = re.findall(edges_pattern, edge_text)
+    
     if edge_matches:
         # We need to extract just the 'nodeX -> nodeY' part.
         # A refined regex can do this in one step.
         edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
         captured_edges = re.findall(edge_capture_pattern, edge_text)
         parsed_edges = [edge.strip() for edge in captured_edges]
+    else:
+        # It's okay to have no edges for some cases, but return empty list instead of None
+        parsed_edges = []
 
-    return parsed_nodes, parsed_edges
+    return parsed_nodes, parsed_edges, None
 
 def _parse_node_with_type(node_line: str) -> Optional[dict]:
     """
@@ -85,7 +102,7 @@ def _parse_node_with_type(node_line: str) -> Optional[dict]:
         node_name = categorical_match.group(1).strip()
         categories_str = categorical_match.group(2).strip()
         # Split categories by comma and clean them
-        categories = [cat.strip() for cat in categories_str.split(',')]
+        categories = [cat.strip() for cat in categories_str.split(',') if cat.strip()]
         return {
             "name": node_name,
             "type": "categorical",
@@ -94,6 +111,45 @@ def _parse_node_with_type(node_line: str) -> Optional[dict]:
     
     # If neither pattern matches, return None (parsing failed)
     return None
+
+
+def _fix_invalid_nodes(nodes: List[Dict]) -> List[Dict]:
+    """
+    Post-process parsed nodes to fix common issues:
+    - Convert categorical nodes with only 1 category to binary
+    - Remove empty categories
+    
+    Args:
+        nodes: List of node dictionaries
+    
+    Returns:
+        List of fixed node dictionaries
+    """
+    fixed_nodes = []
+    for node in nodes:
+        if node["type"] == "categorical":
+            categories = node.get("categories", [])
+            # Filter out empty categories
+            categories = [c for c in categories if c]
+            
+            if len(categories) <= 1:
+                # Convert to binary (1 or fewer categories should be binary)
+                print(f"  🔧 Auto-fixing: Converting '{node['name']}' from categorical to binary (had {len(categories)} category/ies)")
+                fixed_nodes.append({
+                    "name": node["name"],
+                    "type": "binary",
+                    "categories": None
+                })
+            else:
+                # Keep as categorical with cleaned categories
+                fixed_nodes.append({
+                    "name": node["name"],
+                    "type": "categorical",
+                    "categories": categories
+                })
+        else:
+            fixed_nodes.append(node)
+    return fixed_nodes
 
 def _parse_additions_content_strictly(additions_content: str) -> Tuple[Optional[list], Optional[list]]:
     """
@@ -155,12 +211,14 @@ def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successf
     extracted_reasoning = None
     parsed_nodes = None
     parsed_edges = None
+    error_message = None
 
     if not successful_api_call:
         return {
             "raw_data": sample, "successful_api_call": False, "right_format": False,
             "model_output": model_output, "model_answer": None,
             "correct_answer": sample.get("answer_idx"), "token_usage": None,
+            "error": "API call failed"
         }
 
     # 1. Clean the output if it contains <think> blocks
@@ -176,22 +234,32 @@ def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successf
     # 3. Enforce order: Find <reasoning> first, then find <dag> *after* it.
     reasoning_match = re.search(reasoning_pattern, cleaned_text, flags=re.DOTALL)
     
-    if reasoning_match:
+    if not reasoning_match:
+        error_message = "Missing <reasoning> tag in model output"
+    else:
         extracted_reasoning = reasoning_match.group(1).strip()
         
         # Search for the <dag> block *only in the text following the reasoning block*.
         text_after_reasoning = cleaned_text[reasoning_match.end():]
         dag_match = re.search(dag_pattern, text_after_reasoning, flags=re.DOTALL)
 
-        if dag_match:
+        if not dag_match:
+            error_message = "Missing <dag> tag after <reasoning> in model output"
+        else:
             dag_content = dag_match.group(1).strip()
             
             # 4. Use the new strict function to parse the <dag> content
-            parsed_nodes, parsed_edges = _parse_dag_content_strictly(dag_content)
+            parsed_nodes, parsed_edges, parse_error = _parse_dag_content_strictly(dag_content)
+            
+            if parse_error:
+                error_message = f"DAG parsing error: {parse_error}"
+            elif parsed_nodes:
+                # 4.5. Auto-fix invalid nodes (e.g., categorical with 1 category -> binary)
+                parsed_nodes = _fix_invalid_nodes(parsed_nodes)
 
     # 5. Determine if the format is correct based on the strict parsing results
     # The format is correct only if all components were found in the correct order.
-    if extracted_reasoning is not None and parsed_nodes and parsed_edges:
+    if extracted_reasoning is not None and parsed_nodes and parsed_edges is not None:
         right_format = True
 
     # 6. Structure the final model answer
@@ -213,6 +281,7 @@ def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successf
         "model_output": model_output,
         "model_answer": model_answer,
         "correct_answer": correct_answer,
+        "error": error_message
     }
 
 def _parse_context_and_question(dataset_name: str, sample: Dict[str, Any]) -> Tuple[str, str]:
@@ -416,6 +485,10 @@ def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successf
             
             # 4. Use the strict function to parse the <additions> content
             parsed_new_nodes, parsed_new_edges = _parse_additions_content_strictly(additions_content)
+            
+            # 4.5. Auto-fix invalid nodes in additions
+            if parsed_new_nodes:
+                parsed_new_nodes = _fix_invalid_nodes(parsed_new_nodes)
 
     # 5. Determine if the format is correct based on the strict parsing results
     # The format is correct if both parsed lists are not None (they can be empty lists though)
@@ -510,7 +583,18 @@ def create_prompt_step3dot5(dataset_name: str, sample: dict, step3_result: dict,
     nodes = registered_dag.get("nodes", {})
     
     # Build node information section with IDs, names, types, and possible states
-    node_info_text = "DAG NODES:\n"
+    # Extract all node IDs for explicit listing
+    available_node_ids = sorted(nodes.keys(), key=lambda x: int(x.replace('node', '')))
+    
+    node_info_text = f"""AVAILABLE NODE IDs: {', '.join(available_node_ids)}
+
+⚠️ CRITICAL: Use ONLY the node IDs listed above. These are the ONLY valid node IDs in this DAG.
+⚠️ Node IDs may not be sequential due to previous processing steps.
+⚠️ When specifying a node, use the EXACT node ID from the list above (e.g., '{available_node_ids[0]}' not '1' or 'Node 1').
+
+DAG NODES (detailed information):
+"""
+    
     for node_id, node_data in sorted(nodes.items(), key=lambda x: x[1]["index"]):
         node_name = node_data["name"]
         node_type = node_data["type"]
@@ -561,6 +645,41 @@ HYPOTHESIS:
         raise ValueError(f"Invalid dataset name: {dataset_name}")
     
     return input_text
+
+
+def _normalize_node_id(raw_id: str) -> str:
+    """
+    Normalize various node ID formats to standard 'nodeX' format.
+    
+    Handles:
+    - "1" → "node1"
+    - "Node 1" → "node1"
+    - "NODE1" → "node1"
+    - "node1" → "node1"
+    - "node 1" → "node1"
+    
+    Args:
+        raw_id: Raw node ID string from model output
+    
+    Returns:
+        Normalized node ID in format "nodeX"
+    """
+    # Remove whitespace
+    cleaned = raw_id.strip().lower()
+    
+    # If it's just a number, prepend "node"
+    if cleaned.isdigit():
+        return f"node{cleaned}"
+    
+    # If it starts with "node" (case-insensitive), normalize it
+    if cleaned.startswith("node"):
+        # Remove "node" prefix, extract number, rebuild
+        number_part = cleaned.replace("node", "").strip()
+        if number_part.isdigit():
+            return f"node{number_part}"
+    
+    # If all else fails, return as-is (lowercase)
+    return cleaned
 
 
 def parse_model_answer_step3dot5(sample: Dict[str, Any], model_output: str, successful_api_call: bool, 
@@ -642,16 +761,22 @@ def parse_model_answer_step3dot5(sample: Dict[str, Any], model_output: str, succ
             if not line:
                 continue
             
-            if line.startswith("NODE:"):
-                current_node = line.split("NODE:", 1)[1].strip()
-            elif line.startswith("VALUE:") and current_node:
-                value = line.split("VALUE:", 1)[1].strip()
-                
-                # Validate that the node exists in the DAG
-                if current_node not in nodes:
-                    validation_issues.append(f"Node {current_node} not found in DAG")
-                    current_node = None
-                    continue
+            # Match NODE: with case-insensitive
+            node_match = re.match(r"(?i)NODE:\s*(.+)", line)
+            if node_match:
+                raw_node_id = node_match.group(1).strip()
+                # Normalize node ID: handle "1", "Node 1", "node1", "NODE1", etc.
+                current_node = _normalize_node_id(raw_node_id)
+            elif re.match(r"(?i)VALUE:", line) and current_node:
+                value_match = re.match(r"(?i)VALUE:\s*(.+)", line)
+                if value_match:
+                    value = value_match.group(1).strip()
+                    
+                    # Validate that the node exists in the DAG
+                    if current_node not in nodes:
+                        validation_issues.append(f"Node {current_node} not found in DAG")
+                        current_node = None
+                        continue
                 
                 # Validate that the value is valid for this node's type
                 node_info = nodes[current_node]
@@ -1134,12 +1259,14 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
     edges_to_add = None
     merged_nodes = None
     merged_edges = None
+    error_message = None
 
     if not successful_api_call:
         return {
             "raw_data": sample, "successful_api_call": False, "right_format": False,
             "model_output": model_output, "model_answer": None,
             "correct_answer": sample.get("answer_idx"), "token_usage": None,
+            "error": "API call failed"
         }
 
     # 1. Clean the output if it contains <think> blocks
@@ -1155,14 +1282,18 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
     # 3. Enforce order: Find <analysis> first, then find <modifications> *after* it.
     analysis_match = re.search(analysis_pattern, cleaned_text, flags=re.DOTALL)
     
-    if analysis_match:
+    if not analysis_match:
+        error_message = "Missing <analysis> tag in model output"
+    else:
         extracted_analysis = analysis_match.group(1).strip()
         
         # Search for the <modifications> block *only in the text following the analysis block*.
         text_after_analysis = cleaned_text[analysis_match.end():]
         modifications_match = re.search(modifications_pattern, text_after_analysis, flags=re.DOTALL)
 
-        if modifications_match:
+        if not modifications_match:
+            error_message = "Missing <modifications> tag after <analysis> in model output"
+        else:
             modifications_content = modifications_match.group(1).strip()
             
             # 4. Parse the <modifications> content (now extracting options_node separately)
@@ -1175,6 +1306,8 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
                 nodes_to_add = parsed_result["nodes_to_add"]  # All nodes combined
                 edges_to_remove = parsed_result["edges_to_remove"]
                 edges_to_add = parsed_result["edges_to_add"]
+            else:
+                error_message = f"Modifications parsing error: {parsed_result.get('error', 'Unknown error')}"
 
     # 5. Determine if the format is correct based on the strict parsing results
     if (extracted_analysis is not None and nodes_to_remove is not None and 
@@ -1243,6 +1376,7 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
         "model_answer": model_answer,
         "options_node": options_node,  # Make it available at top level too
         "correct_answer": correct_answer,
+        "error": error_message
     }
 
 
@@ -1259,6 +1393,7 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
         - nodes_to_add: list of all node dicts (options + others)
         - edges_to_remove: list of edge strings
         - edges_to_add: list of edge strings
+        - error: error message if parsing failed
     """
     nodes_to_remove = []
     nodes_to_add = []
@@ -1274,8 +1409,22 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
     edges_remove_match = re.search(r"EDGES_TO_REMOVE:", modifications_content, re.IGNORECASE)
     edges_add_match = re.search(r"EDGES_TO_ADD:", modifications_content, re.IGNORECASE)
 
-    if not all([nodes_remove_match, options_node_match, edges_remove_match, edges_add_match]):
-        return {"success": False}
+    # Check which required headers are missing
+    missing_headers = []
+    if not nodes_remove_match:
+        missing_headers.append("NODES_TO_REMOVE:")
+    if not options_node_match:
+        missing_headers.append("OPTIONS_NODE:")
+    if not edges_remove_match:
+        missing_headers.append("EDGES_TO_REMOVE:")
+    if not edges_add_match:
+        missing_headers.append("EDGES_TO_ADD:")
+    
+    if missing_headers:
+        return {
+            "success": False,
+            "error": f"Missing required header(s): {', '.join(missing_headers)}"
+        }
 
     # 2. Extract sections
     nodes_remove_text = modifications_content[nodes_remove_match.end():options_node_match.start()]
@@ -1305,18 +1454,44 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
     if not re.search(r"^\s*None\s*$", options_node_text.strip(), re.IGNORECASE):
         nodes_pattern = r"node\d+:\s*(.*)"
         node_matches = re.findall(nodes_pattern, options_node_text)
-        if node_matches and len(node_matches) > 0:
-            node_line = node_matches[0].strip()
-            # Parse the node with type information
-            options_node = _parse_node_with_type(node_line)
-            if options_node:
-                nodes_to_add.append(options_node)
+        if not node_matches or len(node_matches) == 0:
+            return {
+                "success": False,
+                "error": "OPTIONS_NODE section is not 'None' but contains no valid node definition. Expected format: 'node{N}: NodeName (categorical: option1, option2, ...)'"
+            }
+        
+        node_line = node_matches[0].strip()
+        # Parse the node with type information
+        options_node = _parse_node_with_type(node_line)
+        if not options_node:
+            return {
+                "success": False,
+                "error": f"Failed to parse OPTIONS_NODE. Invalid format: '{node_line}'. Expected: 'NodeName (categorical: option1, option2, ...)'"
+            }
+        
+        # Validate that options node is categorical
+        if options_node.get("type") != "categorical":
+            return {
+                "success": False,
+                "error": f"OPTIONS_NODE must be categorical, got: {options_node.get('type')}"
+            }
+        
+        # Validate that it has at least 2 categories
+        categories = options_node.get("categories", [])
+        if len(categories) < 2:
+            return {
+                "success": False,
+                "error": f"OPTIONS_NODE must have at least 2 categories, got {len(categories)}: {categories}"
+            }
+        
+        nodes_to_add.append(options_node)
 
     # 5. Parse other nodes to add (if NODES_TO_ADD section exists)
     if nodes_add_text and not re.search(r"^\s*None\s*$", nodes_add_text.strip(), re.IGNORECASE):
         nodes_pattern = r"node\d+:\s*(.*)"
         node_matches = re.findall(nodes_pattern, nodes_add_text)
         if node_matches:
+            failed_additional_nodes = []
             for node_line in node_matches:
                 node_line = node_line.strip()
                 # Parse the node with type information
@@ -1324,6 +1499,14 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
                 if node_info:
                     other_nodes_to_add.append(node_info)
                     nodes_to_add.append(node_info)
+                else:
+                    failed_additional_nodes.append(node_line)
+            
+            if failed_additional_nodes:
+                return {
+                    "success": False,
+                    "error": f"Failed to parse {len(failed_additional_nodes)} node(s) in NODES_TO_ADD section. Invalid format: {failed_additional_nodes[0]}"
+                }
 
     # 6. Parse edges to remove
     if re.search(r"^\s*None\s*$", edges_remove_text.strip(), re.IGNORECASE):

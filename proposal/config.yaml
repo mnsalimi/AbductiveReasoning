@@ -7,6 +7,15 @@ api:
   retries: 3
 
 models:
+  GPT-OSS-120B:
+    thinking: false
+    temperature: 0.0
+    max_tokens_by_prompt_type:
+      "Only Final Answer": 256
+      "Chain of Thought": 2048
+      "Chain of Thought and Think Abductively": 2048
+      "Chain of Thought and Only Think Abductively": 2048
+      "CPT Creation": 1024
   DeepSeek-V3.1:
     thinking: false
     temperature: 0.7
@@ -284,6 +293,60 @@ prompt_templates:
       ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
       ** Focus on this specific condition only - do not provide probabilities for other parent combinations
 
+    step4_batch: |
+      You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
+      
+      You are given a Bayesian Network node and MULTIPLE CONDITIONS of its parent nodes. Your task is to provide the conditional probability distribution for this node given EACH of the parent conditions listed.
+      
+      You will be provided with:
+      1. The target node information (name, type, possible states/categories)
+      2. Parent nodes information (if any)
+      3. MULTIPLE parent conditions/states you need to analyze
+      4. The original context that led to this Bayesian network
+      
+      For EACH given parent condition, you need to estimate the conditional probability of each state of the target node.
+      
+      IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
+      - "very_low"
+      - "low"
+      - "moderate" 
+      - "high" 
+      - "very_high" 
+      
+      Your output must be in the exact following format:
+      
+      <reasoning> your detailed reasoning about why these specific parent conditions lead to these probability estimates for the target node </reasoning>
+      <cpd_rows>
+      ROW 1:
+      CONDITION: first_parent_condition
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
+      ...
+      
+      ROW 2:
+      CONDITION: second_parent_condition
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
+      ...
+      
+      ROW N:
+      CONDITION: nth_parent_condition
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
+      ...
+      </cpd_rows>
+      
+      ** For root nodes with no parents, use: "CONDITION: NO_PARENTS"
+      ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
+      ** You MUST provide probability estimates for ALL conditions listed
+      ** Each ROW should correspond to the conditions in the order they were listed
+
     step3dot5: |
       You are analyzing a medical question to identify which variables (nodes) in a Bayesian Network have known values from the question and context.
       
@@ -302,9 +365,15 @@ prompt_templates:
       
       IMPORTANT:
       - Only identify nodes as visible if their value is CERTAIN from the context
+      - Use the EXACT node IDs from the "AVAILABLE NODE IDs" list provided above
       - Use the EXACT values from the "possible values" list for each node
       - If a node's value is uncertain or not mentioned, do NOT include it
       - Match values to the node's type (binary: yes/no; categorical: one of the listed categories)
+      
+      CRITICAL FORMAT REQUIREMENTS:
+      - Use the EXACT node ID format (e.g., "node2" not "2" or "Node 2")
+      - Node IDs may have gaps (e.g., node2, node3, node5, node7) - this is normal
+      - You MUST use only node IDs that appear in the "AVAILABLE NODE IDs" list
       
       Your output must be in the exact following format:
       
@@ -314,7 +383,7 @@ prompt_templates:
       
       <visible_nodes>
       [For each visible node, list it in this format:]
-      NODE: [node_id]
+      NODE: [exact node_id from the AVAILABLE NODE IDs list, e.g., node2]
       VALUE: [exact value from the node's possible values]
       
       [If no nodes are visible, write:]
@@ -567,6 +636,60 @@ prompt_templates:
       ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
       ** Focus on this specific condition only - do not provide probabilities for other parent combinations
 
+    step4_batch: |
+      You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
+      
+      You are given a Bayesian Network node and MULTIPLE CONDITIONS of its parent nodes. Your task is to provide the conditional probability distribution for this node given EACH of the parent conditions listed based on logical reasoning principles.
+      
+      You will be provided with:
+      1. The target node information (name, type, possible states/categories)
+      2. Parent nodes information (if any)
+      3. MULTIPLE parent conditions/states you need to analyze
+      4. The original logical context that led to this Bayesian network
+      
+      For EACH given parent condition, you need to estimate the conditional probability of each state of the target node based on logical reasoning principles.
+      
+      IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
+      - "very_low" 
+      - "low"
+      - "moderate" 
+      - "high" 
+      - "very_high"
+      
+      Your output must be in the exact following format:
+      
+      <reasoning> your detailed reasoning about why these specific parent conditions lead to these probability estimates for the target node based on logical principles </reasoning>
+      <cpd_rows>
+      ROW 1:
+      CONDITION: first_parent_condition
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
+      ...
+      
+      ROW 2:
+      CONDITION: second_parent_condition
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
+      ...
+      
+      ROW N:
+      CONDITION: nth_parent_condition
+      PROBABILITIES:
+      target_state1: probability_level
+      target_state2: probability_level
+      target_state3: probability_level
+      ...
+      </cpd_rows>
+      
+      ** For root nodes with no parents, use: "CONDITION: NO_PARENTS"
+      ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
+      ** You MUST provide probability estimates for ALL conditions listed
+      ** Each ROW should correspond to the conditions in the order they were listed
+
     step3dot5: |
       You are analyzing a logical reasoning task to identify which variables (nodes) in a Bayesian Network have known values from the context and hypothesis.
       
@@ -579,9 +702,15 @@ prompt_templates:
       
       IMPORTANT:
       - Only identify nodes as visible if their value is CERTAIN from the context
+      - Use the EXACT node IDs from the "AVAILABLE NODE IDs" list provided above
       - Use the EXACT values from the "possible values" list for each node
       - If a node's value is uncertain or not mentioned, do NOT include it
       - Match values to the node's type (binary: yes/no; categorical: one of the listed categories)
+      
+      CRITICAL FORMAT REQUIREMENTS:
+      - Use the EXACT node ID format (e.g., "node2" not "2" or "Node 2")
+      - Node IDs may have gaps (e.g., node2, node3, node5, node7) - this is normal
+      - You MUST use only node IDs that appear in the "AVAILABLE NODE IDs" list
       
       Your output must be in the exact following format:
       
@@ -591,7 +720,7 @@ prompt_templates:
       
       <visible_nodes>
       [For each visible node, list it in this format:]
-      NODE: [node_id]
+      NODE: [exact node_id from the AVAILABLE NODE IDs list, e.g., node2]
       VALUE: [exact value from the node's possible values]
       
       [If no nodes are visible, write:]

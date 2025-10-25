@@ -586,9 +586,8 @@ def plot_dag(registered_dag: Dict[str, Any], output_path: str, sample_idx: int =
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Save the figure
+    # Save the figure (PNG only)
     plt.savefig(f"{output_path}.png", dpi=300, bbox_inches='tight')
-    plt.savefig(f"{output_path}.pdf", bbox_inches='tight')
     plt.close()
     
-    print(f"  💾 DAG visualization saved to: {output_path}.png and {output_path}.pdf")
+    print(f"  💾 DAG visualization saved to: {output_path}.png")

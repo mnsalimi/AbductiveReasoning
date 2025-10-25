@@ -425,40 +425,60 @@ def _generate_parent_combinations(parent_info: Dict[str, Any], visible_nodes: Di
 def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
                      condition: Any, registered_dag: Dict[str, Any], model_name: str, api_key: str,
                      max_tokens: int, temperature: float, thinking: bool, dataset_name: str) -> Dict[str, Any]:
-    """Generate a single CPT row for a specific parent condition."""
-    try:
-        # Create prompt for this specific condition
-        prompt = _create_cpt_row_prompt(sample, node_info, parent_info, condition, registered_dag, dataset_name)
+    """Generate a single CPT row for a specific parent condition with retry logic."""
+    
+    # Retry logic: up to 3 attempts
+    max_retries = 3
+    retry_count = 0
+    last_error = None
+    
+    while retry_count < max_retries:
+        retry_count += 1
         
-        # Get LLM response
-        model_output, usage = get_model_response(model_name, api_key, prompt, max_tokens, temperature)
-        
-        # Parse the response
-        parsed_row = _parse_cpt_row_response(model_output, node_info, condition, thinking)
-        
-        if parsed_row["success"]:
-            # Convert qualitative probabilities to numerical values
-            numerical_probs = _convert_qualitative_row_to_numerical(parsed_row["qualitative_probs"])
+        try:
+            # Create prompt for this specific condition
+            prompt = _create_cpt_row_prompt(sample, node_info, parent_info, condition, registered_dag, dataset_name)
             
-            return {
-                "success": True,
-                "qualitative_probs": parsed_row["qualitative_probs"],
-                "numerical_probs": numerical_probs,
-                "raw_response": model_output,
-                "token_usage": usage
-            }
-        else:
-            return {
-                "success": False,
-                "error": f"Failed to parse CPT row response: {parsed_row['error']}",
-                "raw_response": model_output
-            }
+            # Get LLM response
+            model_output, usage = get_model_response(model_name, api_key, prompt, max_tokens, temperature)
             
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"CPT row generation failed: {e}"
-        }
+            # Parse the response
+            parsed_row = _parse_cpt_row_response(model_output, node_info, condition, thinking)
+            
+            if parsed_row["success"]:
+                # Convert qualitative probabilities to numerical values
+                numerical_probs = _convert_qualitative_row_to_numerical(parsed_row["qualitative_probs"])
+                
+                return {
+                    "success": True,
+                    "qualitative_probs": parsed_row["qualitative_probs"],
+                    "numerical_probs": numerical_probs,
+                    "raw_response": model_output,
+                    "token_usage": usage,
+                    "attempts": retry_count
+                }
+            else:
+                last_error = f"Failed to parse CPT row response: {parsed_row['error']}"
+                if retry_count < max_retries:
+                    print(f"        ⚠️  Attempt {retry_count} failed, retrying...")
+                    import time
+                    time.sleep(0.5)  # Short delay between retries
+                continue
+                
+        except Exception as e:
+            last_error = f"CPT row generation failed: {e}"
+            if retry_count < max_retries:
+                print(f"        ⚠️  Attempt {retry_count} failed: {e}, retrying...")
+                import time
+                time.sleep(0.5)  # Short delay between retries
+            continue
+    
+    # All retries exhausted
+    return {
+        "success": False,
+        "error": f"CPT row generation failed after {max_retries} attempts. Last error: {last_error}",
+        "attempts": max_retries
+    }
 
 
 def _create_cpt_row_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],

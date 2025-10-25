@@ -50,78 +50,121 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
             "step3dot5_result": step6_result.get("step3dot5_result"),
         }
     
-    try:
-        # Create the prompt with context, question, and all variable assignments
-        print(f"\n  📝 Creating prompt with variable assignments...")
-        input_text = create_prompt_step7(dataset_name, sample, step6_result)
+    # Create the prompt with context, question, and all variable assignments
+    print(f"\n  📝 Creating prompt with variable assignments...")
+    input_text = create_prompt_step7(dataset_name, sample, step6_result)
+    
+    # Retry logic: up to 3 attempts
+    max_retries = 3
+    retry_count = 0
+    last_error = None
+    all_attempts = []
+    
+    while retry_count < max_retries:
+        retry_count += 1
         
-        # Call the LLM API
-        print(f"  📞 Calling LLM API to extract answer...")
-        model_output, token_usage = get_model_response(
-            model_name=model_name,
-            api_key=api_key,
-            input_text=input_text,
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-        
-        # Parse the model's response
-        print(f"  🔍 Parsing extracted answer...")
-        parsed_result = parse_model_answer_step7(
-            sample=sample,
-            model_output=model_output,
-            successful_api_call=True,
-            thinking=thinking,
-            dataset_name=dataset_name
-        )
-        
-        # Add additional metadata
-        parsed_result["input_text"] = input_text
-        parsed_result["token_usage"] = token_usage
-        parsed_result["idx"] = idx
-        parsed_result["step1_result"] = step6_result.get("step1_result")
-        parsed_result["step2_result"] = step6_result.get("step2_result")
-        parsed_result["step2dot5_result"] = step6_result.get("step2dot5_result")
-        parsed_result["step3_result"] = step6_result.get("step3_result")
-        parsed_result["step3dot5_result"] = step6_result.get("step3dot5_result")
-        parsed_result["step4_result"] = step6_result.get("step4_result")
-        parsed_result["step5_result"] = step6_result.get("step5_result")
-        parsed_result["step6_result"] = step6_result
-        
-        # Check if the extracted answer is correct
-        if parsed_result.get("right_format") and parsed_result.get("extracted_answer"):
-            extracted_answer = parsed_result["extracted_answer"]
-            correct_answer = sample.get("answer_idx")
+        try:
+            # Call the LLM API
+            print(f"\n  🔄 Step 7 - Attempt {retry_count}/{max_retries}...")
+            print(f"  📞 Calling LLM API to extract answer...")
+            model_output, token_usage = get_model_response(
+                model_name=model_name,
+                api_key=api_key,
+                input_text=input_text,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
             
-            if dataset_name == "medqa":
-                # For MedQA, compare option letters
-                extracted_option = extracted_answer.get("option", "").upper()
-                is_correct = (extracted_option == correct_answer)
-            elif dataset_name == "uniadilr":
-                # For UniADILR, we would need to compare with the proof sentences
-                # This is more complex, so for now we'll leave it as None
-                is_correct = None
+            # Parse the model's response
+            print(f"  🔍 Parsing extracted answer...")
+            parsed_result = parse_model_answer_step7(
+                sample=sample,
+                model_output=model_output,
+                successful_api_call=True,
+                thinking=thinking,
+                dataset_name=dataset_name
+            )
+            
+            # Record this attempt
+            all_attempts.append({
+                "attempt": retry_count,
+                "successful_api_call": True,
+                "right_format": parsed_result.get("right_format", False)
+            })
+            
+            # Check if parsing was successful
+            if parsed_result.get("right_format"):
+                print(f"      ✅ Step 7 successful!")
+                
+                # Add additional metadata
+                parsed_result["input_text"] = input_text
+                parsed_result["token_usage"] = token_usage
+                parsed_result["idx"] = idx
+                parsed_result["step1_result"] = step6_result.get("step1_result")
+                parsed_result["step2_result"] = step6_result.get("step2_result")
+                parsed_result["step2dot5_result"] = step6_result.get("step2dot5_result")
+                parsed_result["step3_result"] = step6_result.get("step3_result")
+                parsed_result["step3dot5_result"] = step6_result.get("step3dot5_result")
+                parsed_result["step4_result"] = step6_result.get("step4_result")
+                parsed_result["step5_result"] = step6_result.get("step5_result")
+                parsed_result["step6_result"] = step6_result
+                parsed_result["attempts"] = all_attempts
+                
+                # Check if the extracted answer is correct
+                if parsed_result.get("extracted_answer"):
+                    extracted_answer = parsed_result["extracted_answer"]
+                    correct_answer = sample.get("answer_idx")
+                    
+                    if dataset_name == "medqa":
+                        # For MedQA, compare option letters
+                        extracted_option = extracted_answer.get("option", "").upper()
+                        is_correct = (extracted_option == correct_answer)
+                    elif dataset_name == "uniadilr":
+                        # For UniADILR, we would need to compare with the proof sentences
+                        # This is more complex, so for now we'll leave it as None
+                        is_correct = None
+                    else:
+                        is_correct = None
+                    
+                    parsed_result["is_correct"] = is_correct
+                
+                return parsed_result
             else:
-                is_correct = None
+                last_error = parsed_result.get("error", "Unknown parsing error")
+                print(f"      ❌ Parsing failed: {last_error}")
+                
+                if retry_count < max_retries:
+                    print(f"      🔄 Retrying...")
+                    time.sleep(sleep_time)
             
-            parsed_result["is_correct"] = is_correct
-        
-        return parsed_result
-        
-    except Exception as e:
-        return {
-            "raw_data": sample,
-            "successful_api_call": False,
-            "right_format": False,
-            "extracted_answer": None,
-            "model_output": None,
-            "correct_answer": sample.get("answer_idx"),
-            "is_correct": False,
-            "idx": idx,
-            "error": f"Step 7 failed for sample {idx}: {str(e)}",
-            "step2dot5_result": step6_result.get("step2dot5_result"),
-            "step3dot5_result": step6_result.get("step3dot5_result"),
-        }
+        except Exception as e:
+            last_error = f"Step 7 failed: {str(e)}"
+            all_attempts.append({
+                "attempt": retry_count,
+                "error": last_error,
+                "stage": "api_call"
+            })
+            print(f"      ❌ API call failed: {e}")
+            
+            if retry_count < max_retries:
+                print(f"      🔄 Retrying...")
+                time.sleep(sleep_time)
+    
+    # All retries exhausted
+    return {
+        "raw_data": sample,
+        "successful_api_call": False,
+        "right_format": False,
+        "extracted_answer": None,
+        "model_output": None,
+        "correct_answer": sample.get("answer_idx"),
+        "is_correct": False,
+        "idx": idx,
+        "error": f"Step 7 failed after {max_retries} attempts. Last error: {last_error}",
+        "step2dot5_result": step6_result.get("step2dot5_result"),
+        "step3dot5_result": step6_result.get("step3dot5_result"),
+        "attempts": all_attempts
+    }
 
 
 def _convert_tuple_keys_to_strings(obj):

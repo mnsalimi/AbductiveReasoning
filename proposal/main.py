@@ -3,6 +3,7 @@ import os
 from loader import load_med_qa_dataset, load_uniadilr_hgc_dataset
 from step1 import step1
 from step2 import step2
+from step2dot5 import step2dot5
 from step3 import step3, plot_dag
 from step3dot5 import step3dot5
 from step4 import step4
@@ -117,9 +118,35 @@ def main():
             print(f"✗ Step 2 failed: {step2_result.get('error', 'Unknown error')}")
             continue
         
+        # STEP 2.5: Refine DAG to ensure answer options are properly represented
+        print_separator("STEP 2.5: Refine DAG for Answer Options")
+        step2dot5_result = step2dot5(sample, idx, model_name, api_key, max_tokens, temperature,
+                                      thinking, sleep_time, dataset_name, step2_result)
+        
+        if step2dot5_result.get("successful_api_call") and step2dot5_result.get("right_format"):
+            print("✓ Step 2.5 completed successfully")
+            modified_nodes = step2dot5_result["model_answer"].get("nodes", [])
+            modified_edges = step2dot5_result["model_answer"].get("edges", [])
+            modifications = step2dot5_result["model_answer"].get("modifications_summary", {})
+            options_node = step2dot5_result.get("options_node")
+            
+            print(f"  📊 Final nodes: {len(modified_nodes)}")
+            print(f"  🔗 Final edges: {len(modified_edges)}")
+            print(f"  ➖ Nodes removed: {modifications.get('nodes_removed_count', 0)}")
+            print(f"  ➕ Nodes added: {modifications.get('nodes_added_count', 0)}")
+            print(f"  ➖ Edges removed: {modifications.get('edges_removed_count', 0)}")
+            print(f"  ➕ Edges added: {modifications.get('edges_added_count', 0)}")
+            if options_node:
+                print(f"  🎯 Options node: '{options_node['name']}' with {len(options_node.get('categories', []))} categories")
+            if step2dot5_result.get("token_usage"):
+                print(f"  🔢 Tokens used: {step2dot5_result['token_usage'].get('total_tokens', 0)}")
+        else:
+            print(f"✗ Step 2.5 failed: {step2dot5_result.get('error', 'Unknown error')}")
+            continue
+        
         # STEP 3: Register DAG
         print_separator("STEP 3: Register DAG")
-        step3_result = step3(sample, idx, step2_result, sleep_time)
+        step3_result = step3(sample, idx, step2dot5_result, sleep_time)
         
         if step3_result.get("successful_api_call") and step3_result.get("right_format"):
             print("✓ Step 3 completed successfully")
@@ -420,12 +447,13 @@ def main():
             save_step7_result(step7_result, dataset_name, model_name)
         
         print_separator("PIPELINE COMPLETED FOR SAMPLE")
-        print(f"✓ All 7 steps completed for sample {idx + 1}")
+        print(f"✓ All steps completed for sample {idx + 1}")
         
         # Print summary
         print("\n📊 SUMMARY:")
         print(f"  Step 1: {len(nodes)} nodes, {len(edges)} edges")
         print(f"  Step 2: {len(refined_nodes)} nodes, {len(refined_edges)} edges (refined)")
+        print(f"  Step 2.5: {len(modified_nodes)} nodes, {len(modified_edges)} edges (options refined)")
         print(f"  Step 3: DAG registered with {dag.get('num_nodes', 0)} nodes")
         print(f"  Step 4: {len(cpts)} CPTs created")
         print(f"  Step 5: Bayesian Network constructed")

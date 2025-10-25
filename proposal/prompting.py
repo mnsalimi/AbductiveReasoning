@@ -1,10 +1,7 @@
 import yaml
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional, List
 import re
 import os
-
-import re
-from typing import Dict, Any, Optional, Tuple
 
 def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optional[list]]:
     """
@@ -1020,3 +1017,389 @@ def _parse_uniadilr_answer(answer_content: str, sample: Dict[str, Any]) -> Tuple
     }
     
     return extracted_answer, True, None
+
+
+def create_prompt_step2dot5(dataset_name: str, sample: dict, step2_result: dict, type: str = "v1"):
+    """
+    Create prompt for Step 2.5: Refine DAG to ensure answer choices/options are properly represented.
+    
+    Args:
+        dataset_name: "medqa" or "uniadilr"
+        sample: Original data sample
+        step2_result: Result from step2 containing the refined BN Schema
+        type: Template type (default "v1")
+    
+    Returns:
+        str: Complete prompt for step2.5
+    """
+    prompt_content = _load_prompt_template(dataset_name, "step2dot5", type)
+    context, question = _parse_context_and_question(dataset_name, sample)
+    answer_choices = _get_answer_choices(dataset_name, sample)
+    
+    # Build the step2 BN Schema text to include in the prompt
+    step2_schema_text = ""
+    if step2_result.get("model_answer"):
+        model_answer = step2_result["model_answer"]
+        nodes = model_answer.get("nodes", [])
+        
+        # Format nodes properly (handle both old string format and new dict format)
+        formatted_nodes = []
+        for i, node in enumerate(nodes):
+            if isinstance(node, dict):
+                # New format with type information
+                if node["type"] == "binary":
+                    formatted_nodes.append(f"node{i+1}: {node['name']} (binary)")
+                elif node["type"] == "categorical":
+                    categories_str = ", ".join(node["categories"])
+                    formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str})")
+            else:
+                # Old format (backward compatibility) - assume binary
+                formatted_nodes.append(f"node{i+1}: {node} (binary)")
+        
+        step2_schema_text = f"""
+Current BN Schema from Step 2:
+<dag>
+NODES: 
+{chr(10).join(formatted_nodes)}
+EDGES: 
+{chr(10).join([f"edge{i+1}: {edge}" for i, edge in enumerate(model_answer.get("edges", []))])}
+</dag>
+"""
+    
+    # Build the complete input with clear labels
+    if dataset_name == "medqa":
+        # For MedQA: clearly labeled context, question, and answer choices
+        input_parts = [
+            f"Context:\n{context}",
+            f"Question:\n{question}"
+        ]
+        if answer_choices:
+            input_parts.append(f"Answer Choices:\n{answer_choices}")
+        input_parts.extend([step2_schema_text, prompt_content])
+        input_text = "\n\n".join(input_parts)
+    elif dataset_name == "uniadilr":
+        # For UniADILR: clearly labeled context and hypothesis
+        # Format context sentences nicely
+        if isinstance(context, dict):
+            context_text = "Context:\n"
+            for key, value in context.items():
+                context_text += f"{key}: {value}\n"
+            context_text = context_text.strip()
+        else:
+            context_text = f"Context:\n{str(context)}"
+        
+        input_parts = [
+            context_text,
+            f"Hypothesis:\n{str(question)}",
+            step2_schema_text,
+            prompt_content
+        ]
+        input_text = "\n\n".join(input_parts)
+    
+    return input_text
+
+
+def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, successful_api_call: bool, 
+                                  thinking: bool, step2_result: dict, dataset_name: str) -> dict:
+    """
+    Parse the model's response for Step 2.5 (DAG refinement for proper option representation)
+    
+    Args:
+        sample: Original data sample
+        model_output: Raw model response
+        successful_api_call: Whether API call succeeded
+        thinking: Whether model supports <think> blocks
+        step2_result: Result from step2 to apply modifications to
+        dataset_name: "medqa" or "uniadilr"
+    
+    Returns:
+        dict: Parsed result with modified BN Schema and options_node separately identified
+    """
+    right_format = False
+    extracted_analysis = None
+    nodes_to_remove = None
+    nodes_to_add = None
+    options_node = None
+    other_nodes_to_add = None
+    edges_to_remove = None
+    edges_to_add = None
+    merged_nodes = None
+    merged_edges = None
+
+    if not successful_api_call:
+        return {
+            "raw_data": sample, "successful_api_call": False, "right_format": False,
+            "model_output": model_output, "model_answer": None,
+            "correct_answer": sample.get("answer_idx"), "token_usage": None,
+        }
+
+    # 1. Clean the output if it contains <think> blocks
+    if thinking:
+        cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL).strip()
+    else:
+        cleaned_text = model_output.strip()
+
+    # 2. Define regex patterns for the main blocks
+    analysis_pattern = r"<analysis>(.*?)</analysis>"
+    modifications_pattern = r"<modifications>(.*?)</modifications>"
+
+    # 3. Enforce order: Find <analysis> first, then find <modifications> *after* it.
+    analysis_match = re.search(analysis_pattern, cleaned_text, flags=re.DOTALL)
+    
+    if analysis_match:
+        extracted_analysis = analysis_match.group(1).strip()
+        
+        # Search for the <modifications> block *only in the text following the analysis block*.
+        text_after_analysis = cleaned_text[analysis_match.end():]
+        modifications_match = re.search(modifications_pattern, text_after_analysis, flags=re.DOTALL)
+
+        if modifications_match:
+            modifications_content = modifications_match.group(1).strip()
+            
+            # 4. Parse the <modifications> content (now extracting options_node separately)
+            parsed_result = _parse_modifications_content_step2dot5(modifications_content, sample, dataset_name)
+            
+            if parsed_result["success"]:
+                nodes_to_remove = parsed_result["nodes_to_remove"]
+                options_node = parsed_result["options_node"]
+                other_nodes_to_add = parsed_result["other_nodes_to_add"]
+                nodes_to_add = parsed_result["nodes_to_add"]  # All nodes combined
+                edges_to_remove = parsed_result["edges_to_remove"]
+                edges_to_add = parsed_result["edges_to_add"]
+
+    # 5. Determine if the format is correct based on the strict parsing results
+    if (extracted_analysis is not None and nodes_to_remove is not None and 
+        nodes_to_add is not None and edges_to_remove is not None and edges_to_add is not None):
+        right_format = True
+
+    # 6. Apply modifications to the schema from step2
+    validation_passed = False
+    if right_format and step2_result.get("model_answer"):
+        original_nodes = step2_result["model_answer"].get("nodes", [])
+        original_edges = step2_result["model_answer"].get("edges", [])
+        
+        # Apply modifications
+        try:
+            modified_result = _apply_dag_modifications(
+                original_nodes, original_edges, 
+                nodes_to_remove, nodes_to_add, 
+                edges_to_remove, edges_to_add
+            )
+            
+            merged_nodes = modified_result["nodes"]
+            merged_edges = modified_result["edges"]
+            validation_passed = True
+        except Exception as e:
+            validation_passed = False
+            right_format = False
+
+    # 7. Structure the final model answer
+    model_answer = None
+    if right_format and validation_passed:
+        # Calculate node type statistics for merged schema
+        binary_nodes = [node for node in merged_nodes if node["type"] == "binary"]
+        categorical_nodes = [node for node in merged_nodes if node["type"] == "categorical"]
+        
+        model_answer = {
+            "analysis": extracted_analysis,
+            "nodes": merged_nodes,  # Complete modified schema
+            "edges": merged_edges,  # Complete modified schema
+            "options_node": options_node,  # The specific node representing answer options
+            "nodes_removed": nodes_to_remove,  # Nodes that were removed
+            "nodes_added": nodes_to_add,  # All nodes that were added
+            "other_nodes_added": other_nodes_to_add,  # Other nodes added (not the options node)
+            "edges_removed": edges_to_remove,  # Edges that were removed
+            "edges_added": edges_to_add,  # Edges that were added
+            "total_nodes_count": len(merged_nodes),
+            "total_edges_count": len(merged_edges),
+            "binary_nodes_count": len(binary_nodes),
+            "categorical_nodes_count": len(categorical_nodes),
+            "modifications_summary": {
+                "nodes_removed_count": len(nodes_to_remove) if nodes_to_remove and nodes_to_remove != ["None"] else 0,
+                "nodes_added_count": len(nodes_to_add) if nodes_to_add else 0,
+                "edges_removed_count": len(edges_to_remove) if edges_to_remove and edges_to_remove != ["None"] else 0,
+                "edges_added_count": len(edges_to_add) if edges_to_add else 0
+            }
+        }
+        
+    correct_answer = sample.get("answer_idx")
+
+    # 8. Return the comprehensive dictionary
+    return {
+        "raw_data": sample,
+        "successful_api_call": successful_api_call,
+        "right_format": right_format,
+        "validation_passed": validation_passed,
+        "model_output": model_output,
+        "model_answer": model_answer,
+        "options_node": options_node,  # Make it available at top level too
+        "correct_answer": correct_answer,
+    }
+
+
+def _parse_modifications_content_step2dot5(modifications_content: str, sample: Dict[str, Any], dataset_name: str) -> Dict[str, Any]:
+    """
+    Parse the content of a <modifications> block strictly for step2.5.
+    Extracts the options node separately from other nodes.
+    
+    Returns dict with:
+        - success: bool
+        - nodes_to_remove: list of node IDs
+        - options_node: dict for the node representing answer options
+        - other_nodes_to_add: list of other node dicts
+        - nodes_to_add: list of all node dicts (options + others)
+        - edges_to_remove: list of edge strings
+        - edges_to_add: list of edge strings
+    """
+    nodes_to_remove = []
+    nodes_to_add = []
+    options_node = None
+    other_nodes_to_add = []
+    edges_to_remove = []
+    edges_to_add = []
+
+    # 1. Check for the existence and order of headers
+    nodes_remove_match = re.search(r"NODES_TO_REMOVE:", modifications_content, re.IGNORECASE)
+    nodes_add_match = re.search(r"NODES_TO_ADD:", modifications_content, re.IGNORECASE)
+    options_node_match = re.search(r"OPTIONS_NODE:", modifications_content, re.IGNORECASE)
+    edges_remove_match = re.search(r"EDGES_TO_REMOVE:", modifications_content, re.IGNORECASE)
+    edges_add_match = re.search(r"EDGES_TO_ADD:", modifications_content, re.IGNORECASE)
+
+    if not all([nodes_remove_match, options_node_match, edges_remove_match, edges_add_match]):
+        return {"success": False}
+
+    # 2. Extract sections
+    nodes_remove_text = modifications_content[nodes_remove_match.end():options_node_match.start()]
+    
+    # OPTIONS_NODE section
+    if nodes_add_match:
+        # There are additional nodes after OPTIONS_NODE
+        options_node_text = modifications_content[options_node_match.end():nodes_add_match.start()]
+        nodes_add_text = modifications_content[nodes_add_match.end():edges_remove_match.start()]
+    else:
+        # Only OPTIONS_NODE, no additional nodes
+        options_node_text = modifications_content[options_node_match.end():edges_remove_match.start()]
+        nodes_add_text = ""
+    
+    edges_remove_text = modifications_content[edges_remove_match.end():edges_add_match.start()]
+    edges_add_text = modifications_content[edges_add_match.end():]
+
+    # 3. Parse nodes to remove
+    if re.search(r"^\s*None\s*$", nodes_remove_text.strip(), re.IGNORECASE):
+        nodes_to_remove = ["None"]
+    else:
+        # Match pattern: "node{number}"
+        node_remove_pattern = r"(node\d+)"
+        nodes_to_remove = re.findall(node_remove_pattern, nodes_remove_text)
+
+    # 4. Parse OPTIONS_NODE (the node that represents answer options)
+    if not re.search(r"^\s*None\s*$", options_node_text.strip(), re.IGNORECASE):
+        nodes_pattern = r"node\d+:\s*(.*)"
+        node_matches = re.findall(nodes_pattern, options_node_text)
+        if node_matches and len(node_matches) > 0:
+            node_line = node_matches[0].strip()
+            # Parse the node with type information
+            options_node = _parse_node_with_type(node_line)
+            if options_node:
+                nodes_to_add.append(options_node)
+
+    # 5. Parse other nodes to add (if NODES_TO_ADD section exists)
+    if nodes_add_text and not re.search(r"^\s*None\s*$", nodes_add_text.strip(), re.IGNORECASE):
+        nodes_pattern = r"node\d+:\s*(.*)"
+        node_matches = re.findall(nodes_pattern, nodes_add_text)
+        if node_matches:
+            for node_line in node_matches:
+                node_line = node_line.strip()
+                # Parse the node with type information
+                node_info = _parse_node_with_type(node_line)
+                if node_info:
+                    other_nodes_to_add.append(node_info)
+                    nodes_to_add.append(node_info)
+
+    # 6. Parse edges to remove
+    if re.search(r"^\s*None\s*$", edges_remove_text.strip(), re.IGNORECASE):
+        edges_to_remove = ["None"]
+    else:
+        # Match pattern: "edge{number}: node{x} -> node{y}"
+        edge_remove_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
+        edges_to_remove = re.findall(edge_remove_pattern, edges_remove_text)
+
+    # 7. Parse edges to add
+    if re.search(r"^\s*None\s*$", edges_add_text.strip(), re.IGNORECASE):
+        edges_to_add = []
+    else:
+        edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
+        edges_to_add = re.findall(edge_capture_pattern, edges_add_text)
+
+    return {
+        "success": True,
+        "nodes_to_remove": nodes_to_remove,
+        "options_node": options_node,
+        "other_nodes_to_add": other_nodes_to_add,
+        "nodes_to_add": nodes_to_add,
+        "edges_to_remove": edges_to_remove,
+        "edges_to_add": edges_to_add
+    }
+
+
+def _apply_dag_modifications(original_nodes: List, original_edges: List,
+                            nodes_to_remove: List[str], nodes_to_add: List[Dict],
+                            edges_to_remove: List[str], edges_to_add: List[str]) -> Dict[str, Any]:
+    """
+    Apply modifications to a DAG (remove and add nodes/edges).
+    
+    Args:
+        original_nodes: Original list of nodes
+        original_edges: Original list of edges
+        nodes_to_remove: List of node IDs to remove (or ["None"])
+        nodes_to_add: List of node dicts to add
+        edges_to_remove: List of edge strings to remove (or ["None"])
+        edges_to_add: List of edge strings to add
+    
+    Returns:
+        dict: Modified DAG with "nodes" and "edges"
+    """
+    # Create working copies
+    modified_nodes = original_nodes.copy()
+    modified_edges = original_edges.copy()
+    
+    # 1. Remove nodes (if not "None")
+    if nodes_to_remove and nodes_to_remove != ["None"]:
+        # Build node ID to index mapping
+        node_id_to_index = {}
+        for i, node in enumerate(modified_nodes):
+            node_id = f"node{i+1}"
+            node_id_to_index[node_id] = i
+        
+        # Remove nodes (in reverse order to maintain indices)
+        indices_to_remove = []
+        for node_id in nodes_to_remove:
+            if node_id in node_id_to_index:
+                indices_to_remove.append(node_id_to_index[node_id])
+        
+        for idx in sorted(indices_to_remove, reverse=True):
+            modified_nodes.pop(idx)
+    
+    # 2. Remove edges (if not "None")
+    if edges_to_remove and edges_to_remove != ["None"]:
+        # Normalize edge strings for comparison
+        edges_to_remove_normalized = [edge.replace(" ", "") for edge in edges_to_remove]
+        
+        # Filter out edges to remove
+        modified_edges = [
+            edge for edge in modified_edges 
+            if edge.replace(" ", "") not in edges_to_remove_normalized
+        ]
+    
+    # 3. Add new nodes
+    if nodes_to_add:
+        modified_nodes.extend(nodes_to_add)
+    
+    # 4. Add new edges
+    if edges_to_add:
+        modified_edges.extend(edges_to_add)
+    
+    return {
+        "nodes": modified_nodes,
+        "edges": modified_edges
+    }

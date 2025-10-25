@@ -170,6 +170,81 @@ prompt_templates:
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
       ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
 
+    step2dot5: |
+      You are a professional medical scientist and biologist.
+      You have a Bayesian Network (BN) Schema that represents medical causal relationships. Your task is to ensure that the answer choices/options for the medical question are properly represented in the DAG as EXACTLY ONE categorical node with categories being EXACTLY the answer options - no more, no less.
+
+      You will be given:
+      1. The medical context and question
+      2. The answer choices/options (A, B, C, D)
+      3. The current BN Schema from previous steps
+
+      CRITICAL REQUIREMENTS:
+      - The answer options MUST exist as EXACTLY ONE categorical node in the DAG
+      - The categories of this node MUST be the FULL TEXT of each answer option, NOT letters like "A", "B", "C", "D"
+      - For example, if option A is "Diabetes mellitus", use "Diabetes mellitus" as the category, NOT "A" or "option_A"
+      - If options currently exist as separate nodes, combined with other concepts, or incorrectly formatted, you must fix this
+      - Do NOT remove nodes that are relevant to the options but don't directly represent the options themselves
+      - Do NOT modify unrelated nodes
+
+      Your task is to:
+      1. IDENTIFY which nodes (if any) currently represent or partially represent the answer options
+      2. REMOVE those nodes that incorrectly represent the options (they will be replaced)
+      3. ADD exactly one categorical node with categories being the FULL TEXT of each answer option
+      4. ADD appropriate edges connecting this new node to relevant parts of the DAG
+
+      EXAMPLES:
+      
+      Example 1 - Options scattered as separate nodes:
+      Current: node5: Diabetes (binary), node6: Hypertension (binary), node7: Hyperthyroidism (binary)
+      Given options: A. Diabetes mellitus, B. Hypertension, C. Hyperthyroidism, D. Cushing syndrome
+      Problem: Options are separate binary nodes
+      Solution: REMOVE node5, node6, node7; ADD Diagnosis (categorical: Diabetes mellitus, Hypertension, Hyperthyroidism, Cushing syndrome)
+      
+      Example 2 - Using shortened or incorrect category names:
+      Current: node8: Diagnosis (categorical: A, B, C, D)
+      Given options: A. Acute myocardial infarction, B. Pulmonary embolism, C. Aortic dissection, D. Pneumothorax
+      Problem: Using letters instead of full text
+      Solution: REMOVE node8; ADD Diagnosis (categorical: Acute myocardial infarction, Pulmonary embolism, Aortic dissection, Pneumothorax)
+      
+      Example 3 - Options already correctly represented:
+      Current: node4: Diagnosis (categorical: Diabetes mellitus, Hypertension, Hyperthyroidism, Cushing syndrome)
+      Given options: A. Diabetes mellitus, B. Hypertension, C. Hyperthyroidism, D. Cushing syndrome
+      Problem: None - already correct! Categories match the full text of options.
+      Solution: REMOVE nothing; ADD nothing (OPTIONS_NODE: None)
+
+      Your output must be in the exact following format:
+
+      <analysis> your detailed analysis of how the answer options are currently represented in the DAG and what needs to be changed </analysis>
+      <modifications>
+      NODES_TO_REMOVE: 
+      node{i}
+      node{j}
+      ...
+      OPTIONS_NODE:
+      node{N+1}: node_name (categorical: full_text_of_option_A, full_text_of_option_B, full_text_of_option_C, full_text_of_option_D)
+      NODES_TO_ADD:
+      node{N+2}: other_node_name (binary|categorical: ...)
+      ...
+      EDGES_TO_REMOVE: 
+      edge{k}: node{x} -> node{y}
+      ...
+      EDGES_TO_ADD: 
+      edge{M+1}: node{a} -> node{b}
+      ...
+      </modifications>
+
+      ** If there are NO nodes to remove, write "NODES_TO_REMOVE: None"
+      ** The OPTIONS_NODE section is MANDATORY - it must contain the node representing answer options
+      ** If options are already correct, write "OPTIONS_NODE: None" and skip modifications
+      ** If there are NO additional nodes to add (besides OPTIONS_NODE), write "NODES_TO_ADD: None" or omit the section
+      ** If there are NO edges to remove, write "EDGES_TO_REMOVE: None"
+      ** If there are NO edges to add, write "EDGES_TO_ADD: None"
+      ** When removing a node, also remove all edges connected to it (list them in EDGES_TO_REMOVE)
+      ** New node numbering continues from the current maximum (after accounting for removals)
+      ** New edge numbering continues from the current maximum (after accounting for removals)
+      ** CRITICAL: Use the FULL TEXT of answer options as categories, NOT letters or abbreviations
+
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
       
@@ -381,6 +456,77 @@ prompt_templates:
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
       ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
+
+    step2dot5: |
+      You are a professional logician and reasoning master.
+      You have a Bayesian Network (BN) Schema that represents logical causal relationships. Your task is to ensure that the hypothesis/conclusion for the logical reasoning task is properly represented in the DAG as EXACTLY ONE categorical node with categories representing the possible conclusions about the hypothesis.
+
+      You will be given:
+      1. The logical context and hypothesis
+      2. The current BN Schema from previous steps
+
+      CRITICAL REQUIREMENTS:
+      - The hypothesis conclusion MUST exist as EXACTLY ONE categorical node in the DAG
+      - The categories of this node should represent meaningful conclusion states based on the task
+      - Use descriptive, meaningful category names that reflect the nature of the conclusion
+      - If the hypothesis or its conclusions currently exist as separate nodes, combined with other concepts, or incorrectly formatted, you must fix this
+      - Do NOT remove nodes that are relevant to the hypothesis reasoning but don't directly represent the final conclusion
+      - Do NOT modify unrelated nodes
+
+      Your task is to:
+      1. IDENTIFY which nodes (if any) currently represent or partially represent the hypothesis conclusion
+      2. REMOVE those nodes that incorrectly represent the conclusion (they will be replaced)
+      3. ADD exactly one categorical node that correctly represents the hypothesis conclusion states
+      4. ADD appropriate edges connecting this new node to relevant parts of the DAG
+
+      EXAMPLES:
+      
+      Example 1 - Hypothesis scattered as separate binary nodes:
+      Current: node5: Hypothesis_True (binary), node6: Evidence_Supports (binary)
+      Problem: Conclusion represented by multiple separate nodes
+      Solution: REMOVE node5, node6; ADD Hypothesis_Conclusion (categorical: strongly_supported, supported, neutral, contradicted, strongly_contradicted)
+      
+      Example 2 - Conclusion combined with other reasoning:
+      Current: node8: Reasoning_and_Conclusion (categorical: valid_logic_supports_hypothesis, invalid_logic, uncertain)
+      Problem: Conclusion mixed with reasoning process
+      Solution: REMOVE node8; ADD Hypothesis_Conclusion (categorical: supported, not_supported, contradicted, uncertain)
+      
+      Example 3 - Conclusion already correctly represented:
+      Current: node4: Hypothesis_Conclusion (categorical: supported, not_supported, contradicted, uncertain)
+      Problem: None - already correct!
+      Solution: REMOVE nothing; ADD nothing (OPTIONS_NODE: None)
+
+      Your output must be in the exact following format:
+
+      <analysis> your detailed analysis of how the hypothesis conclusion is currently represented in the DAG and what needs to be changed </analysis>
+      <modifications>
+      NODES_TO_REMOVE: 
+      node{i}
+      node{j}
+      ...
+      OPTIONS_NODE:
+      node{N+1}: node_name (categorical: conclusion_state1, conclusion_state2, conclusion_state3, ...)
+      NODES_TO_ADD:
+      node{N+2}: other_node_name (binary|categorical: ...)
+      ...
+      EDGES_TO_REMOVE: 
+      edge{k}: node{x} -> node{y}
+      ...
+      EDGES_TO_ADD: 
+      edge{M+1}: node{a} -> node{b}
+      ...
+      </modifications>
+
+      ** If there are NO nodes to remove, write "NODES_TO_REMOVE: None"
+      ** The OPTIONS_NODE section is MANDATORY - it must contain the node representing hypothesis conclusion
+      ** If conclusion is already correct, write "OPTIONS_NODE: None" and skip modifications
+      ** If there are NO additional nodes to add (besides OPTIONS_NODE), write "NODES_TO_ADD: None" or omit the section
+      ** If there are NO edges to remove, write "EDGES_TO_REMOVE: None"
+      ** If there are NO edges to add, write "EDGES_TO_ADD: None"
+      ** When removing a node, also remove all edges connected to it (list them in EDGES_TO_REMOVE)
+      ** New node numbering continues from the current maximum (after accounting for removals)
+      ** New edge numbering continues from the current maximum (after accounting for removals)
+      ** The categorical node representing the conclusion should have meaningful logical states
 
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.

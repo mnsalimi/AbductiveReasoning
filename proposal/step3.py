@@ -23,7 +23,7 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
     """
     time.sleep(sleep_time)
     
-    # Check if step2 was successful and has a valid format
+    # Check if previous step was successful and has a valid format
     if not step2_result.get("successful_api_call") or not step2_result.get("right_format"):
         return {
             "raw_data": sample,
@@ -33,9 +33,10 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
             "dag_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": "Step 2 failed or had invalid format - cannot proceed with Step 3",
+            "error": "Previous step (Step 2 or 2.5) failed or had invalid format - cannot proceed with Step 3",
             "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result
+            "step2_result": step2_result.get("step2_result", step2_result),
+            "step2dot5_result": step2_result if step2_result.get("step2_result") else None
         }
     
     try:
@@ -69,7 +70,8 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
             "idx": idx,
             "error": None,
             "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result
+            "step2_result": step2_result.get("step2_result", step2_result),
+            "step2dot5_result": step2_result if step2_result.get("step2_result") else None
         }
         
     except Exception as e:
@@ -84,7 +86,8 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
             "idx": idx,
             "error": f"DAG registration failed for sample {idx}: {e}",
             "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result
+            "step2_result": step2_result.get("step2_result", step2_result),
+            "step2dot5_result": step2_result if step2_result.get("step2_result") else None
         }
 
 

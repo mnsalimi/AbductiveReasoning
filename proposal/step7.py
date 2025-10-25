@@ -46,13 +46,8 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
             "is_correct": False,
             "idx": idx,
             "error": "Step 6 failed or had invalid format - cannot proceed with Step 7",
-            "step1_result": step6_result.get("step1_result"),
-            "step2_result": step6_result.get("step2_result"),
-            "step3_result": step6_result.get("step3_result"),
+            "step2dot5_result": step6_result.get("step2dot5_result"),
             "step3dot5_result": step6_result.get("step3dot5_result"),
-            "step4_result": step6_result.get("step4_result"),
-            "step5_result": step6_result.get("step5_result"),
-            "step6_result": step6_result
         }
     
     try:
@@ -86,6 +81,7 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
         parsed_result["idx"] = idx
         parsed_result["step1_result"] = step6_result.get("step1_result")
         parsed_result["step2_result"] = step6_result.get("step2_result")
+        parsed_result["step2dot5_result"] = step6_result.get("step2dot5_result")
         parsed_result["step3_result"] = step6_result.get("step3_result")
         parsed_result["step3dot5_result"] = step6_result.get("step3dot5_result")
         parsed_result["step4_result"] = step6_result.get("step4_result")
@@ -123,14 +119,69 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
             "is_correct": False,
             "idx": idx,
             "error": f"Step 7 failed for sample {idx}: {str(e)}",
-            "step1_result": step6_result.get("step1_result"),
-            "step2_result": step6_result.get("step2_result"),
-            "step3_result": step6_result.get("step3_result"),
+            "step2dot5_result": step6_result.get("step2dot5_result"),
             "step3dot5_result": step6_result.get("step3dot5_result"),
-            "step4_result": step6_result.get("step4_result"),
-            "step5_result": step6_result.get("step5_result"),
-            "step6_result": step6_result
         }
+
+
+def _convert_tuple_keys_to_strings(obj):
+    """
+    Recursively convert tuple keys to strings for JSON serialization.
+    
+    Args:
+        obj: Object to convert (can be dict, list, tuple, or primitive)
+    
+    Returns:
+        Converted object with tuple keys as strings
+    """
+    if isinstance(obj, dict):
+        new_dict = {}
+        for key, value in obj.items():
+            # Convert tuple keys to string representation
+            if isinstance(key, tuple):
+                new_key = str(key)
+            else:
+                new_key = key
+            new_dict[new_key] = _convert_tuple_keys_to_strings(value)
+        return new_dict
+    elif isinstance(obj, list):
+        return [_convert_tuple_keys_to_strings(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return list(obj)  # Convert tuples to lists
+    else:
+        return obj
+
+
+def _strip_nested_steps(step_result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Remove nested step results from a step result dictionary.
+    
+    Each step result contains all previous step results nested inside it
+    (e.g., step6_result contains step5_result, which contains step4_result, etc.).
+    This function creates a copy with only the step's own data, removing the nested
+    step_X_result keys to avoid exponential duplication.
+    
+    Args:
+        step_result: Full step result dictionary with nested previous steps
+    
+    Returns:
+        dict: Step result with only its own data (no nested step results)
+    """
+    if not step_result:
+        return None
+    
+    # Create a copy of the result
+    clean_result = {}
+    
+    # Copy all keys EXCEPT nested step results
+    for key, value in step_result.items():
+        # Skip keys that are nested step results
+        if key.startswith("step") and key.endswith("_result"):
+            continue
+        # Keep everything else
+        clean_result[key] = value
+    
+    return clean_result
 
 
 def save_step7_result(result: Dict[str, Any], dataset_name: str, model_name: str, 
@@ -139,7 +190,10 @@ def save_step7_result(result: Dict[str, Any], dataset_name: str, model_name: str
     Save step7 result to results.jsonl file.
     
     This function appends the result to a JSONL file, creating the directory
-    structure if it doesn't exist.
+    structure if it doesn't exist. It strips out nested step results from each
+    step's data to avoid exponential duplication (e.g., step6 normally contains
+    step5, which contains step4, etc.). Each step's result will contain only
+    its own specific data.
     
     Args:
         result: Step7 result dictionary
@@ -159,7 +213,9 @@ def save_step7_result(result: Dict[str, Any], dataset_name: str, model_name: str
     # Path to results.jsonl
     results_file = os.path.join(output_dir, "results.jsonl")
     
-    # Prepare the result for saving (include all step results)
+    # Prepare the result for saving
+    # Strip out nested step results from each step to avoid exponential duplication
+    # (e.g., step6 contains step5, which contains step4, etc.)
     save_result = {
         "idx": result["idx"],
         "raw_data": result["raw_data"],
@@ -171,14 +227,18 @@ def save_step7_result(result: Dict[str, Any], dataset_name: str, model_name: str
         "model_output": result.get("model_output"),
         "error": result.get("error"),
         "token_usage": result.get("token_usage"),
-        "step1_result": result.get("step1_result"),
-        "step2_result": result.get("step2_result"),
-        "step3_result": result.get("step3_result"),
-        "step3dot5_result": result.get("step3dot5_result"),
-        "step4_result": result.get("step4_result"),
-        "step5_result": result.get("step5_result"),
-        "step6_result": result.get("step6_result")
+        "step1_result": _strip_nested_steps(result.get("step1_result")),
+        "step2_result": _strip_nested_steps(result.get("step2_result")),
+        "step2dot5_result": _strip_nested_steps(result.get("step2dot5_result")),
+        "step3_result": _strip_nested_steps(result.get("step3_result")),
+        "step3dot5_result": _strip_nested_steps(result.get("step3dot5_result")),
+        "step4_result": _strip_nested_steps(result.get("step4_result")),
+        "step5_result": _strip_nested_steps(result.get("step5_result")),
+        "step6_result": _strip_nested_steps(result.get("step6_result"))
     }
+    
+    # Convert tuple keys to strings for JSON serialization
+    save_result = _convert_tuple_keys_to_strings(save_result)
     
     # Append to JSONL file
     with open(results_file, "a", encoding="utf-8") as f:

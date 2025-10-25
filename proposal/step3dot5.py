@@ -37,10 +37,7 @@ def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
             "visible_nodes_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": "Step 3 failed or had invalid format - cannot proceed with Step 3.5",
-            "step1_result": step3_result.get("step1_result"),
-            "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result
+            "error": "Step 3 failed or had invalid format - cannot proceed with Step 3.5"
         }
     
     registered_dag = step3_result.get("registered_dag")
@@ -53,10 +50,7 @@ def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
             "visible_nodes_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": "No registered DAG found in step3 result",
-            "step1_result": step3_result.get("step1_result"),
-            "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result
+            "error": "No registered DAG found in step3 result"
         }
     
     # Retry logic: up to 3 attempts
@@ -129,10 +123,7 @@ def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
                     "idx": idx,
                     "error": None,
                     "token_usage": usage if successful_api_call else None,
-                    "attempts": all_attempts,
-                    "step1_result": step3_result.get("step1_result"),
-                    "step2_result": step3_result.get("step2_result"),
-                    "step3_result": step3_result
+                    "attempts": all_attempts
                 }
             else:
                 # Parsing failed, record error and retry
@@ -166,10 +157,7 @@ def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
         "correct_answer": sample.get("answer_idx"),
         "idx": idx,
         "error": f"Step 3.5 failed after {max_retries} attempts. Last error: {last_error}",
-        "attempts": all_attempts,
-        "step1_result": step3_result.get("step1_result"),
-        "step2_result": step3_result.get("step2_result"),
-        "step3_result": step3_result
+        "attempts": all_attempts
     }
 
 

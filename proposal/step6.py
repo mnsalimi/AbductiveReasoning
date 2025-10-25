@@ -33,12 +33,7 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
             "error": "Step 5 failed or had invalid format - cannot proceed with Step 6",
-            "step1_result": step5_result.get("step1_result"),
-            "step2_result": step5_result.get("step2_result"),
-            "step3_result": step5_result.get("step3_result"),
             "step3dot5_result": step3dot5_result,
-            "step4_result": step5_result.get("step4_result"),
-            "step5_result": step5_result
         }
     
     bayesian_network = step5_result.get("bayesian_network")
@@ -52,12 +47,7 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
             "error": "No Bayesian Network found in step5 result",
-            "step1_result": step5_result.get("step1_result"),
-            "step2_result": step5_result.get("step2_result"),
-            "step3_result": step5_result.get("step3_result"),
             "step3dot5_result": step3dot5_result,
-            "step4_result": step5_result.get("step4_result"),
-            "step5_result": step5_result
         }
     
     try:
@@ -87,12 +77,7 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
             "error": None,
-            "step1_result": step5_result.get("step1_result"),
-            "step2_result": step5_result.get("step2_result"),
-            "step3_result": step5_result.get("step3_result"),
             "step3dot5_result": step3dot5_result,
-            "step4_result": step5_result.get("step4_result"),
-            "step5_result": step5_result
         }
         
     except Exception as e:
@@ -107,12 +92,7 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
             "error": f"MPE algorithm failed for sample {idx}: {e}",
-            "step1_result": step5_result.get("step1_result"),
-            "step2_result": step5_result.get("step2_result"),
-            "step3_result": step5_result.get("step3_result"),
             "step3dot5_result": step3dot5_result,
-            "step4_result": step5_result.get("step4_result"),
-            "step5_result": step5_result
         }
 
 

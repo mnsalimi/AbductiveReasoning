@@ -56,16 +56,16 @@ def main():
     print(f"✓ Temperature: {temperature}")
     print(f"✓ Thinking mode: {thinking}")
     print(f"✓ Sleep time: {sleep_time}s")
-    dataset = []
-    dataset.append(
-        {'question': 'what is the answer to 1021300x104340000?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
-    )
-    dataset.append(
-        {'question': 'tell us an interesting story?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
-    )
-    dataset.append(
-        {'question': 'Should I kill myself?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
-    )
+    # dataset = []
+    # dataset.append(
+    #     {'question': 'what is the answer to 1021300x104340000?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
+    # )
+    # dataset.append(
+    #     {'question': 'tell us an interesting story?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
+    # )
+    # dataset.append(
+    #     {'question': 'Should I kill myself?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
+    # )
     
     # Process each sample through the complete pipeline
     for idx, sample in enumerate(dataset):
@@ -291,7 +291,7 @@ def main():
         
         # STEP 5: Bayesian Network Construction
         print_separator("STEP 5: Bayesian Network Construction")
-        step5_result = step5(sample, idx, step4_result, sleep_time, step3dot5_result)
+        step5_result = step5(sample, idx, step4_result, step3_result, sleep_time, step3dot5_result)
         
         if step5_result.get("successful_api_call") and step5_result.get("right_format"):
             print("✓ Step 5 completed successfully")
@@ -438,13 +438,36 @@ def main():
             if step7_result.get("token_usage"):
                 print(f"  🔢 Tokens used: {step7_result['token_usage'].get('total_tokens', 0)}")
             
-            # Save step7 result to file
-            save_step7_result(step7_result, dataset_name, model_name)
+            # Save step7 result to file with all step results aggregated
+            # Create a combined result with all steps
+            combined_result = {
+                **step7_result,
+                "step1_result": step1_result,
+                "step2_result": step2_result,
+                "step2dot5_result": step2dot5_result,
+                "step3_result": step3_result,
+                "step3dot5_result": step3dot5_result,
+                "step4_result": step4_result,
+                "step5_result": step5_result,
+                "step6_result": step6_result
+            }
+            save_step7_result(combined_result, dataset_name, model_name)
         else:
             error_msg = step7_result.get('error', 'Unknown error')
             print(f"✗ Step 7 failed: {error_msg}")
-            # Still save the result even if it failed
-            save_step7_result(step7_result, dataset_name, model_name)
+            # Still save the result even if it failed with all step results aggregated
+            combined_result = {
+                **step7_result,
+                "step1_result": step1_result,
+                "step2_result": step2_result,
+                "step2dot5_result": step2dot5_result,
+                "step3_result": step3_result,
+                "step3dot5_result": step3dot5_result,
+                "step4_result": step4_result,
+                "step5_result": step5_result,
+                "step6_result": step6_result
+            }
+            save_step7_result(combined_result, dataset_name, model_name)
         
         print_separator("PIPELINE COMPLETED FOR SAMPLE")
         print(f"✓ All steps completed for sample {idx + 1}")

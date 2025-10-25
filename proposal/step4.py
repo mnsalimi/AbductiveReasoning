@@ -39,11 +39,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "cpt_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": "Step 3 failed or had invalid format - cannot proceed with Step 4",
-            "step1_result": step3_result.get("step1_result"),
-            "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result,
-            "step3dot5_result": step3dot5_result
+            "error": "Step 3 failed or had invalid format - cannot proceed with Step 4"
         }
     
     registered_dag = step3_result.get("registered_dag")
@@ -56,11 +52,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "cpt_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": "No registered DAG found in step3 result",
-            "step1_result": step3_result.get("step1_result"),
-            "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result,
-            "step3dot5_result": step3dot5_result
+            "error": "No registered DAG found in step3 result"
         }
     
     try:
@@ -147,11 +139,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                     "correct_answer": sample.get("answer_idx"),
                     "idx": idx,
                     "error": error_msg,
-                    "cpt_generation_log": cpt_generation_log,
-                    "step1_result": step3_result.get("step1_result"),
-                    "step2_result": step3_result.get("step2_result"),
-                    "step3_result": step3_result,
-                    "step3dot5_result": step3dot5_result
+                    "cpt_generation_log": cpt_generation_log
                 }
         
         # Create metadata about CPT generation
@@ -167,11 +155,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
             "error": None,
-            "token_usage": total_token_usage,
-            "step1_result": step3_result.get("step1_result"),
-            "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result,
-            "step3dot5_result": step3dot5_result
+            "token_usage": total_token_usage
         }
         
     except Exception as e:
@@ -183,11 +167,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "cpt_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": f"CPT generation failed for sample {idx}: {e}",
-            "step1_result": step3_result.get("step1_result"),
-            "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result,
-            "step3dot5_result": step3dot5_result
+            "error": f"CPT generation failed for sample {idx}: {e}"
         }
 
 
@@ -346,13 +326,9 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                     "raw_responses": all_raw_responses
                 }
         
-        # Fill in skipped combinations with zero probabilities
+        # Track skipped combinations but DON'T add them to the CPT
+        # (they represent impossible states given observed evidence)
         skipped_combinations = [c for c in all_combinations if c not in valid_combinations]
-        for combination in skipped_combinations:
-            # Create zero probability distribution for this combination
-            zero_probs = {state: 0.0 for state in node_states}
-            qualitative_cpt[combination] = {state: "very_low" for state in node_states}
-            numerical_cpt[combination] = zero_probs
         
         return {
             "success": True,

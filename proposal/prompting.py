@@ -806,6 +806,11 @@ def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
     bayesian_network = step5_result.get("bayesian_network", {})
     nodes = bayesian_network.get("nodes", {})
     
+    # Get the options node from step2.5
+    step2dot5_result = step6_result.get("step2dot5_result", {})
+    options_node = step2dot5_result.get("options_node")
+    options_node_name = options_node.get("name") if options_node else None
+    
     if not mpe_assignment:
         lines.append("No variable assignments available.")
         return "\n".join(lines)
@@ -829,7 +834,11 @@ def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
             else:
                 status = "[INFERRED]"
             
-            lines.append(f"  {status} {node_name}: {assigned_value}")
+            # Special highlight for options node
+            if options_node_name and node_name == options_node_name:
+                lines.append(f"  {status} 🎯 **{node_name}**: {assigned_value}  ← THIS IS THE ANSWER OPTIONS NODE")
+            else:
+                lines.append(f"  {status} {node_name}: {assigned_value}")
     
     return "\n".join(lines)
 
@@ -1359,26 +1368,45 @@ def _apply_dag_modifications(original_nodes: List, original_edges: List,
     Returns:
         dict: Modified DAG with "nodes" and "edges"
     """
+    import re
+    
     # Create working copies
     modified_nodes = original_nodes.copy()
     modified_edges = original_edges.copy()
     
     # 1. Remove nodes (if not "None")
+    old_to_new_mapping = {}  # Maps old node IDs to new node IDs after removal
+    indices_to_remove = []
+    
     if nodes_to_remove and nodes_to_remove != ["None"]:
-        # Build node ID to index mapping
+        # Build node ID to index mapping for the ORIGINAL nodes
         node_id_to_index = {}
-        for i, node in enumerate(modified_nodes):
+        for i, node in enumerate(original_nodes):
             node_id = f"node{i+1}"
             node_id_to_index[node_id] = i
         
-        # Remove nodes (in reverse order to maintain indices)
-        indices_to_remove = []
+        # Get indices of nodes to remove
         for node_id in nodes_to_remove:
             if node_id in node_id_to_index:
                 indices_to_remove.append(node_id_to_index[node_id])
         
+        # Sort for consistent removal
+        indices_to_remove = sorted(indices_to_remove)
+        
+        # Remove nodes from modified_nodes (in reverse order to maintain indices)
         for idx in sorted(indices_to_remove, reverse=True):
             modified_nodes.pop(idx)
+    
+    # Build mapping from old node IDs to new node IDs
+    # Only create mappings for nodes that were NOT removed
+    new_index = 0
+    for old_index in range(len(original_nodes)):
+        if old_index not in indices_to_remove:
+            old_node_id = f"node{old_index + 1}"
+            new_node_id = f"node{new_index + 1}"
+            old_to_new_mapping[old_node_id] = new_node_id
+            new_index += 1
+        # Note: We don't create mappings for removed nodes - they should not appear in edges!
     
     # 2. Remove edges (if not "None")
     if edges_to_remove and edges_to_remove != ["None"]:
@@ -1391,13 +1419,62 @@ def _apply_dag_modifications(original_nodes: List, original_edges: List,
             if edge.replace(" ", "") not in edges_to_remove_normalized
         ]
     
-    # 3. Add new nodes
+    # 3. Renumber existing edges based on node removal
+    def renumber_edge(edge_str: str, mapping: dict) -> str:
+        """Renumber node references in an edge string using the provided mapping."""
+        def replace_node(match):
+            old_node = match.group(0)
+            return mapping.get(old_node, old_node)
+        
+        return re.sub(r'node\d+', replace_node, edge_str)
+    
+    # Renumber and filter existing edges - remove any edges that reference removed nodes
+    renumbered_edges = []
+    for edge in modified_edges:
+        # Check if edge references any removed nodes
+        referenced_nodes = re.findall(r'node\d+', edge)
+        if all(node in old_to_new_mapping for node in referenced_nodes):
+            # All referenced nodes still exist, renumber the edge
+            renumbered_edges.append(renumber_edge(edge, old_to_new_mapping))
+        # else: skip this edge as it references removed nodes
+    
+    modified_edges = renumbered_edges
+    
+    # 4. Add new nodes
+    num_nodes_before_adding = len(modified_nodes)
     if nodes_to_add:
         modified_nodes.extend(nodes_to_add)
     
-    # 4. Add new edges
+    # 5. Add new edges with proper node ID remapping
     if edges_to_add:
-        modified_edges.extend(edges_to_add)
+        # Build mapping for newly added nodes
+        # New nodes should be numbered starting from num_nodes_before_adding + 1
+        new_node_mapping = {}
+        for i, new_node in enumerate(nodes_to_add):
+            # The LLM may have generated edges with node IDs beyond the current count
+            # We need to map these to the actual new node IDs
+            old_new_node_id = f"node{len(original_nodes) + i + 1}"
+            actual_new_node_id = f"node{num_nodes_before_adding + i + 1}"
+            new_node_mapping[old_new_node_id] = actual_new_node_id
+        
+        # Combine the mappings
+        combined_mapping = {**old_to_new_mapping, **new_node_mapping}
+        
+        # Renumber and filter the edges to add - skip edges that reference removed nodes
+        renumbered_edges_to_add = []
+        skipped_edges = []
+        for edge in edges_to_add:
+            referenced_nodes = re.findall(r'node\d+', edge)
+            if all(node in combined_mapping for node in referenced_nodes):
+                renumbered_edges_to_add.append(renumber_edge(edge, combined_mapping))
+            else:
+                skipped_edges.append(edge)
+        
+        # Print warning if edges were skipped
+        if skipped_edges:
+            print(f"  ⚠️  Warning: {len(skipped_edges)} edge(s) skipped (referenced removed nodes)")
+        
+        modified_edges.extend(renumbered_edges_to_add)
     
     return {
         "nodes": modified_nodes,

@@ -39,9 +39,7 @@ def step2dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
             "input_text": None,
             "idx": idx,
             "error": "Step 2 failed or had invalid format - cannot proceed with Step 2.5",
-            "token_usage": None,
-            "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result
+            "token_usage": None
         }
 
     input_text = create_prompt_step2dot5(dataset_name, sample, step2_result)
@@ -62,8 +60,6 @@ def step2dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
     result["idx"] = idx
     result["error"] = error_message
     result["token_usage"] = usage if successful_api_call else None
-    result["step1_result"] = step2_result.get("step1_result")
-    result["step2_result"] = step2_result
 
     return result
 

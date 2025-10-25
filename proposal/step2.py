@@ -37,8 +37,7 @@ def step2(sample, idx, model_name, api_key, max_tokens, temperature, thinking, s
             "input_text": None,
             "idx": idx,
             "error": "Step 1 failed or had invalid format - cannot proceed with Step 2",
-            "token_usage": None,
-            "step1_result": step1_result
+            "token_usage": None
         }
 
     input_text = create_prompt_step2(dataset_name, sample, step1_result)
@@ -59,7 +58,6 @@ def step2(sample, idx, model_name, api_key, max_tokens, temperature, thinking, s
     result["idx"] = idx
     result["error"] = error_message
     result["token_usage"] = usage if successful_api_call else None
-    result["step1_result"] = step1_result
 
     return result
 

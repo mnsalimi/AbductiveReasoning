@@ -33,10 +33,7 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
             "dag_metadata": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": "Previous step (Step 2 or 2.5) failed or had invalid format - cannot proceed with Step 3",
-            "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result.get("step2_result", step2_result),
-            "step2dot5_result": step2_result if step2_result.get("step2_result") else None
+            "error": "Previous step (Step 2 or 2.5) failed or had invalid format - cannot proceed with Step 3"
         }
     
     try:
@@ -68,10 +65,7 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
             "validation_result": validation_result,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": None,
-            "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result.get("step2_result", step2_result),
-            "step2dot5_result": step2_result if step2_result.get("step2_result") else None
+            "error": None
         }
         
     except Exception as e:
@@ -84,10 +78,7 @@ def step3(sample: Dict[str, Any], idx: int, step2_result: Dict[str, Any], sleep_
             "validation_result": None,
             "correct_answer": sample.get("answer_idx"),
             "idx": idx,
-            "error": f"DAG registration failed for sample {idx}: {e}",
-            "step1_result": step2_result.get("step1_result"),
-            "step2_result": step2_result.get("step2_result", step2_result),
-            "step2dot5_result": step2_result if step2_result.get("step2_result") else None
+            "error": f"DAG registration failed for sample {idx}: {e}"
         }
 
 

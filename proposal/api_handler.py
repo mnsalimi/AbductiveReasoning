@@ -32,6 +32,8 @@ def get_model_response(
     Raises:
         RuntimeError: If the request fails after all retries.
     """
+    # print("model_name: ", model_name)
+    # print("input_text: ", input_text)
     # Load config if parameters not provided
     if retries is None or timeout is None or base_url is None:
         config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -62,7 +64,12 @@ def get_model_response(
                 max_tokens=max_tokens
             )
             
+            # print("response: ", response)
+            # print("response.choices[0]: ", response.choices[0])
+            # print("response.choices[0] keys: ", response.choices[0].keys())
+            
             content = response.choices[0].message.content
+            # print("content: ", content)
             usage = {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,

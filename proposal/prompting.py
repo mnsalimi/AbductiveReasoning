@@ -16,25 +16,29 @@ def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optio
     parsed_nodes = None
     parsed_edges = None
 
-    # 1. Check for the existence and order of NODES: and EDGES: headers.
-    # We use re.IGNORECASE to be slightly tolerant of "nodes:" vs "NODES:".
+    # 1. Check for the existence of NODES: and EDGES: headers (order-agnostic)
     nodes_header_match = re.search(r"NODES:", dag_content, re.IGNORECASE)
     edges_header_match = re.search(r"EDGES:", dag_content, re.IGNORECASE)
 
     if not nodes_header_match:
         return None, None, "Missing 'NODES:' header in DAG"
-    
     if not edges_header_match:
         return None, None, "Missing 'EDGES:' header in DAG"
 
-    if nodes_header_match.start() >= edges_header_match.start():
-        return None, None, "'NODES:' header must appear before 'EDGES:' header"
-        
-    # 2. Split the DAG content into two parts based on the headers.
-    # The node_text is the content between "NODES:" and "EDGES:".
-    node_text = dag_content[nodes_header_match.end():edges_header_match.start()]
-    # The edge_text is the content after "EDGES:".
-    edge_text = dag_content[edges_header_match.end():]
+    # 2. Build sections regardless of order
+    headers = [
+        {"name": "NODES", "start": nodes_header_match.start(), "end": nodes_header_match.end()},
+        {"name": "EDGES", "start": edges_header_match.start(), "end": edges_header_match.end()},
+    ]
+    headers.sort(key=lambda h: h["start"])
+    sections = {}
+    for i, h in enumerate(headers):
+        section_start = h["end"]
+        section_end = headers[i + 1]["start"] if i + 1 < len(headers) else len(dag_content)
+        sections[h["name"]] = dag_content[section_start:section_end]
+
+    node_text = sections.get("NODES", "")
+    edge_text = sections.get("EDGES", "")
 
     # 3. Parse nodes from the node_text section with type information.
     # Pattern matches: "node1: node_name (binary)" or "node1: node_name (categorical: cat1, cat2, cat3)"
@@ -163,7 +167,7 @@ def _parse_additions_content_strictly(additions_content: str) -> Tuple[Optional[
     parsed_new_nodes = []
     parsed_new_edges = []
 
-    # 1. Check for the existence and order of NEW_NODES: and NEW_EDGES: headers.
+    # 1. Check for the existence of NEW_NODES: and NEW_EDGES: headers (order-agnostic)
     nodes_header_match = re.search(r"NEW_NODES:", additions_content, re.IGNORECASE)
     edges_header_match = re.search(r"NEW_EDGES:", additions_content, re.IGNORECASE)
 
@@ -171,13 +175,20 @@ def _parse_additions_content_strictly(additions_content: str) -> Tuple[Optional[
         # If either header is missing, parsing fails.
         return None, None
 
-    if nodes_header_match.start() >= edges_header_match.start():
-        # If NEW_NODES: does not appear before NEW_EDGES:, parsing fails.
-        return None, None
-        
-    # 2. Split the additions content into two parts based on the headers.
-    node_text = additions_content[nodes_header_match.end():edges_header_match.start()]
-    edge_text = additions_content[edges_header_match.end():]
+    # 2. Build sections regardless of order
+    header_matches = sorted([
+        {"name": "NEW_NODES", "start": nodes_header_match.start(), "end": nodes_header_match.end()},
+        {"name": "NEW_EDGES", "start": edges_header_match.start(), "end": edges_header_match.end()},
+    ], key=lambda x: x["start"])
+
+    sections: Dict[str, str] = {}
+    for i, h in enumerate(header_matches):
+        section_start = h["end"]
+        section_end = header_matches[i + 1]["start"] if i + 1 < len(header_matches) else len(additions_content)
+        sections[h["name"]] = additions_content[section_start:section_end]
+
+    node_text = sections.get("NEW_NODES", "")
+    edge_text = sections.get("NEW_EDGES", "")
 
     # 3. Parse new nodes from the node_text section with type information.
     # Check if the section contains "None" (case-insensitive)
@@ -231,31 +242,26 @@ def parse_model_answer_step1(sample: Dict[str, Any], model_output: str, successf
     reasoning_pattern = r"<reasoning>(.*?)</reasoning>"
     dag_pattern = r"<dag>(.*?)</dag>"
 
-    # 3. Enforce order: Find <reasoning> first, then find <dag> *after* it.
+    # 3. Order-agnostic extraction of <reasoning> and <dag>
     reasoning_match = re.search(reasoning_pattern, cleaned_text, flags=re.DOTALL)
-    
+    dag_match = re.search(dag_pattern, cleaned_text, flags=re.DOTALL)
+
     if not reasoning_match:
         error_message = "Missing <reasoning> tag in model output"
-    else:
-        extracted_reasoning = reasoning_match.group(1).strip()
-        
-        # Search for the <dag> block *only in the text following the reasoning block*.
-        text_after_reasoning = cleaned_text[reasoning_match.end():]
-        dag_match = re.search(dag_pattern, text_after_reasoning, flags=re.DOTALL)
+    if not dag_match:
+        error_message = "Missing <dag> tag in model output"
 
-        if not dag_match:
-            error_message = "Missing <dag> tag after <reasoning> in model output"
-        else:
-            dag_content = dag_match.group(1).strip()
-            
-            # 4. Use the new strict function to parse the <dag> content
-            parsed_nodes, parsed_edges, parse_error = _parse_dag_content_strictly(dag_content)
-            
-            if parse_error:
-                error_message = f"DAG parsing error: {parse_error}"
-            elif parsed_nodes:
-                # 4.5. Auto-fix invalid nodes (e.g., categorical with 1 category -> binary)
-                parsed_nodes = _fix_invalid_nodes(parsed_nodes)
+    if reasoning_match:
+        extracted_reasoning = reasoning_match.group(1).strip()
+    if dag_match:
+        dag_content = dag_match.group(1).strip()
+        # 4. Use the strict function to parse the <dag> content (now order-agnostic inside)
+        parsed_nodes, parsed_edges, parse_error = _parse_dag_content_strictly(dag_content)
+        if parse_error:
+            error_message = f"DAG parsing error: {parse_error}"
+        elif parsed_nodes:
+            # 4.5. Auto-fix invalid nodes (e.g., categorical with 1 category -> binary)
+            parsed_nodes = _fix_invalid_nodes(parsed_nodes)
 
     # 5. Determine if the format is correct based on the strict parsing results
     # The format is correct only if all components were found in the correct order.
@@ -470,25 +476,19 @@ def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successf
     analysis_pattern = r"<analysis>(.*?)</analysis>"
     additions_pattern = r"<additions>(.*?)</additions>"
 
-    # 3. Enforce order: Find <analysis> first, then find <additions> *after* it.
+    # 3. Order-agnostic extraction of <analysis> and <additions>
     analysis_match = re.search(analysis_pattern, cleaned_text, flags=re.DOTALL)
-    
+    additions_match = re.search(additions_pattern, cleaned_text, flags=re.DOTALL)
+
     if analysis_match:
         extracted_analysis = analysis_match.group(1).strip()
-        
-        # Search for the <additions> block *only in the text following the analysis block*.
-        text_after_analysis = cleaned_text[analysis_match.end():]
-        additions_match = re.search(additions_pattern, text_after_analysis, flags=re.DOTALL)
-
-        if additions_match:
-            additions_content = additions_match.group(1).strip()
-            
-            # 4. Use the strict function to parse the <additions> content
-            parsed_new_nodes, parsed_new_edges = _parse_additions_content_strictly(additions_content)
-            
-            # 4.5. Auto-fix invalid nodes in additions
-            if parsed_new_nodes:
-                parsed_new_nodes = _fix_invalid_nodes(parsed_new_nodes)
+    if additions_match:
+        additions_content = additions_match.group(1).strip()
+        # 4. Use the strict function to parse the <additions> content
+        parsed_new_nodes, parsed_new_edges = _parse_additions_content_strictly(additions_content)
+        # 4.5. Auto-fix invalid nodes in additions
+        if parsed_new_nodes:
+            parsed_new_nodes = _fix_invalid_nodes(parsed_new_nodes)
 
     # 5. Determine if the format is correct based on the strict parsing results
     # The format is correct if both parsed lists are not None (they can be empty lists though)
@@ -1279,35 +1279,30 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
     analysis_pattern = r"<analysis>(.*?)</analysis>"
     modifications_pattern = r"<modifications>(.*?)</modifications>"
 
-    # 3. Enforce order: Find <analysis> first, then find <modifications> *after* it.
+    # 3. Order-agnostic extraction of <analysis> and <modifications>
     analysis_match = re.search(analysis_pattern, cleaned_text, flags=re.DOTALL)
-    
+    modifications_match = re.search(modifications_pattern, cleaned_text, flags=re.DOTALL)
+
     if not analysis_match:
         error_message = "Missing <analysis> tag in model output"
-    else:
-        extracted_analysis = analysis_match.group(1).strip()
-        
-        # Search for the <modifications> block *only in the text following the analysis block*.
-        text_after_analysis = cleaned_text[analysis_match.end():]
-        modifications_match = re.search(modifications_pattern, text_after_analysis, flags=re.DOTALL)
+    if not modifications_match:
+        error_message = "Missing <modifications> tag in model output"
 
-        if not modifications_match:
-            error_message = "Missing <modifications> tag after <analysis> in model output"
+    if analysis_match:
+        extracted_analysis = analysis_match.group(1).strip()
+    if modifications_match:
+        modifications_content = modifications_match.group(1).strip()
+        # 4. Parse the <modifications> content (now extracting options_node separately)
+        parsed_result = _parse_modifications_content_step2dot5(modifications_content, sample, dataset_name)
+        if parsed_result["success"]:
+            nodes_to_remove = parsed_result["nodes_to_remove"]
+            options_node = parsed_result["options_node"]
+            other_nodes_to_add = parsed_result["other_nodes_to_add"]
+            nodes_to_add = parsed_result["nodes_to_add"]  # All nodes combined
+            edges_to_remove = parsed_result["edges_to_remove"]
+            edges_to_add = parsed_result["edges_to_add"]
         else:
-            modifications_content = modifications_match.group(1).strip()
-            
-            # 4. Parse the <modifications> content (now extracting options_node separately)
-            parsed_result = _parse_modifications_content_step2dot5(modifications_content, sample, dataset_name)
-            
-            if parsed_result["success"]:
-                nodes_to_remove = parsed_result["nodes_to_remove"]
-                options_node = parsed_result["options_node"]
-                other_nodes_to_add = parsed_result["other_nodes_to_add"]
-                nodes_to_add = parsed_result["nodes_to_add"]  # All nodes combined
-                edges_to_remove = parsed_result["edges_to_remove"]
-                edges_to_add = parsed_result["edges_to_add"]
-            else:
-                error_message = f"Modifications parsing error: {parsed_result.get('error', 'Unknown error')}"
+            error_message = f"Modifications parsing error: {parsed_result.get('error', 'Unknown error')}"
 
     # 5. Determine if the format is correct based on the strict parsing results
     if (extracted_analysis is not None and nodes_to_remove is not None and 
@@ -1402,48 +1397,45 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
     edges_to_remove = []
     edges_to_add = []
 
-    # 1. Check for the existence and order of headers
-    nodes_remove_match = re.search(r"NODES_TO_REMOVE:", modifications_content, re.IGNORECASE)
-    nodes_add_match = re.search(r"NODES_TO_ADD:", modifications_content, re.IGNORECASE)
-    options_node_match = re.search(r"OPTIONS_NODE:", modifications_content, re.IGNORECASE)
-    edges_remove_match = re.search(r"EDGES_TO_REMOVE:", modifications_content, re.IGNORECASE)
-    edges_add_match = re.search(r"EDGES_TO_ADD:", modifications_content, re.IGNORECASE)
+    # 1) Find all section headers regardless of order and slice each section independently
+    header_patterns = {
+        "NODES_TO_REMOVE": r"NODES_TO_REMOVE:",
+        "OPTIONS_NODE": r"OPTIONS_NODE:",
+        "NODES_TO_ADD": r"NODES_TO_ADD:",
+        "EDGES_TO_REMOVE": r"EDGES_TO_REMOVE:",
+        "EDGES_TO_ADD": r"EDGES_TO_ADD:"
+    }
 
-    # Check which required headers are missing
-    missing_headers = []
-    if not nodes_remove_match:
-        missing_headers.append("NODES_TO_REMOVE:")
-    if not options_node_match:
-        missing_headers.append("OPTIONS_NODE:")
-    if not edges_remove_match:
-        missing_headers.append("EDGES_TO_REMOVE:")
-    if not edges_add_match:
-        missing_headers.append("EDGES_TO_ADD:")
-    
-    if missing_headers:
+    header_matches = []
+    for name, pattern in header_patterns.items():
+        m = re.search(pattern, modifications_content, re.IGNORECASE)
+        if m:
+            header_matches.append({"name": name, "start": m.start(), "end": m.end()})
+
+    # OPTIONS_NODE is mandatory for step2.5
+    if not any(h["name"] == "OPTIONS_NODE" for h in header_matches):
         return {
             "success": False,
-            "error": f"Missing required header(s): {', '.join(missing_headers)}"
+            "error": "Missing required header: OPTIONS_NODE:"
         }
 
-    # 2. Extract sections
-    nodes_remove_text = modifications_content[nodes_remove_match.end():options_node_match.start()]
-    
-    # OPTIONS_NODE section
-    if nodes_add_match:
-        # There are additional nodes after OPTIONS_NODE
-        options_node_text = modifications_content[options_node_match.end():nodes_add_match.start()]
-        nodes_add_text = modifications_content[nodes_add_match.end():edges_remove_match.start()]
-    else:
-        # Only OPTIONS_NODE, no additional nodes
-        options_node_text = modifications_content[options_node_match.end():edges_remove_match.start()]
-        nodes_add_text = ""
-    
-    edges_remove_text = modifications_content[edges_remove_match.end():edges_add_match.start()]
-    edges_add_text = modifications_content[edges_add_match.end():]
+    # Sort headers by their position and build section text map
+    header_matches = sorted(header_matches, key=lambda x: x["start"])
+    sections: Dict[str, str] = {}
+    for i, h in enumerate(header_matches):
+        section_start = h["end"]
+        section_end = header_matches[i + 1]["start"] if i + 1 < len(header_matches) else len(modifications_content)
+        sections[h["name"]] = modifications_content[section_start:section_end]
+
+    # Pull out each section text (missing sections become empty strings)
+    nodes_remove_text = sections.get("NODES_TO_REMOVE", "")
+    options_node_text = sections.get("OPTIONS_NODE", "")
+    nodes_add_text = sections.get("NODES_TO_ADD", "")
+    edges_remove_text = sections.get("EDGES_TO_REMOVE", "")
+    edges_add_text = sections.get("EDGES_TO_ADD", "")
 
     # 3. Parse nodes to remove
-    if re.search(r"^\s*None\s*$", nodes_remove_text.strip(), re.IGNORECASE):
+    if not nodes_remove_text or re.search(r"^\s*None\s*$", nodes_remove_text.strip(), re.IGNORECASE):
         nodes_to_remove = ["None"]
     else:
         # Match pattern: "node{number}"
@@ -1509,7 +1501,7 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
                 }
 
     # 6. Parse edges to remove
-    if re.search(r"^\s*None\s*$", edges_remove_text.strip(), re.IGNORECASE):
+    if not edges_remove_text or re.search(r"^\s*None\s*$", edges_remove_text.strip(), re.IGNORECASE):
         edges_to_remove = ["None"]
     else:
         # Match pattern: "edge{number}: node{x} -> node{y}"
@@ -1517,7 +1509,7 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
         edges_to_remove = re.findall(edge_remove_pattern, edges_remove_text)
 
     # 7. Parse edges to add
-    if re.search(r"^\s*None\s*$", edges_add_text.strip(), re.IGNORECASE):
+    if not edges_add_text or re.search(r"^\s*None\s*$", edges_add_text.strip(), re.IGNORECASE):
         edges_to_add = []
     else:
         edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"

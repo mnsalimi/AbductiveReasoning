@@ -48,4 +48,6 @@ results/
 results/*
 results
 proposal/dag_visualizations/
+proposal/debug_outputs/
+proposal/debug_outputs/*
 *.png

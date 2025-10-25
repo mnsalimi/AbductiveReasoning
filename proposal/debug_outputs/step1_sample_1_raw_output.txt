@@ -1,0 +1,110 @@
+================================================================================
+STEP 1 RAW MODEL OUTPUT - Sample 1
+================================================================================
+
+PROMPT:
+--------------------------------------------------------------------------------
+Context:
+Story telling is important.
+
+You are a professional medical scientist and biologist.
+You're given a medical context and background. 
+You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
+ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
+
+For each node, you must specify if it's binary or categorical:
+- Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
+- Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories, otherwise use binary)
+
+CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
+
+EXAMPLES OF CORRECT NODE DEFINITIONS:
+✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
+✗ WRONG: Patient_Age_Group (categorical: elderly) ← Only one category!
+
+✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination)
+✗ WRONG: Treatment_Type (categorical: chemotherapy) ← Only one category!
+
+✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical)
+✗ WRONG: Disease_Severity (categorical: moderate) ← Only one category!
+
+✓ CORRECT: Smoking_Status (binary)  ← Only two states: smoker/non-smoker
+✗ WRONG: Smoking_Status (categorical: smoker) ← Should be binary!
+
+✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic)
+✗ WRONG: Drug_Class (categorical: antibiotic) ← Only one category!
+
+Your output DAG should be in the exact following format:
+
+<reasoning> your full reasoning comes here </reasoning>
+<dag>
+NODES: 
+node1: node1_name (binary)
+node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
+node3: node3_name (binary)
+node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
+...
+node{last_node_number}: last_node_name (binary)
+EDGES: 
+edge1: node{i} -> node{j}
+edge2: node{x} -> node{y}
+edge3: node{z} -> node{w}
+...
+edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
+</dag>
+
+** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
+** for binary nodes: use format "node_name (binary)"
+** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
+** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
+** you should only output the DAG in the exact format above. No other text, no other format.
+** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
+
+
+MODEL OUTPUT:
+--------------------------------------------------------------------------------
+<reasoning>
+To create an exhaustive DAG representing the relationships between entities in the context of storytelling being important in a medical context, we first need to identify key entities and their possible states. Given that storytelling is crucial, let's assume the context involves a patient, their condition, the treatment they receive, and the outcomes. 
+
+1. **Patient's Condition Severity**: This can vary and is often categorized, so it's a categorical node with possible states: mild, moderate, severe, critical.
+2. **Treatment Type**: This can vary widely, so it's a categorical node with possible states: chemotherapy, radiation, surgery, immunotherapy, combination, and possibly alternative or traditional medicine.
+3. **Patient's Age Group**: This affects treatment and outcomes, so it's a categorical node with states: pediatric, young_adult, middle_aged, elderly.
+4. **Smoking Status**: A binary node as it can be smoker or non-smoker.
+5. **Disease Type**: This can vary, so it's a categorical node with states: cancer, cardiovascular, neurological, infectious, etc.
+6. **Storytelling Engagement**: A binary node as patients can either be engaged in storytelling or not.
+7. **Treatment Outcome**: A categorical node with states: complete remission, partial remission, stable condition, deterioration.
+8. **Patient's Mental Health**: A categorical node with states: anxious, depressed, neutral, improved.
+
+These nodes can have various relationships:
+- A patient's age group and smoking status can affect their disease type and treatment type.
+- The severity of the condition can affect the treatment type and outcome.
+- Storytelling engagement can affect the patient's mental health and treatment outcome.
+</reasoning>
+
+<dag>
+NODES:
+node1: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
+node2: Smoking_Status (binary)
+node3: Disease_Type (categorical: cancer, cardiovascular, neurological, infectious, metabolic)
+node4: Disease_Severity (categorical: mild, moderate, severe, critical)
+node5: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination, alternative, traditional)
+node6: Storytelling_Engagement (binary)
+node7: Treatment_Outcome (categorical: complete remission, partial remission, stable condition, deterioration)
+node8: Patient_Mental_Health (categorical: anxious, depressed, neutral, improved)
+
+EDGES:
+edge1: Patient_Age_Group -> Disease_Type
+edge2: Smoking_Status -> Disease_Type
+edge3: Disease_Type -> Disease_Severity
+edge4: Disease_Severity -> Treatment_Type
+edge5: Patient_Age_Group -> Treatment_Type
+edge6: Smoking_Status -> Treatment_Type
+edge7: Storytelling_Engagement -> Patient_Mental_Health
+edge8: Disease_Severity -> Treatment_Outcome
+edge9: Treatment_Type -> Treatment_Outcome
+edge10: Storytelling_Engagement -> Treatment_Outcome
+edge11: Patient_Mental_Health -> Treatment_Outcome
+</dag>
+
+================================================================================

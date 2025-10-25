@@ -209,6 +209,43 @@ prompt_templates:
       ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
       ** Focus on this specific condition only - do not provide probabilities for other parent combinations
 
+    step3dot5: |
+      You are analyzing a medical question to identify which variables (nodes) in a Bayesian Network have known values from the question and context.
+      
+      You will be provided with:
+      1. The medical question and context
+      2. Answer choices (if available)
+      3. A list of DAG nodes with their IDs, names, types, and possible values
+      
+      TASK:
+      Carefully analyze the question and context above. For each node in the DAG, determine if its value is explicitly mentioned or can be directly inferred from the information provided. A node is "visible" if we know its exact value from the question/context.
+      
+      For example:
+      - If the context mentions "65-year-old man", then an "age_category" node might be visible with value "elderly" or "old"
+      - If it says "no history of smoking", then a "smoking_history" node is visible with value "no"
+      - If symptoms are described, relevant symptom nodes are visible with value "yes"
+      
+      IMPORTANT:
+      - Only identify nodes as visible if their value is CERTAIN from the context
+      - Use the EXACT values from the "possible values" list for each node
+      - If a node's value is uncertain or not mentioned, do NOT include it
+      - Match values to the node's type (binary: yes/no; categorical: one of the listed categories)
+      
+      Your output must be in the exact following format:
+      
+      <reasoning>
+      [Explain your analysis of which nodes are visible and why, going through the context systematically]
+      </reasoning>
+      
+      <visible_nodes>
+      [For each visible node, list it in this format:]
+      NODE: [node_id]
+      VALUE: [exact value from the node's possible values]
+      
+      [If no nodes are visible, write:]
+      None
+      </visible_nodes>
+
   uniadilr_template:
     step1: |
       You are a professional logician and reasoning master.
@@ -362,6 +399,37 @@ prompt_templates:
       ** For root nodes with no parents, use: "CONDITION: NO_PARENTS"
       ** Use only the five specified qualitative terms: very_low, low, moderate, high, very_high
       ** Focus on this specific condition only - do not provide probabilities for other parent combinations
+
+    step3dot5: |
+      You are analyzing a logical reasoning task to identify which variables (nodes) in a Bayesian Network have known values from the context and hypothesis.
+      
+      You will be provided with:
+      1. The logical context and hypothesis
+      2. A list of DAG nodes with their IDs, names, types, and possible values
+      
+      TASK:
+      Carefully analyze the context and hypothesis above. For each node in the DAG, determine if its value is explicitly mentioned or can be directly inferred from the information provided. A node is "visible" if we know its exact value from the context/hypothesis.
+      
+      IMPORTANT:
+      - Only identify nodes as visible if their value is CERTAIN from the context
+      - Use the EXACT values from the "possible values" list for each node
+      - If a node's value is uncertain or not mentioned, do NOT include it
+      - Match values to the node's type (binary: yes/no; categorical: one of the listed categories)
+      
+      Your output must be in the exact following format:
+      
+      <reasoning>
+      [Explain your analysis of which nodes are visible and why, going through the context systematically]
+      </reasoning>
+      
+      <visible_nodes>
+      [For each visible node, list it in this format:]
+      NODE: [node_id]
+      VALUE: [exact value from the node's possible values]
+      
+      [If no nodes are visible, write:]
+      None
+      </visible_nodes>
 
 datasets:
   medqa:

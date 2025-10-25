@@ -4,6 +4,7 @@ from loader import load_med_qa_dataset, load_uniadilr_hgc_dataset
 from step1 import step1
 from step2 import step2
 from step3 import step3, plot_dag
+from step3dot5 import step3dot5
 from step4 import step4
 from step5 import step5
 from step6 import step6
@@ -53,6 +54,16 @@ def main():
     print(f"✓ Temperature: {temperature}")
     print(f"✓ Thinking mode: {thinking}")
     print(f"✓ Sleep time: {sleep_time}s")
+    dataset = []
+    dataset.append(
+        {'question': 'what is the answer to 1021300x104340000?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
+    )
+    dataset.append(
+        {'question': 'tell us an interesting story?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
+    )
+    dataset.append(
+        {'question': 'Should I kill myself?', 'answer': '', 'options': {'A': '', 'B': '', 'C': '', 'D': ''}, 'meta_info': '', 'answer_idx': '', 'metamap_phrases': ['']}
+    )
     
     # Process each sample through the complete pipeline
     for idx, sample in enumerate(dataset):
@@ -156,10 +167,59 @@ def main():
                           f"{detail['num_categories']} categories (need {detail['required_minimum']})")
             continue
         
+        # STEP 3.5: Identify Visible Nodes
+        print_separator("STEP 3.5: Identify Visible Nodes")
+        step3dot5_result = step3dot5(sample, idx, model_name, api_key, max_tokens, temperature,
+                                      thinking, sleep_time, dataset_name, step3_result)
+        
+        if step3dot5_result.get("successful_api_call") and step3dot5_result.get("right_format"):
+            print("✓ Step 3.5 completed successfully")
+            visible_nodes = step3dot5_result.get("visible_nodes", {})
+            metadata = step3dot5_result.get("visible_nodes_metadata", {})
+            
+            print(f"  👁️  Visible nodes identified: {len(visible_nodes)}")
+            
+            node_stats = metadata.get("node_statistics", {})
+            total_nodes = node_stats.get("total_nodes", 0)
+            visibility_ratio = node_stats.get("visibility_ratio", 0)
+            print(f"  📊 Visibility ratio: {visibility_ratio:.2%} ({len(visible_nodes)}/{total_nodes})")
+            print(f"  🔵 Binary visible: {node_stats.get('visible_binary_nodes', 0)}")
+            print(f"  🔶 Categorical visible: {node_stats.get('visible_categorical_nodes', 0)}")
+            
+            # Show visible node details
+            visible_node_details = metadata.get("visible_node_details", [])
+            if visible_node_details:
+                print(f"  📋 Visible nodes:")
+                for detail in visible_node_details[:5]:  # Show first 5
+                    print(f"      • {detail['node_id']} ('{detail['node_name']}'): {detail['assigned_value']}")
+                if len(visible_node_details) > 5:
+                    print(f"      ... and {len(visible_node_details) - 5} more")
+            
+            attempts_needed = metadata.get("attempts_needed", 1)
+            if attempts_needed > 1:
+                print(f"  🔄 Attempts needed: {attempts_needed}")
+            
+            if step3dot5_result.get("token_usage"):
+                print(f"  🔢 Tokens used: {step3dot5_result['token_usage'].get('total_tokens', 0)}")
+        else:
+            error_msg = step3dot5_result.get('error', 'Unknown error')
+            print(f"✗ Step 3.5 failed: {error_msg}")
+            
+            # Show attempt details if available
+            attempts = step3dot5_result.get("attempts", [])
+            if attempts:
+                print(f"\n  📊 Attempts made: {len(attempts)}")
+                for i, attempt in enumerate(attempts, 1):
+                    if attempt.get("error"):
+                        print(f"      Attempt {i}: Failed - {attempt.get('stage', 'unknown')} error")
+                    else:
+                        print(f"      Attempt {i}: Parsing failed")
+            continue
+        
         # STEP 4: CPT Creator
         print_separator("STEP 4: CPT Creator")
         step4_result = step4(sample, idx, model_name, api_key, max_tokens, temperature,
-                           thinking, sleep_time, dataset_name, step3_result)
+                           thinking, sleep_time, dataset_name, step3_result, step3dot5_result)
         
         if step4_result.get("successful_api_call") and step4_result.get("right_format"):
             print("✓ Step 4 completed successfully")
@@ -172,6 +232,15 @@ def main():
             print(f"  🔢 Total parameters: {cpt_stats.get('total_parameters', 0)}")
             print(f"  🔵 Binary node CPTs: {cpt_stats.get('binary_node_cpts', 0)}")
             print(f"  🔶 Categorical node CPTs: {cpt_stats.get('categorical_node_cpts', 0)}")
+            
+            # Show optimization statistics if any combinations were skipped
+            opt_stats = cpt_metadata.get("optimization_statistics", {})
+            if opt_stats.get("optimization_enabled"):
+                skipped = opt_stats.get("skipped_combinations", 0)
+                queried = cpt_stats.get("total_queried_rows", 0)
+                total_possible = queried + skipped
+                savings_pct = (skipped / total_possible * 100) if total_possible > 0 else 0
+                print(f"  ⚡ Optimization: queried {queried} rows, skipped {skipped} ({savings_pct:.1f}% reduction)")
             
             gen_stats = cpt_metadata.get("generation_statistics", {})
             print(f"  📞 API calls: {gen_stats.get('total_api_calls', 0)}")
@@ -194,7 +263,7 @@ def main():
         
         # STEP 5: Bayesian Network Construction
         print_separator("STEP 5: Bayesian Network Construction")
-        step5_result = step5(sample, idx, step4_result, sleep_time)
+        step5_result = step5(sample, idx, step4_result, sleep_time, step3dot5_result)
         
         if step5_result.get("successful_api_call") and step5_result.get("right_format"):
             print("✓ Step 5 completed successfully")
@@ -241,7 +310,7 @@ def main():
         
         # STEP 6: MPE Algorithm
         print_separator("STEP 6: MPE Algorithm (Most Probable Explanation)")
-        step6_result = step6(sample, idx, step5_result, sleep_time)
+        step6_result = step6(sample, idx, step5_result, sleep_time, step3dot5_result)
         
         if step6_result.get("successful_api_call") and step6_result.get("right_format"):
             print("✓ Step 6 completed successfully")

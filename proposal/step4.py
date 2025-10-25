@@ -5,7 +5,7 @@ from api_handler import get_model_response
 
 def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_tokens: int, 
           temperature: float, thinking: bool, sleep_time: float, dataset_name: str, 
-          step3_result: Dict[str, Any]) -> Dict[str, Any]:
+          step3_result: Dict[str, Any], step3dot5_result: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Step 4: CPT Creator - Generate Conditional Probability Tables for all nodes using LLMs.
     
@@ -42,7 +42,8 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "error": "Step 3 failed or had invalid format - cannot proceed with Step 4",
             "step1_result": step3_result.get("step1_result"),
             "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result
+            "step3_result": step3_result,
+            "step3dot5_result": step3dot5_result
         }
     
     registered_dag = step3_result.get("registered_dag")
@@ -58,14 +59,25 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "error": "No registered DAG found in step3 result",
             "step1_result": step3_result.get("step1_result"),
             "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result
+            "step3_result": step3_result,
+            "step3dot5_result": step3dot5_result
         }
     
     try:
+        # Extract visible nodes from step3dot5 if available
+        visible_nodes = {}
+        if (step3dot5_result and 
+            step3dot5_result.get("successful_api_call") and 
+            step3dot5_result.get("right_format")):
+            visible_nodes = step3dot5_result.get("visible_nodes", {})
+            if visible_nodes:
+                print(f"\n  👁️  Using {len(visible_nodes)} observed variables from Step 3.5 to optimize CPT generation")
+        
         # Generate CPTs for all nodes
         all_cpts = {}
         cpt_generation_log = []
         total_api_calls = 0
+        total_skipped_combinations = 0
         total_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
         # Process each node in the DAG
@@ -88,7 +100,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             # Generate CPT for this node
             cpt_result = _generate_node_cpt(
                 sample, node_info, registered_dag, model_name, api_key, 
-                max_tokens, temperature, thinking, dataset_name
+                max_tokens, temperature, thinking, dataset_name, visible_nodes
             )
             
             if cpt_result["success"]:
@@ -97,7 +109,8 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                     "node_id": node_id,
                     "node_name": node_info["name"],
                     "success": True,
-                    "token_usage": cpt_result.get("token_usage")
+                    "token_usage": cpt_result.get("token_usage"),
+                    "skipped_combinations": cpt_result.get("skipped_combinations", 0)
                 })
                 
                 # Accumulate token usage
@@ -106,7 +119,10 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                         total_token_usage[key] += cpt_result["token_usage"].get(key, 0)
                 
                 total_api_calls += 1
-                print(f"      ✅ Success! Generated {len(cpt_result['cpt'].get('numerical_cpt', {}))} CPT row(s)")
+                skipped = cpt_result.get("skipped_combinations", 0)
+                total_skipped_combinations += skipped
+                queried = len(cpt_result['cpt'].get('numerical_cpt', {})) - skipped
+                print(f"      ✅ Success! Queried {queried} CPT row(s)" + (f", skipped {skipped} (contradicts evidence)" if skipped > 0 else ""))
             else:
                 cpt_generation_log.append({
                     "node_id": node_id,
@@ -134,11 +150,12 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                     "cpt_generation_log": cpt_generation_log,
                     "step1_result": step3_result.get("step1_result"),
                     "step2_result": step3_result.get("step2_result"),
-                    "step3_result": step3_result
+                    "step3_result": step3_result,
+                    "step3dot5_result": step3dot5_result
                 }
         
         # Create metadata about CPT generation
-        cpt_metadata = _create_cpt_metadata(all_cpts, registered_dag, cpt_generation_log, total_api_calls, total_token_usage)
+        cpt_metadata = _create_cpt_metadata(all_cpts, registered_dag, cpt_generation_log, total_api_calls, total_token_usage, total_skipped_combinations)
         
         return {
             "raw_data": sample,
@@ -153,7 +170,8 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "token_usage": total_token_usage,
             "step1_result": step3_result.get("step1_result"),
             "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result
+            "step3_result": step3_result,
+            "step3dot5_result": step3dot5_result
         }
         
     except Exception as e:
@@ -168,7 +186,8 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             "error": f"CPT generation failed for sample {idx}: {e}",
             "step1_result": step3_result.get("step1_result"),
             "step2_result": step3_result.get("step2_result"),
-            "step3_result": step3_result
+            "step3_result": step3_result,
+            "step3dot5_result": step3dot5_result
         }
 
 
@@ -259,7 +278,7 @@ def _format_cpt_generation_error(node_id: str, node_info: Dict[str, Any], cpt_re
 
 def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], registered_dag: Dict[str, Any],
                       model_name: str, api_key: str, max_tokens: int, temperature: float, 
-                      thinking: bool, dataset_name: str) -> Dict[str, Any]:
+                      thinking: bool, dataset_name: str, visible_nodes: Dict[str, str] = None) -> Dict[str, Any]:
     """
     Generate CPT for a single node using LLM with row-by-row approach.
     
@@ -270,6 +289,7 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
         model_name, api_key, max_tokens, temperature: LLM parameters
         thinking: Whether model supports <think> blocks
         dataset_name: "medqa" or "uniadilr"
+        visible_nodes: Optional dict of observed node_id -> value from step3dot5
     
     Returns:
         dict: Result with CPT or error information
@@ -279,14 +299,18 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
         parent_info = _get_parent_info(node_info, registered_dag)
         node_states = _get_node_states(node_info)
         
-        # Generate all parent combinations
+        # Generate all parent combinations (both valid and invalid)
         if parent_info["has_parents"]:
-            parent_combinations = _generate_parent_combinations(parent_info)
+            all_combinations, valid_combinations = _generate_parent_combinations(parent_info, visible_nodes or {})
         else:
             # Root node - only one "combination" (no parents)
-            parent_combinations = ["NO_PARENTS"]
+            all_combinations = ["NO_PARENTS"]
+            valid_combinations = ["NO_PARENTS"]
         
-        print(f"Generating CPT for {node_info['name']} with {len(parent_combinations)} combinations")
+        num_skipped = len(all_combinations) - len(valid_combinations)
+        
+        if num_skipped > 0:
+            print(f"      ⚡ Optimizing: {len(valid_combinations)} combinations to query, {num_skipped} skipped (contradict evidence)")
         
         # Generate CPT row by row
         qualitative_cpt = {}
@@ -294,7 +318,8 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
         all_raw_responses = []
         total_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         
-        for combination in parent_combinations:
+        # Query only valid combinations
+        for combination in valid_combinations:
             # Generate CPT row for this specific parent combination
             row_result = _generate_cpt_row(
                 sample, node_info, parent_info, combination, registered_dag,
@@ -321,6 +346,14 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                     "raw_responses": all_raw_responses
                 }
         
+        # Fill in skipped combinations with zero probabilities
+        skipped_combinations = [c for c in all_combinations if c not in valid_combinations]
+        for combination in skipped_combinations:
+            # Create zero probability distribution for this combination
+            zero_probs = {state: 0.0 for state in node_states}
+            qualitative_cpt[combination] = {state: "very_low" for state in node_states}
+            numerical_cpt[combination] = zero_probs
+        
         return {
             "success": True,
             "cpt": {
@@ -332,9 +365,11 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                 "qualitative_cpt": qualitative_cpt,
                 "numerical_cpt": numerical_cpt,
                 "raw_responses": all_raw_responses,
-                "generation_method": "row_by_row"
+                "generation_method": "row_by_row_optimized",
+                "skipped_combinations": skipped_combinations
             },
-            "token_usage": total_token_usage
+            "token_usage": total_token_usage,
+            "skipped_combinations": len(skipped_combinations)
         }
             
     except Exception as e:
@@ -344,30 +379,71 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
         }
 
 
-def _generate_parent_combinations(parent_info: Dict[str, Any]) -> List:
-    """Generate all possible combinations of parent states."""
+def _generate_parent_combinations(parent_info: Dict[str, Any], visible_nodes: Dict[str, str] = None) -> Tuple[List, List]:
+    """
+    Generate all possible combinations of parent states, and filter based on observed variables.
+    
+    Args:
+        parent_info: Information about parent nodes
+        visible_nodes: Dictionary of observed node_id -> value from step3dot5
+    
+    Returns:
+        Tuple of (all_combinations, valid_combinations)
+        - all_combinations: All theoretically possible parent combinations
+        - valid_combinations: Only combinations that don't contradict observed variables
+    """
     import itertools
     
     if not parent_info["has_parents"]:
-        return ["NO_PARENTS"]
+        return ["NO_PARENTS"], ["NO_PARENTS"]
     
-    # Get all parent states
+    visible_nodes = visible_nodes or {}
+    
+    # Get all parent states and track which parents are observed
     parent_states = []
     parent_order = []
+    observed_parent_values = {}  # parent_id -> observed_value
     
     for parent_id, parent_data in parent_info["parents"].items():
         parent_order.append(parent_id)
         parent_states.append(parent_data["states"])
+        
+        # Check if this parent is observed
+        if parent_id in visible_nodes:
+            observed_parent_values[parent_id] = visible_nodes[parent_id]
     
     # Generate all combinations
-    combinations = []
+    all_combinations = []
     for combo in itertools.product(*parent_states):
         if len(combo) == 1:
-            combinations.append(combo[0])
+            all_combinations.append(combo[0])
         else:
-            combinations.append(combo)
+            all_combinations.append(combo)
     
-    return combinations
+    # Filter to only valid combinations (those that match observed parent values)
+    valid_combinations = []
+    for combo in all_combinations:
+        # Check if this combination contradicts any observed parent values
+        is_valid = True
+        
+        if isinstance(combo, tuple):
+            # Multiple parents
+            for i, parent_id in enumerate(parent_order):
+                if parent_id in observed_parent_values:
+                    if combo[i] != observed_parent_values[parent_id]:
+                        is_valid = False
+                        break
+        else:
+            # Single parent
+            parent_id = parent_order[0]
+            if parent_id in observed_parent_values:
+                if combo != observed_parent_values[parent_id]:
+                    is_valid = False
+        
+        if is_valid:
+            valid_combinations.append(combo)
+    
+    return all_combinations, valid_combinations
 
 
 def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
@@ -815,12 +891,13 @@ def _convert_qualitative_to_numerical(cpt_data: Dict[str, Any]) -> Dict[str, Any
 
 def _create_cpt_metadata(all_cpts: Dict[str, Any], registered_dag: Dict[str, Any], 
                         generation_log: List[Dict], total_api_calls: int, 
-                        total_token_usage: Dict[str, int]) -> Dict[str, Any]:
+                        total_token_usage: Dict[str, int], total_skipped_combinations: int = 0) -> Dict[str, Any]:
     """Create metadata about the CPT generation process."""
     
     # Analyze CPT characteristics
     node_types = {"binary": 0, "categorical": 0}
     total_parameters = 0
+    total_queried_rows = 0
     
     for node_id, cpt in all_cpts.items():
         node_types[cpt["node_type"]] += 1
@@ -828,6 +905,10 @@ def _create_cpt_metadata(all_cpts: Dict[str, Any], registered_dag: Dict[str, Any
         # Count parameters (number of probability values)
         for condition_probs in cpt["numerical_cpt"].values():
             total_parameters += len(condition_probs)
+        
+        # Count queried rows (non-zero probability rows)
+        skipped_combos = cpt.get("skipped_combinations", [])
+        total_queried_rows += len(cpt["numerical_cpt"]) - len(skipped_combos)
     
     # Success statistics
     successful_generations = sum(1 for log in generation_log if log["success"])
@@ -843,13 +924,19 @@ def _create_cpt_metadata(all_cpts: Dict[str, Any], registered_dag: Dict[str, Any
             "total_cpts": len(all_cpts),
             "binary_node_cpts": node_types["binary"],
             "categorical_node_cpts": node_types["categorical"],
-            "total_parameters": total_parameters
+            "total_parameters": total_parameters,
+            "total_queried_rows": total_queried_rows,
+            "total_skipped_combinations": total_skipped_combinations
         },
         "generation_statistics": {
             "total_api_calls": total_api_calls,
             "successful_generations": successful_generations,
             "failed_generations": failed_generations,
             "success_rate": successful_generations / len(generation_log) if generation_log else 0
+        },
+        "optimization_statistics": {
+            "skipped_combinations": total_skipped_combinations,
+            "optimization_enabled": total_skipped_combinations > 0
         },
         "token_usage": total_token_usage,
         "generation_log": generation_log

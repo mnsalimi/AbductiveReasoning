@@ -3,7 +3,7 @@ import math
 from typing import Dict, Any, List, Tuple, Optional, Set
 import itertools
 
-def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_time: float = 0.0) -> Dict[str, Any]:
+def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_time: float = 0.0, step3dot5_result: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Step 6: MPE Algorithm - Apply Most Probable Explanation algorithm on the Bayesian Network.
     
@@ -36,6 +36,7 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "step1_result": step5_result.get("step1_result"),
             "step2_result": step5_result.get("step2_result"),
             "step3_result": step5_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step5_result.get("step4_result"),
             "step5_result": step5_result
         }
@@ -54,13 +55,14 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "step1_result": step5_result.get("step1_result"),
             "step2_result": step5_result.get("step2_result"),
             "step3_result": step5_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step5_result.get("step4_result"),
             "step5_result": step5_result
         }
     
     try:
-        # Extract evidence from the sample (context and question)
-        evidence = _extract_evidence_from_sample(sample, bayesian_network)
+        # Extract evidence from the sample (context and question) and step3dot5 visible nodes
+        evidence = _extract_evidence_from_sample(sample, bayesian_network, step3dot5_result)
         
         # Apply MPE algorithm
         mpe_result = _apply_mpe_algorithm(bayesian_network, evidence)
@@ -88,6 +90,7 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "step1_result": step5_result.get("step1_result"),
             "step2_result": step5_result.get("step2_result"),
             "step3_result": step5_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step5_result.get("step4_result"),
             "step5_result": step5_result
         }
@@ -107,21 +110,25 @@ def step6(sample: Dict[str, Any], idx: int, step5_result: Dict[str, Any], sleep_
             "step1_result": step5_result.get("step1_result"),
             "step2_result": step5_result.get("step2_result"),
             "step3_result": step5_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step5_result.get("step4_result"),
             "step5_result": step5_result
         }
 
 
-def _extract_evidence_from_sample(sample: Dict[str, Any], bayesian_network: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_evidence_from_sample(sample: Dict[str, Any], bayesian_network: Dict[str, Any], 
+                                 step3dot5_result: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Extract evidence from the sample context and question.
     
     This function analyzes the sample to identify what evidence is available
-    and maps it to the Bayesian Network nodes.
+    and maps it to the Bayesian Network nodes. If step3dot5_result is provided,
+    it uses the visible nodes identified by the AI model as evidence.
     
     Args:
         sample: Original data sample
         bayesian_network: Constructed Bayesian Network from step5
+        step3dot5_result: Optional result from step3dot5 containing visible nodes
     
     Returns:
         dict: Evidence mapping and metadata
@@ -133,7 +140,7 @@ def _extract_evidence_from_sample(sample: Dict[str, Any], bayesian_network: Dict
     evidence = {
         "observed_variables": {},  # node_id -> observed_state
         "query_variables": [],     # Variables we want to find MPE for
-        "evidence_source": "sample_context",
+        "evidence_source": "unknown",
         "raw_context": context,
         "raw_question": question
     }
@@ -141,9 +148,42 @@ def _extract_evidence_from_sample(sample: Dict[str, Any], bayesian_network: Dict
     # Get network nodes for analysis
     nodes = bayesian_network["nodes"]
     
-    # Extract evidence using heuristic matching
-    evidence_extraction = _heuristic_evidence_extraction(context, question, nodes)
-    evidence.update(evidence_extraction)
+    # Check if step3dot5 provided visible nodes
+    if (step3dot5_result and 
+        step3dot5_result.get("successful_api_call") and 
+        step3dot5_result.get("right_format") and 
+        step3dot5_result.get("visible_nodes")):
+        
+        # Use visible nodes from step3dot5 as evidence
+        visible_nodes = step3dot5_result.get("visible_nodes", {})
+        
+        print(f"\n  📊 Using {len(visible_nodes)} visible nodes from Step 3.5 as evidence")
+        
+        for node_id, value in visible_nodes.items():
+            if node_id in nodes:
+                evidence["observed_variables"][node_id] = value
+                print(f"      • {node_id}: {value}")
+            else:
+                print(f"      ⚠️  Node {node_id} from visible nodes not found in Bayesian Network")
+        
+        evidence["evidence_source"] = "step3dot5_visible_nodes"
+        
+        # If no visible nodes were found, fall back to heuristic extraction
+        if not evidence["observed_variables"]:
+            print(f"      ⚠️  No valid visible nodes found, falling back to heuristic extraction")
+            evidence_extraction = _heuristic_evidence_extraction(context, question, nodes)
+            evidence.update(evidence_extraction)
+            evidence["evidence_source"] = "heuristic_fallback"
+    else:
+        # Fall back to heuristic evidence extraction
+        if step3dot5_result:
+            print(f"\n  ⚠️  Step 3.5 did not complete successfully, using heuristic evidence extraction")
+        else:
+            print(f"\n  ℹ️  No Step 3.5 result available, using heuristic evidence extraction")
+        
+        evidence_extraction = _heuristic_evidence_extraction(context, question, nodes)
+        evidence.update(evidence_extraction)
+        evidence["evidence_source"] = "heuristic"
     
     # If no specific evidence found, treat all non-query variables as hidden
     if not evidence["observed_variables"] and not evidence["query_variables"]:

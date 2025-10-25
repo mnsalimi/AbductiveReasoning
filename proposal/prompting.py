@@ -484,4 +484,235 @@ def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successf
         "model_answer": model_answer,
         "correct_answer": correct_answer,
     }
+
+
+def create_prompt_step3dot5(dataset_name: str, sample: dict, step3_result: dict, type: str = "v1"):
+    """
+    Create prompt for Step 3.5: Identify Visible Nodes
+    
+    This prompt asks the model to identify which nodes in the DAG have values that are
+    explicitly mentioned or can be directly inferred from the question and context.
+    
+    Args:
+        dataset_name: "medqa" or "uniadilr"
+        sample: Original data sample
+        step3_result: Result from step3 containing the registered DAG
+        type: Template type (default "v1")
+    
+    Returns:
+        str: Complete prompt for step 3.5
+    """
+    # Load the prompt template from config
+    prompt_template = _load_prompt_template(dataset_name, "step3dot5", type)
+    
+    context, question = _parse_context_and_question(dataset_name, sample)
+    answer_choices = _get_answer_choices(dataset_name, sample)
+    
+    # Extract DAG information from step3_result
+    registered_dag = step3_result.get("registered_dag", {})
+    nodes = registered_dag.get("nodes", {})
+    
+    # Build node information section with IDs, names, types, and possible states
+    node_info_text = "DAG NODES:\n"
+    for node_id, node_data in sorted(nodes.items(), key=lambda x: x[1]["index"]):
+        node_name = node_data["name"]
+        node_type = node_data["type"]
+        
+        # Get possible states/values
+        if node_type == "binary":
+            states = "yes, no"
+        elif node_type == "categorical":
+            categories = node_data.get("categories", [])
+            states = ", ".join(categories) if categories else "unknown"
+        else:
+            states = "unknown"
+        
+        node_info_text += f"- {node_id}: {node_name} (type: {node_type}, possible values: {states})\n"
+    
+    # Build the complete prompt based on dataset type
+    if dataset_name == "medqa":
+        input_text = f"""QUESTION AND CONTEXT:
+{context}
+{question}
+
+{answer_choices}
+
+{node_info_text}
+
+{prompt_template}"""
+    
+    elif dataset_name == "uniadilr":
+        # Format context nicely for UniADILR
+        if isinstance(context, dict):
+            context_text = "CONTEXT:\n"
+            for key, value in context.items():
+                context_text += f"{key}: {value}\n"
+            context_text = context_text.strip()
+        else:
+            context_text = f"CONTEXT:\n{str(context)}"
+        
+        input_text = f"""{context_text}
+
+HYPOTHESIS:
+{question}
+
+{node_info_text}
+
+{prompt_template}"""
+    
+    else:
+        raise ValueError(f"Invalid dataset name: {dataset_name}")
+    
+    return input_text
+
+
+def parse_model_answer_step3dot5(sample: Dict[str, Any], model_output: str, successful_api_call: bool, 
+                                  thinking: bool, step3_result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse the model's response for Step 3.5: Identify Visible Nodes
+    
+    Args:
+        sample: Original data sample
+        model_output: Raw output from the model
+        successful_api_call: Whether the API call was successful
+        thinking: Whether model uses <think> blocks
+        step3_result: Result from step3 (needed for validation)
+    
+    Returns:
+        dict: Parsed result with visible_nodes mapping and validation info
+    """
+    right_format = False
+    extracted_reasoning = None
+    visible_nodes = {}
+    validation_issues = []
+    
+    if not successful_api_call:
+        return {
+            "raw_data": sample,
+            "successful_api_call": False,
+            "right_format": False,
+            "model_output": model_output,
+            "visible_nodes": {},
+            "reasoning": None,
+            "correct_answer": sample.get("answer_idx"),
+            "error": "API call was not successful"
+        }
+    
+    # Get registered DAG for validation
+    registered_dag = step3_result.get("registered_dag", {})
+    nodes = registered_dag.get("nodes", {})
+    
+    # 1. Clean the output if it contains <think> blocks
+    if thinking:
+        cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL).strip()
+    else:
+        cleaned_text = model_output.strip()
+    
+    # 2. Extract reasoning and visible_nodes sections
+    reasoning_pattern = r"<reasoning>(.*?)</reasoning>"
+    visible_nodes_pattern = r"<visible_nodes>(.*?)</visible_nodes>"
+    
+    reasoning_match = re.search(reasoning_pattern, cleaned_text, flags=re.DOTALL)
+    visible_nodes_match = re.search(visible_nodes_pattern, cleaned_text, flags=re.DOTALL)
+    
+    if not reasoning_match or not visible_nodes_match:
+        return {
+            "raw_data": sample,
+            "successful_api_call": True,
+            "right_format": False,
+            "model_output": model_output,
+            "visible_nodes": {},
+            "reasoning": None,
+            "correct_answer": sample.get("answer_idx"),
+            "error": "Missing <reasoning> or <visible_nodes> sections in model output"
+        }
+    
+    extracted_reasoning = reasoning_match.group(1).strip()
+    visible_nodes_content = visible_nodes_match.group(1).strip()
+    
+    # 3. Parse visible nodes content
+    # Check if it's "None" (no visible nodes)
+    if re.search(r"^\s*None\s*$", visible_nodes_content, re.IGNORECASE):
+        visible_nodes = {}
+        right_format = True
+    else:
+        # Parse NODE: VALUE: pairs
+        lines = visible_nodes_content.split('\n')
+        current_node = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            if line.startswith("NODE:"):
+                current_node = line.split("NODE:", 1)[1].strip()
+            elif line.startswith("VALUE:") and current_node:
+                value = line.split("VALUE:", 1)[1].strip()
+                
+                # Validate that the node exists in the DAG
+                if current_node not in nodes:
+                    validation_issues.append(f"Node {current_node} not found in DAG")
+                    current_node = None
+                    continue
+                
+                # Validate that the value is valid for this node's type
+                node_info = nodes[current_node]
+                valid_values = _get_node_states_for_validation(node_info)
+                
+                # Case-insensitive matching
+                value_lower = value.lower()
+                valid_values_lower = [v.lower() for v in valid_values]
+                
+                if value_lower in valid_values_lower:
+                    # Find the correctly-cased value
+                    correct_value = valid_values[valid_values_lower.index(value_lower)]
+                    visible_nodes[current_node] = correct_value
+                else:
+                    validation_issues.append(
+                        f"Invalid value '{value}' for node {current_node} "
+                        f"(type: {node_info['type']}, valid values: {valid_values})"
+                    )
+                
+                current_node = None
+        
+        # If we successfully parsed at least something or had no issues, consider format correct
+        if len(validation_issues) == 0:
+            right_format = True
+        else:
+            # If there were validation issues, format is incorrect
+            right_format = False
+    
+    return {
+        "raw_data": sample,
+        "successful_api_call": True,
+        "right_format": right_format,
+        "model_output": model_output,
+        "visible_nodes": visible_nodes,
+        "reasoning": extracted_reasoning,
+        "validation_issues": validation_issues,
+        "correct_answer": sample.get("answer_idx"),
+        "error": "; ".join(validation_issues) if validation_issues else None
+    }
+
+
+def _get_node_states_for_validation(node_info: Dict[str, Any]) -> list:
+    """
+    Get the possible states for a node (for validation in step3dot5).
+    
+    This matches the logic from step4.py's _get_node_states function.
+    
+    Args:
+        node_info: Node information dictionary
+    
+    Returns:
+        list: List of possible states
+    """
+    if node_info["type"] == "binary":
+        return ["yes", "no"]
+    elif node_info["type"] == "categorical":
+        categories = node_info.get("categories", [])
+        return categories if isinstance(categories, list) and categories else []
+    else:
+        return ["unknown"]
     

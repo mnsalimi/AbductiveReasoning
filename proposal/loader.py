@@ -53,4 +53,4 @@ def load_uniadilr_hgc_dataset(n_samples: int = -1) -> List[Dict[str, Any]]:
         return dataset_samples[:n_samples]
 
 if __name__ == "__main__":
-    print(load_med_qa_dataset(n_samples=2))
+    print(load_med_qa_dataset(n_samples=1))

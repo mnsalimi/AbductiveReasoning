@@ -1,0 +1,73 @@
+================================================================================
+STEP 1 RAW MODEL OUTPUT - Sample 2
+================================================================================
+
+PROMPT:
+--------------------------------------------------------------------------------
+Context:
+
+
+You are a professional medical scientist and biologist.
+You're given a medical context and background. 
+You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
+ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
+
+For each node, you must specify if it's binary or categorical:
+- Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
+- Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories, otherwise use binary)
+
+CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
+
+EXAMPLES OF CORRECT NODE DEFINITIONS:
+✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
+✗ WRONG: Patient_Age_Group (categorical: elderly) ← Only one category!
+
+✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination)
+✗ WRONG: Treatment_Type (categorical: chemotherapy) ← Only one category!
+
+✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical)
+✗ WRONG: Disease_Severity (categorical: moderate) ← Only one category!
+
+✓ CORRECT: Smoking_Status (binary)  ← Only two states: smoker/non-smoker
+✗ WRONG: Smoking_Status (categorical: smoker) ← Should be binary!
+
+✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic)
+✗ WRONG: Drug_Class (categorical: antibiotic) ← Only one category!
+
+Your output DAG should be in the exact following format:
+
+<reasoning> your full reasoning comes here </reasoning>
+<dag>
+NODES: 
+node1: node1_name (binary)
+node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
+node3: node3_name (binary)
+node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
+...
+node{last_node_number}: last_node_name (binary)
+EDGES: 
+edge1: node{i} -> node{j}
+edge2: node{x} -> node{y}
+edge3: node{z} -> node{w}
+...
+edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
+</dag>
+
+** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
+** for binary nodes: use format "node_name (binary)"
+** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
+** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
+** you should only output the DAG in the exact format above. No other text, no other format.
+** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
+
+
+MODEL OUTPUT:
+--------------------------------------------------------------------------------
+I'm ready to help. What is the medical context and background that I should create a DAG for? 
+
+Please provide the context, and I'll create an exhaustive DAG representing the relationships between entities in the context and related entities outside the context. I'll define each node as binary or categorical, specifying all possible values for categorical nodes. 
+
+I'll output the DAG in the exact format you specified. Let's get started!
+
+================================================================================

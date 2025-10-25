@@ -11,7 +11,7 @@ def _product(iterable):
         result *= x
     return result
 
-def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_time: float = 0.0) -> Dict[str, Any]:
+def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_time: float = 0.0, step3dot5_result: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Step 5: Bayesian Network Construction - Construct a complete Bayesian Network from CPTs.
     
@@ -43,6 +43,7 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
             "step1_result": step4_result.get("step1_result"),
             "step2_result": step4_result.get("step2_result"),
             "step3_result": step4_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step4_result
         }
     
@@ -60,6 +61,7 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
             "step1_result": step4_result.get("step1_result"),
             "step2_result": step4_result.get("step2_result"),
             "step3_result": step4_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step4_result
         }
     
@@ -96,6 +98,7 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
             "step1_result": step4_result.get("step1_result"),
             "step2_result": step4_result.get("step2_result"),
             "step3_result": step4_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step4_result
         }
         
@@ -119,6 +122,7 @@ def step5(sample: Dict[str, Any], idx: int, step4_result: Dict[str, Any], sleep_
             "step1_result": step4_result.get("step1_result"),
             "step2_result": step4_result.get("step2_result"),
             "step3_result": step4_result.get("step3_result"),
+            "step3dot5_result": step3dot5_result,
             "step4_result": step4_result
         }
 

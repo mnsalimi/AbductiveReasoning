@@ -246,6 +246,27 @@ prompt_templates:
       None
       </visible_nodes>
 
+    step7: |
+      You are given the results of a Bayesian Network analysis for a medical question. The analysis has determined the values of all variables (nodes) in the network through a combination of:
+      1. Observed variables: directly mentioned in the question/context
+      2. Inferred variables: determined through Most Probable Explanation (MPE) inference
+      
+      YOUR TASK:
+      Based on the variable assignments shown below, identify what answer option the analysis indicates. DO NOT solve the medical problem yourself - simply identify what answer is indicated by the given analysis results.
+      
+      Your output must be in the exact following format:
+      
+      <answer>
+      OPTION: [single letter: A, B, C, or D]
+      VALUE: [the exact text of the chosen option]
+      </answer>
+      
+      CRITICAL:
+      - Output only the <answer> block, nothing else
+      - OPTION must be a single uppercase letter (A, B, C, or D)
+      - VALUE must be the complete text of that option
+      - Do NOT add any reasoning or explanation outside the <answer> block
+
   uniadilr_template:
     step1: |
       You are a professional logician and reasoning master.
@@ -430,6 +451,25 @@ prompt_templates:
       [If no nodes are visible, write:]
       None
       </visible_nodes>
+
+    step7: |
+      You are given the results of a Bayesian Network analysis for a logical reasoning task. The analysis has determined the values of all variables (nodes) in the network through a combination of:
+      1. Observed variables: directly mentioned in the context/hypothesis
+      2. Inferred variables: determined through Most Probable Explanation (MPE) inference
+      
+      YOUR TASK:
+      Based on the variable assignments shown below, identify what conclusion the analysis indicates about the hypothesis. DO NOT solve the logical problem yourself - simply identify what conclusion is indicated by the given analysis results.
+      
+      Your output must be in the exact following format:
+      
+      <answer>
+      CONCLUSION: [the conclusion about the hypothesis - what sentences support it]
+      </answer>
+      
+      CRITICAL:
+      - Output only the <answer> block, nothing else
+      - CONCLUSION should describe what the analysis determined
+      - Do NOT add any reasoning or explanation outside the <answer> block
 
 datasets:
   medqa:

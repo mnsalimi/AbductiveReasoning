@@ -715,4 +715,308 @@ def _get_node_states_for_validation(node_info: Dict[str, Any]) -> list:
         return categories if isinstance(categories, list) and categories else []
     else:
         return ["unknown"]
+
+
+def create_prompt_step7(dataset_name: str, sample: dict, step6_result: dict, type: str = "v1"):
+    """
+    Create prompt for Step 7: Answer Extraction
     
+    This prompt presents the LLM with the complete Bayesian Network analysis results
+    (observed variables + MPE inferred variables) and asks it to identify what answer
+    is indicated by the analysis.
+    
+    Args:
+        dataset_name: "medqa" or "uniadilr"
+        sample: Original data sample
+        step6_result: Result from step6 containing MPE assignments
+        type: Template type (default "v1")
+    
+    Returns:
+        str: Complete prompt for step7
+    """
+    # Load the prompt template from config
+    prompt_template = _load_prompt_template(dataset_name, "step7", type)
+    
+    context, question = _parse_context_and_question(dataset_name, sample)
+    answer_choices = _get_answer_choices(dataset_name, sample)
+    
+    # Extract variable assignments from step6_result
+    variable_assignments_text = _format_variable_assignments(step6_result)
+    
+    # Build the complete prompt based on dataset type
+    if dataset_name == "medqa":
+        input_text = f"""MEDICAL QUESTION AND CONTEXT:
+{context}
+{question}
+
+ANSWER CHOICES:
+{answer_choices}
+
+BAYESIAN NETWORK ANALYSIS RESULTS:
+{variable_assignments_text}
+
+{prompt_template}"""
+    
+    elif dataset_name == "uniadilr":
+        # Format context nicely for UniADILR
+        if isinstance(context, dict):
+            context_text = "CONTEXT SENTENCES:\n"
+            for key, value in context.items():
+                context_text += f"{key}: {value}\n"
+            context_text = context_text.strip()
+        else:
+            context_text = f"CONTEXT:\n{str(context)}"
+        
+        input_text = f"""{context_text}
+
+HYPOTHESIS:
+{question}
+
+BAYESIAN NETWORK ANALYSIS RESULTS:
+{variable_assignments_text}
+
+{prompt_template}"""
+    
+    else:
+        raise ValueError(f"Invalid dataset name: {dataset_name}")
+    
+    return input_text
+
+
+def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
+    """
+    Format variable assignments from step6 for display in step7 prompt.
+    
+    Combines observed variables (from step3.5) and inferred variables (from MPE in step6).
+    
+    Args:
+        step6_result: Result from step6 containing MPE and visible nodes
+    
+    Returns:
+        str: Formatted text showing all variable assignments
+    """
+    lines = []
+    
+    # Get the MPE assignment (contains all variables)
+    mpe_assignment = step6_result.get("mpe_result", {}).get("mpe_assignment", {})
+    
+    # Get the observed variables (visible nodes from step3.5)
+    step3dot5_result = step6_result.get("step3dot5_result", {})
+    visible_nodes = step3dot5_result.get("visible_nodes", {})
+    
+    # Get node information from step5 (Bayesian Network)
+    step5_result = step6_result.get("step5_result", {})
+    bayesian_network = step5_result.get("bayesian_network", {})
+    nodes = bayesian_network.get("nodes", {})
+    
+    if not mpe_assignment:
+        lines.append("No variable assignments available.")
+        return "\n".join(lines)
+    
+    # Add header
+    lines.append("Variable Assignments (Observed = directly from question/context, Inferred = from MPE):")
+    lines.append("")
+    
+    # Sort nodes by their index for consistent ordering
+    sorted_node_ids = sorted(nodes.keys(), key=lambda x: nodes[x].get("index", 0))
+    
+    for node_id in sorted_node_ids:
+        if node_id in mpe_assignment:
+            node_info = nodes.get(node_id, {})
+            node_name = node_info.get("name", node_id)
+            assigned_value = mpe_assignment[node_id]
+            
+            # Mark if this is an observed variable
+            if node_id in visible_nodes:
+                status = "[OBSERVED]"
+            else:
+                status = "[INFERRED]"
+            
+            lines.append(f"  {status} {node_name}: {assigned_value}")
+    
+    return "\n".join(lines)
+
+
+def parse_model_answer_step7(sample: Dict[str, Any], model_output: str, 
+                              successful_api_call: bool, thinking: bool,
+                              dataset_name: str) -> Dict[str, Any]:
+    """
+    Parse the model's response for Step 7: Answer Extraction
+    
+    Args:
+        sample: Original data sample
+        model_output: Raw output from the model
+        successful_api_call: Whether the API call was successful
+        thinking: Whether model uses <think> blocks
+        dataset_name: "medqa" or "uniadilr"
+    
+    Returns:
+        dict: Parsed result with extracted answer and validation info
+    """
+    right_format = False
+    extracted_answer = None
+    
+    if not successful_api_call:
+        return {
+            "raw_data": sample,
+            "successful_api_call": False,
+            "right_format": False,
+            "model_output": model_output,
+            "extracted_answer": None,
+            "correct_answer": sample.get("answer_idx"),
+            "error": "API call was not successful"
+        }
+    
+    # 1. Clean the output if it contains <think> blocks
+    if thinking:
+        cleaned_text = re.sub(r"<think>.*?</think>", "", model_output, flags=re.DOTALL).strip()
+    else:
+        cleaned_text = model_output.strip()
+    
+    # 2. Extract the <answer> block
+    answer_pattern = r"<answer>(.*?)</answer>"
+    answer_match = re.search(answer_pattern, cleaned_text, flags=re.DOTALL)
+    
+    if not answer_match:
+        return {
+            "raw_data": sample,
+            "successful_api_call": True,
+            "right_format": False,
+            "model_output": model_output,
+            "extracted_answer": None,
+            "correct_answer": sample.get("answer_idx"),
+            "error": "Missing <answer> block in model output"
+        }
+    
+    answer_content = answer_match.group(1).strip()
+    
+    # 3. Parse based on dataset type
+    if dataset_name == "medqa":
+        extracted_answer, right_format, error = _parse_medqa_answer(answer_content, sample)
+    elif dataset_name == "uniadilr":
+        extracted_answer, right_format, error = _parse_uniadilr_answer(answer_content, sample)
+    else:
+        return {
+            "raw_data": sample,
+            "successful_api_call": True,
+            "right_format": False,
+            "model_output": model_output,
+            "extracted_answer": None,
+            "correct_answer": sample.get("answer_idx"),
+            "error": f"Invalid dataset name: {dataset_name}"
+        }
+    
+    return {
+        "raw_data": sample,
+        "successful_api_call": True,
+        "right_format": right_format,
+        "model_output": model_output,
+        "extracted_answer": extracted_answer,
+        "correct_answer": sample.get("answer_idx"),
+        "error": error
+    }
+
+
+def _parse_medqa_answer(answer_content: str, sample: Dict[str, Any]) -> Tuple[Optional[Dict[str, str]], bool, Optional[str]]:
+    """
+    Parse MedQA answer from the <answer> block.
+    
+    Expected format:
+    OPTION: A
+    VALUE: text of option A
+    
+    Args:
+        answer_content: Content inside <answer> tags
+        sample: Original sample (for validation)
+    
+    Returns:
+        Tuple of (extracted_answer dict, right_format bool, error message)
+    """
+    lines = answer_content.split('\n')
+    option = None
+    value = None
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        if line.startswith("OPTION:"):
+            option = line.split("OPTION:", 1)[1].strip().upper()
+        elif line.startswith("VALUE:"):
+            value = line.split("VALUE:", 1)[1].strip()
+    
+    # Validate
+    if not option:
+        return None, False, "Missing OPTION field in answer"
+    
+    if not value:
+        return None, False, "Missing VALUE field in answer"
+    
+    # Check if option is a valid letter (A, B, C, or D)
+    if option not in ["A", "B", "C", "D"]:
+        return None, False, f"Invalid option '{option}' - must be A, B, C, or D"
+    
+    # Optionally validate that value matches the option in the sample
+    sample_options = sample.get("options", {})
+    if sample_options and option in sample_options:
+        expected_value = sample_options[option]
+        # We won't enforce exact match since LLM might paraphrase
+        # Just check that value is not empty
+        pass
+    
+    extracted_answer = {
+        "option": option,
+        "value": value
+    }
+    
+    return extracted_answer, True, None
+
+
+def _parse_uniadilr_answer(answer_content: str, sample: Dict[str, Any]) -> Tuple[Optional[Dict[str, str]], bool, Optional[str]]:
+    """
+    Parse UniADILR answer from the <answer> block.
+    
+    Expected format:
+    CONCLUSION: text describing the conclusion
+    
+    Args:
+        answer_content: Content inside <answer> tags
+        sample: Original sample (for validation)
+    
+    Returns:
+        Tuple of (extracted_answer dict, right_format bool, error message)
+    """
+    lines = answer_content.split('\n')
+    conclusion = None
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        if line.startswith("CONCLUSION:"):
+            conclusion = line.split("CONCLUSION:", 1)[1].strip()
+            # Continue reading subsequent lines as part of conclusion
+            break
+    
+    # If conclusion starts on the line with CONCLUSION:, get the rest of the lines too
+    if conclusion is not None:
+        # Find the index of the line with CONCLUSION:
+        for i, line in enumerate(lines):
+            if line.strip().startswith("CONCLUSION:"):
+                # Get all subsequent lines as part of conclusion
+                subsequent_lines = [l.strip() for l in lines[i+1:] if l.strip()]
+                if subsequent_lines:
+                    conclusion = conclusion + " " + " ".join(subsequent_lines)
+                break
+    
+    # Validate
+    if not conclusion:
+        return None, False, "Missing CONCLUSION field in answer"
+    
+    extracted_answer = {
+        "conclusion": conclusion
+    }
+    
+    return extracted_answer, True, None

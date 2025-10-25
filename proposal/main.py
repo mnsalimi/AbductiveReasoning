@@ -8,6 +8,7 @@ from step3dot5 import step3dot5
 from step4 import step4
 from step5 import step5
 from step6 import step6
+from step7 import step7, save_step7_result
 
 def load_config():
     """Load configuration from config.yaml"""
@@ -381,8 +382,45 @@ def main():
                     print(f"      • {error}")
             continue
         
+        # STEP 7: Answer Extraction
+        print_separator("STEP 7: Answer Extraction")
+        # Use max_tokens from Chain of Thought or default to 2048 for step7
+        max_tokens_step7 = model_config["max_tokens_by_prompt_type"].get("Chain of Thought", 2048)
+        step7_result = step7(sample, idx, model_name, api_key, max_tokens_step7, temperature,
+                           thinking, sleep_time, dataset_name, step6_result)
+        
+        if step7_result.get("successful_api_call") and step7_result.get("right_format"):
+            print("✓ Step 7 completed successfully")
+            extracted_answer = step7_result.get("extracted_answer", {})
+            
+            if dataset_name == "medqa":
+                option = extracted_answer.get("option", "N/A")
+                value = extracted_answer.get("value", "N/A")
+                print(f"  🎯 Extracted Answer: {option}")
+                print(f"  📝 Answer Text: {value[:100]}..." if len(value) > 100 else f"  📝 Answer Text: {value}")
+            elif dataset_name == "uniadilr":
+                conclusion = extracted_answer.get("conclusion", "N/A")
+                print(f"  🎯 Extracted Conclusion: {conclusion[:150]}..." if len(conclusion) > 150 else f"  🎯 Extracted Conclusion: {conclusion}")
+            
+            is_correct = step7_result.get("is_correct")
+            if is_correct is not None:
+                correct_indicator = "✅" if is_correct else "❌"
+                print(f"  {correct_indicator} Correctness: {'Correct' if is_correct else 'Incorrect'}")
+                print(f"  📊 Ground Truth: {step7_result.get('correct_answer', 'N/A')}")
+            
+            if step7_result.get("token_usage"):
+                print(f"  🔢 Tokens used: {step7_result['token_usage'].get('total_tokens', 0)}")
+            
+            # Save step7 result to file
+            save_step7_result(step7_result, dataset_name, model_name)
+        else:
+            error_msg = step7_result.get('error', 'Unknown error')
+            print(f"✗ Step 7 failed: {error_msg}")
+            # Still save the result even if it failed
+            save_step7_result(step7_result, dataset_name, model_name)
+        
         print_separator("PIPELINE COMPLETED FOR SAMPLE")
-        print(f"✓ All 6 steps completed successfully for sample {idx + 1}")
+        print(f"✓ All 7 steps completed for sample {idx + 1}")
         
         # Print summary
         print("\n📊 SUMMARY:")
@@ -392,6 +430,12 @@ def main():
         print(f"  Step 4: {len(cpts)} CPTs created")
         print(f"  Step 5: Bayesian Network constructed")
         print(f"  Step 6: MPE probability = {mpe_probability:.6f}, confidence = {confidence}")
+        if step7_result.get("right_format"):
+            if dataset_name == "medqa":
+                extracted_option = step7_result.get("extracted_answer", {}).get("option", "N/A")
+                print(f"  Step 7: Extracted answer = {extracted_option}")
+            else:
+                print(f"  Step 7: Answer extracted successfully")
         
     print_separator("ALL SAMPLES PROCESSED")
     print(f"✓ Successfully processed {len(dataset)} samples through the complete pipeline")

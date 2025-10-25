@@ -1,8 +1,8 @@
 sleep_time: 0.2
 
 api:
-  base_url: "https://gw.ai-platform.ir/v1/chat/completions"
-  api_key: "sk-SVSNSJKVosankQ4kFjl1Qg"
+  base_url: "https://gw.ai-platform.ir/v1/"
+  api_key: "sk-rrSfURY1CsZmtWYGZQLdvg"
   timeout: 20
   retries: 3
 

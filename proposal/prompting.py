@@ -66,18 +66,16 @@ def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optio
         return None, None, "No valid nodes parsed from NODES section"
 
     # 4. Parse edges from the edge_text section.
-    edges_pattern = r"edge\d+:\s*node\d+\s*->\s*node\d+"
-    edge_matches = re.findall(edges_pattern, edge_text)
+    # More robust edge pattern: looks for lines containing 'nodeX -> nodeY'
+    # and captures just that part, ignoring optional prefixes like "edge...:"
+    edge_capture_pattern = r"^(?:edge\d+:)?\s*(node\d+\s*->\s*node\d+)"
     
-    if edge_matches:
-        # We need to extract just the 'nodeX -> nodeY' part.
-        # A refined regex can do this in one step.
-        edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
-        captured_edges = re.findall(edge_capture_pattern, edge_text)
-        parsed_edges = [edge.strip() for edge in captured_edges]
-    else:
-        # It's okay to have no edges for some cases, but return empty list instead of None
-        parsed_edges = []
+    # Find all matches line by line
+    parsed_edges = []
+    for line in edge_text.strip().split('\n'):
+        match = re.search(edge_capture_pattern, line.strip())
+        if match:
+            parsed_edges.append(match.group(1))
 
     return parsed_nodes, parsed_edges, None
 
@@ -240,9 +238,13 @@ def _parse_additions_content_strictly(additions_content: str) -> Tuple[Optional[
     if re.search(r"^\s*None\s*$", edge_text.strip(), re.IGNORECASE):
         parsed_new_edges = []
     else:
-        edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
-        captured_edges = re.findall(edge_capture_pattern, edge_text)
-        parsed_new_edges = [edge.strip() for edge in captured_edges]
+        # More robust edge pattern
+        edge_capture_pattern = r"^(?:edge\d+:)?\s*(node\d+\s*->\s*node\d+)"
+        parsed_new_edges = []
+        for line in edge_text.strip().split('\n'):
+            match = re.search(edge_capture_pattern, line.strip())
+            if match:
+                parsed_new_edges.append(match.group(1))
 
     return parsed_new_nodes, parsed_new_edges
 
@@ -1309,7 +1311,7 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
     edges_to_add = None
     merged_nodes = None
     merged_edges = None
-    error_message = None
+    error_messages = []
 
     if not successful_api_call:
         return {
@@ -1334,12 +1336,13 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
     modifications_match = re.search(modifications_pattern, cleaned_text, flags=re.DOTALL)
 
     if not analysis_match:
-        error_message = "Missing <analysis> tag in model output"
+        error_messages.append("Missing <analysis> tag in model output")
     if not modifications_match:
-        error_message = "Missing <modifications> tag in model output"
+        error_messages.append("Missing <modifications> tag in model output")
 
     if analysis_match:
         extracted_analysis = analysis_match.group(1).strip()
+    
     if modifications_match:
         modifications_content = modifications_match.group(1).strip()
         # 4. Parse the <modifications> content (now extracting options_node separately)
@@ -1352,11 +1355,16 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
             edges_to_remove = parsed_result["edges_to_remove"]
             edges_to_add = parsed_result["edges_to_add"]
         else:
-            error_message = f"Modifications parsing error: {parsed_result.get('error', 'Unknown error')}"
+            error_messages.append(f"Modifications parsing error: {parsed_result.get('error', 'Unknown error')}")
 
     # 5. Determine if the format is correct based on the strict parsing results
-    if (extracted_analysis is not None and nodes_to_remove is not None and 
-        nodes_to_add is not None and edges_to_remove is not None and edges_to_add is not None):
+    # Note: nodes_to_add can be empty list if OPTIONS_NODE is None (already correct)
+    # and no other nodes are added - this is valid!
+    if (extracted_analysis is not None and 
+        nodes_to_remove is not None and 
+        nodes_to_add is not None and  # Can be empty list
+        edges_to_remove is not None and 
+        edges_to_add is not None):  # Can be empty list
         right_format = True
 
     # 6. Apply modifications to the schema from step2
@@ -1379,21 +1387,25 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
         except Exception as e:
             validation_passed = False
             right_format = False
+            error_messages.append(f"DAG modification failed: {str(e)}")
+    elif right_format and not step2_result.get("model_answer"):
+        error_messages.append("step2_result has no model_answer to apply modifications to")
+        right_format = False
 
     # 7. Structure the final model answer
     model_answer = None
     if right_format and validation_passed:
         # Calculate node type statistics for merged schema
-        binary_nodes = [node for node in merged_nodes if node["type"] == "binary"]
-        categorical_nodes = [node for node in merged_nodes if node["type"] == "categorical"]
+        binary_nodes = [node for node in merged_nodes if node.get("type") == "binary"]
+        categorical_nodes = [node for node in merged_nodes if node.get("type") == "categorical"]
         
         model_answer = {
             "analysis": extracted_analysis,
             "nodes": merged_nodes,  # Complete modified schema
             "edges": merged_edges,  # Complete modified schema
-            "options_node": options_node,  # The specific node representing answer options
+            "options_node": options_node,  # The specific node representing answer options (can be None)
             "nodes_removed": nodes_to_remove,  # Nodes that were removed
-            "nodes_added": nodes_to_add,  # All nodes that were added
+            "nodes_added": nodes_to_add,  # All nodes that were added (can be empty if OPTIONS_NODE was None)
             "other_nodes_added": other_nodes_to_add,  # Other nodes added (not the options node)
             "edges_removed": edges_to_remove,  # Edges that were removed
             "edges_added": edges_to_add,  # Edges that were added
@@ -1405,13 +1417,17 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
                 "nodes_removed_count": len(nodes_to_remove) if nodes_to_remove and nodes_to_remove != ["None"] else 0,
                 "nodes_added_count": len(nodes_to_add) if nodes_to_add else 0,
                 "edges_removed_count": len(edges_to_remove) if edges_to_remove and edges_to_remove != ["None"] else 0,
-                "edges_added_count": len(edges_to_add) if edges_to_add else 0
+                "edges_added_count": len(edges_to_add) if edges_to_add else 0,
+                "options_node_modified": options_node is not None  # True if options node was added/changed
             }
         }
         
     correct_answer = sample.get("answer_idx")
 
-    # 8. Return the comprehensive dictionary
+    # 8. Combine all error messages
+    error_message = "; ".join(error_messages) if error_messages else None
+
+    # 9. Return the comprehensive dictionary
     return {
         "raw_data": sample,
         "successful_api_call": successful_api_call,
@@ -1425,6 +1441,7 @@ def parse_model_answer_step2dot5(sample: Dict[str, Any], model_output: str, succ
     }
 
 
+
 def _parse_modifications_content_step2dot5(modifications_content: str, sample: Dict[str, Any], dataset_name: str) -> Dict[str, Any]:
     """
     Parse the content of a <modifications> block strictly for step2.5.
@@ -1433,7 +1450,7 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
     Returns dict with:
         - success: bool
         - nodes_to_remove: list of node IDs
-        - options_node: dict for the node representing answer options
+        - options_node: dict for the node representing answer options (or None)
         - other_nodes_to_add: list of other node dicts
         - nodes_to_add: list of all node dicts (options + others)
         - edges_to_remove: list of edge strings
@@ -1485,24 +1502,33 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
     edges_add_text = sections.get("EDGES_TO_ADD", "")
 
     # 3. Parse nodes to remove
-    if not nodes_remove_text or re.search(r"^\s*None\s*$", nodes_remove_text.strip(), re.IGNORECASE):
+    if not nodes_remove_text.strip() or re.search(r"^\s*None\s*$", nodes_remove_text.strip(), re.IGNORECASE):
         nodes_to_remove = ["None"]
     else:
         # Match pattern: "node{number}"
         node_remove_pattern = r"(node\d+)"
         nodes_to_remove = re.findall(node_remove_pattern, nodes_remove_text)
+        if not nodes_to_remove:
+            nodes_to_remove = ["None"]
 
     # 4. Parse OPTIONS_NODE (the node that represents answer options)
-    if not re.search(r"^\s*None\s*$", options_node_text.strip(), re.IGNORECASE):
-        nodes_pattern = r"node\d+:\s*(.*)"
-        node_matches = re.findall(nodes_pattern, options_node_text)
+    options_node_text_stripped = options_node_text.strip()
+    if not options_node_text_stripped or re.search(r"^\s*None\s*$", options_node_text_stripped, re.IGNORECASE):
+        # OPTIONS_NODE is None - options are already correctly represented
+        options_node = None
+    else:
+        # Extract the full node definition including node ID
+        nodes_pattern = r"(node\d+):\s*(.*)"
+        node_matches = re.findall(nodes_pattern, options_node_text_stripped)
         if not node_matches or len(node_matches) == 0:
             return {
                 "success": False,
                 "error": "OPTIONS_NODE section is not 'None' but contains no valid node definition. Expected format: 'node{N}: NodeName (categorical: option1, option2, ...)'"
             }
         
-        node_line = node_matches[0].strip()
+        node_id, node_line = node_matches[0]
+        node_line = node_line.strip()
+        
         # Parse the node with type information
         options_node = _parse_node_with_type(node_line)
         if not options_node:
@@ -1511,6 +1537,9 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
                 "error": f"Failed to parse OPTIONS_NODE. Invalid format: '{node_line}'. Expected: 'NodeName (categorical: option1, option2, ...)'"
             }
         
+        # Add the node_id to the options_node dict
+        options_node["node_id"] = node_id
+        
         # Validate that options node is categorical
         if options_node.get("type") != "categorical":
             return {
@@ -1518,7 +1547,7 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
                 "error": f"OPTIONS_NODE must be categorical, got: {options_node.get('type')}"
             }
         
-        # Validate that it has at least 2 categories
+        # Validate that it has at least 2 categories (typically 4 for medical questions)
         categories = options_node.get("categories", [])
         if len(categories) < 2:
             return {
@@ -1529,16 +1558,17 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
         nodes_to_add.append(options_node)
 
     # 5. Parse other nodes to add (if NODES_TO_ADD section exists)
-    if nodes_add_text and not re.search(r"^\s*None\s*$", nodes_add_text.strip(), re.IGNORECASE):
-        nodes_pattern = r"node\d+:\s*(.*)"
+    if nodes_add_text.strip() and not re.search(r"^\s*None\s*$", nodes_add_text.strip(), re.IGNORECASE):
+        nodes_pattern = r"(node\d+):\s*(.*)"
         node_matches = re.findall(nodes_pattern, nodes_add_text)
         if node_matches:
             failed_additional_nodes = []
-            for node_line in node_matches:
+            for node_id, node_line in node_matches:
                 node_line = node_line.strip()
                 # Parse the node with type information
                 node_info = _parse_node_with_type(node_line)
                 if node_info:
+                    node_info["node_id"] = node_id
                     other_nodes_to_add.append(node_info)
                     nodes_to_add.append(node_info)
                 else:
@@ -1551,19 +1581,34 @@ def _parse_modifications_content_step2dot5(modifications_content: str, sample: D
                 }
 
     # 6. Parse edges to remove
-    if not edges_remove_text or re.search(r"^\s*None\s*$", edges_remove_text.strip(), re.IGNORECASE):
+    if not edges_remove_text.strip() or re.search(r"^\s*None\s*$", edges_remove_text.strip(), re.IGNORECASE):
         edges_to_remove = ["None"]
     else:
-        # Match pattern: "edge{number}: node{x} -> node{y}"
-        edge_remove_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
-        edges_to_remove = re.findall(edge_remove_pattern, edges_remove_text)
+        edge_capture_pattern = r"^(?:edge\d+:)?\s*(node\d+\s*->\s*node\d+)"
+        edges_to_remove = []
+        for line in edges_remove_text.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            match = re.search(edge_capture_pattern, line)
+            if match:
+                edges_to_remove.append(match.group(1))
+        if not edges_to_remove:
+            edges_to_remove = ["None"]
 
     # 7. Parse edges to add
-    if not edges_add_text or re.search(r"^\s*None\s*$", edges_add_text.strip(), re.IGNORECASE):
+    if not edges_add_text.strip() or re.search(r"^\s*None\s*$", edges_add_text.strip(), re.IGNORECASE):
         edges_to_add = []
     else:
-        edge_capture_pattern = r"edge\d+:\s*(node\d+\s*->\s*node\d+)"
-        edges_to_add = re.findall(edge_capture_pattern, edges_add_text)
+        edge_capture_pattern = r"^(?:edge\d+:)?\s*(node\d+\s*->\s*node\d+)"
+        edges_to_add = []
+        for line in edges_add_text.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            match = re.search(edge_capture_pattern, line)
+            if match:
+                edges_to_add.append(match.group(1))
 
     return {
         "success": True,

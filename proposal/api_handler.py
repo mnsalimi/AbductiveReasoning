@@ -11,7 +11,8 @@ def get_model_response(
     temperature: float,
     retries: int = None,
     timeout: int = None,
-    base_url: str = None
+    base_url: str = None,
+    print_for_debug: bool = False
 ):
     """
     Sends a request to the specified model API and retrieves the response using OpenAI client.
@@ -25,15 +26,15 @@ def get_model_response(
         retries (int): The number of times to retry the request in case of failure.
         timeout (int): The timeout for the request in seconds.
         base_url (str): The base URL for the API endpoint.
-
+        print_for_debug (bool): Whether to print the response for debugging purposes.
     Returns:
         str: The content of the model's response.
 
     Raises:
         RuntimeError: If the request fails after all retries.
     """
-    # print("model_name: ", model_name)
-    # print("input_text: ", input_text)
+    if print_for_debug:
+        print("input_text: ", input_text)
     # Load config if parameters not provided
     if retries is None or timeout is None or base_url is None:
         config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -64,12 +65,9 @@ def get_model_response(
                 max_tokens=max_tokens
             )
             
-            # print("response: ", response)
-            # print("response.choices[0]: ", response.choices[0])
-            # print("response.choices[0] keys: ", response.choices[0].keys())
-            
             content = response.choices[0].message.content
-            # print("content: ", content)
+            if print_for_debug:
+                print("response content: ", content)
             usage = {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,

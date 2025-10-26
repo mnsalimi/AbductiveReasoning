@@ -8,7 +8,7 @@ from prompting import create_prompt_step7, parse_model_answer_step7
 
 def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, 
           max_tokens: int, temperature: float, thinking: bool, sleep_time: float, 
-          dataset_name: str, step6_result: Dict[str, Any]) -> Dict[str, Any]:
+          dataset_name: str, step6_result: Dict[str, Any], step5_result: Dict[str, Any], options_node: Dict[str, Any]) -> Dict[str, Any]:
     """
     Step 7: Answer Extraction - Extract the final answer from Bayesian Network analysis.
     
@@ -28,7 +28,8 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
         sleep_time: Delay before API call
         dataset_name: "medqa" or "uniadilr"
         step6_result: Result dictionary from step6 containing MPE results
-    
+        step5_result: Result dictionary from step5 containing the Bayesian Network
+        options_node: Options node from step2.5
     Returns:
         dict: Result dictionary with extracted answer and metadata
     """
@@ -52,7 +53,7 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
     
     # Create the prompt with context, question, and all variable assignments
     print(f"\n  📝 Creating prompt with variable assignments...")
-    input_text = create_prompt_step7(dataset_name, sample, step6_result)
+    input_text = create_prompt_step7(dataset_name, sample, step6_result, step5_result, options_node)
     
     # Retry logic: up to 3 attempts
     max_retries = 3
@@ -72,7 +73,8 @@ def step7(sample: Dict[str, Any], idx: int, model_name: str, api_key: str,
                 api_key=api_key,
                 input_text=input_text,
                 max_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
+                print_for_debug=True
             )
             
             # Parse the model's response

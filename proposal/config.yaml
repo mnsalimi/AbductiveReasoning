@@ -70,8 +70,8 @@ prompt_templates:
     step1: |
       You are a professional medical scientist and biologist.
       You're given a medical context and background.
-      You will create a focused Directed Acyclic Graph (DAG) modeling the primary causal relationships presented in the context. Your main goal is to represent the interactions between entities explicitly mentioned in the text.
-      You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding 'Smoking' as a cause for 'Lung Cancer' even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
+      You will create a focused Directed Acyclic Graph (DAG) modeling the primary causal relationships presented in the context and their related entities and elements outside the context. All possibilties (even low) should be included.
+      Prioritize direct and well-established relationships. Avoid including distant causal chains that are not central to the provided text.
       For each node, you must specify if it's binary or categorical:
       Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
       Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories but NOT exceed 10 values, if the node has less than 2 categories, use binary)
@@ -116,12 +116,9 @@ prompt_templates:
       ** The format "edge1: node2 -> node7" means "edge from node2 to node7" where node2 and node7 refer to the node IDs in the NODES section
       ** Example: If you defined "node2: Hypertension (binary)" and "node7: Diabetes (binary)", the edge MUST be "edge1: node2 -> node7" NOT "edge1: Hypertension -> Diabetes"
       ** Example: If you defined "node3: Smoking_Status (binary)" and "node8: Lung_Cancer (binary)", the edge MUST be "edge2: node3 -> node8" NOT "edge2: Smoking_Status -> Lung_Cancer"
-      ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
       ** for binary nodes: use format "node_name (binary) - Description"
       ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …) - Description [MUST have at least 2 values but NOT exceed 10 categories listed]"
       ** CRITICAL: Each node MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
-      ** The description should be SPECIFIC to this medical case and context, explaining what this node represents in THIS scenario
-      ** For example: instead of "The findings from imaging examination", write "The findings from the chest X-ray showing bilateral infiltrates in this pneumonia patient"
       ** Descriptions should provide meaningful clinical context based on the given information, making it clear what specific aspect of the case this node represents
       ** MUST have at least 2 categories listed for categorical nodes
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
@@ -131,10 +128,10 @@ prompt_templates:
 
 
     step2: |
-      Carefully analyze the existing BN Schema from Step 1.
-      **Focus entirely on the reasoning path required to distinguish between the given answer choices.** The answer choices are your primary guide for what is relevant.
-      Identify any missing nodes or edges that are **absolutely critical** for connecting the evidence in the context to the conclusions presented in the answer choices.
-      **Do not add nodes or edges that are simply 'medically related' in a general sense.** An addition is only justified if it directly helps in evaluating the likelihood of one answer choice over another.
+      You are a professional medical scientist and biologist. You have a Bayesian Network (BN) Schema that represents medical causal relationships. Carefully analyze the existing BN Schema.
+      Focus on the reasoning path required to distinguish between the given answer choices. The answer choices are your primary guide for what is relevant.
+      Identify any missing nodes or edges that are critical for connecting the evidence in the context to the conclusions presented in the answer choices.
+      An addition is only justified if it directly helps in evaluating the likelihood of one answer choice over another.
       Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema).
       For new nodes, specify if they are binary or categorical with their categories (categorical nodes MUST have at least 2 categories but NOT exceed 10 values, if the node has less than 2 categories, use binary).
 
@@ -156,7 +153,7 @@ prompt_templates:
       Your output should be in the exact following format:
 
       <analysis>
-      your detailed analysis of what is missing from the original BN Schema and why these additions are **necessary for differentiating between the given answer choices**.
+      your detailed analysis of what is missing from the original BN Schema and why these additions are necessary for differentiating between the given answer choices.
       </analysis>
       <additions>
       NEW_NODES:
@@ -187,9 +184,7 @@ prompt_templates:
       ** For binary nodes: use format "node_name (binary) - Description"
       ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...) - Description [MUST have at least 2 categories but NOT exceed 10 categories listed]"
       ** CRITICAL: Each new node MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
-      ** The description should be SPECIFIC to this medical case, question, and answer choices, explaining what this node represents in THIS scenario
       ** Descriptions should incorporate information from the context AND the question to make it clear how this node relates to differentiating between answer choices
-      ** For example: "The presence of fever >38.5°C that helps distinguish between bacterial vs viral infection in this case"
       ** MUST have at least 2 categories listed for categorical nodes
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
@@ -281,7 +276,7 @@ prompt_templates:
       ** Descriptions should be SPECIFIC to this medical case, incorporating context and question information
 
     step4: |
-      You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
+      You are a professional medical scientist and biologist with deep knowledge in Bayesian networks and conditional probability distributions.
       
       You are given a Bayesian Network node and a SPECIFIC condition of its parent nodes. Your task is to provide the conditional probability distribution for this node given this specific parent condition.
       
@@ -289,7 +284,6 @@ prompt_templates:
       1. The target node information (name, type, possible states/categories and a general description))
       2. Parent nodes information (if any)
       3. The SPECIFIC parent condition/states you need to analyze
-      4. The original context that led to this Bayesian network
       
       Note: Node descriptions are provided to help you understand what each node represents in general terms.
 
@@ -322,7 +316,7 @@ prompt_templates:
       ** Focus on this specific condition only - do not provide probabilities for other parent combinations
 
     step4_batch: |
-      You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
+      You are a professional medical scientist and biologist with deep knowledge in Bayesian networks and conditional probability distributions.
       
       You are given a Bayesian Network node and MULTIPLE CONDITIONS of its parent nodes. Your task is to provide the conditional probability distribution for this node given EACH of the parent conditions listed.
       
@@ -330,7 +324,6 @@ prompt_templates:
       1. The target node information (name, type, possible states/categories and a general description))
       2. Parent nodes information (if any)
       3. MULTIPLE parent conditions/states you need to analyze
-      4. The original context that led to this Bayesian network
       
       Note: Node descriptions are provided to help you understand what each node represents in general terms.
       
@@ -378,15 +371,14 @@ prompt_templates:
       ** Each ROW should correspond to the conditions in the order they were listed
 
     step3dot5: |
-      You are analyzing a medical question to identify which variables (nodes) in a Bayesian Network have known values from the question and context.
+      You are a professional medical scientist and biologist. You are analyzing a medical question to identify which variables (nodes) in a Bayesian Network have known values from the question and context.
       
       You will be provided with:
       1. The medical question and context
-      2. Answer choices (if available)
-      3. A list of DAG nodes with their IDs, names, types, and possible values
+      2. A list of DAG nodes with their IDs, names, types, and possible values
       
       TASK:
-      Carefully analyze the question and context above. For each node in the DAG, determine if its value is explicitly mentioned or can be directly inferred from the information provided. A node is "visible" if we know its exact value from the question/context.
+      Carefully analyze the question and context above. For each node in the DAG, determine if its value is explicitly mentioned. A node is "visible" if we know its exact value from the question/context.
       
       For example:
       - If the context mentions "65-year-old man", then an "age_category" node might be visible with value "elderly" or "old"
@@ -421,12 +413,14 @@ prompt_templates:
       </visible_nodes>
 
     step7: |
+      You are a Bayesian Network expert. You can analyze and infer information from a Bayesian Network.
       You are given the results of a Bayesian Network analysis for a medical question. The analysis has determined the values of all variables (nodes) in the network through a combination of:
       1. Observed variables: directly mentioned in the question/context
       2. Inferred variables: determined through Most Probable Explanation (MPE) inference
       
       YOUR TASK:
       Based on the variable assignments shown below, identify what answer option the analysis indicates. DO NOT solve the medical problem yourself - simply identify what answer is indicated by the given analysis results.
+      YOU SHOULD SIMPLY LOOK AT THE NODE THAT REPRESENTS THE ANSWER OPTIONS AND INFER THE ANSWER FROM THAT NODE'S RESULT FROM MPE INFERENCE.
       
       Your output must be in the exact following format:
       

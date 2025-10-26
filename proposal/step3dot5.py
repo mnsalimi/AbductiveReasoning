@@ -2,7 +2,7 @@ from prompting import create_prompt_step3dot5, parse_model_answer_step3dot5
 from api_handler import get_model_response
 import time
 
-def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinking, sleep_time, dataset_name, step3_result):
+def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinking, sleep_time, dataset_name, step3_result, options_node):
     """
     Step 3.5: Identify Visible Nodes - Determine which nodes have known values from the question/context.
     
@@ -21,6 +21,7 @@ def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
         sleep_time: Delay between API calls
         dataset_name: "medqa" or "uniadilr"
         step3_result: Result dictionary from step3 containing the registered DAG
+        options_node: Options node from step2.5
     
     Returns:
         dict: Result dictionary with visible nodes (node_id -> value) and metadata
@@ -66,7 +67,7 @@ def step3dot5(sample, idx, model_name, api_key, max_tokens, temperature, thinkin
             print(f"\n  🔍 Attempt {retry_count}/{max_retries} to identify visible nodes...")
             
             # Create prompt for visible node identification
-            input_text = create_prompt_step3dot5(dataset_name, sample, step3_result)
+            input_text = create_prompt_step3dot5(dataset_name, sample, step3_result, options_node)
             
             error_message = None
             model_output = None

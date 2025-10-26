@@ -1,4 +1,4 @@
-import yaml
+import yaml, json
 from typing import Dict, Any, Tuple, Optional, List
 import re
 import os
@@ -595,7 +595,7 @@ def parse_model_answer_step2(sample: Dict[str, Any], model_output: str, successf
     }
 
 
-def create_prompt_step3dot5(dataset_name: str, sample: dict, step3_result: dict, type: str = "v1"):
+def create_prompt_step3dot5(dataset_name: str, sample: dict, step3_result: dict, options_node: dict, type: str = "v1"):
     """
     Create prompt for Step 3.5: Identify Visible Nodes
     
@@ -606,6 +606,7 @@ def create_prompt_step3dot5(dataset_name: str, sample: dict, step3_result: dict,
         dataset_name: "medqa" or "uniadilr"
         sample: Original data sample
         step3_result: Result from step3 containing the registered DAG
+        options_node: Options node from step2.5
         type: Template type (default "v1")
     
     Returns:
@@ -636,6 +637,8 @@ DAG NODES (detailed information):
     
     for node_id, node_data in sorted(nodes.items(), key=lambda x: x[1]["index"]):
         node_name = node_data["name"]
+        if node_name == options_node["name"]:
+            continue
         node_type = node_data["type"]
         node_description = node_data.get("description", "")
         
@@ -660,8 +663,6 @@ DAG NODES (detailed information):
         input_text = f"""QUESTION AND CONTEXT:
 {context}
 {question}
-
-{answer_choices}
 
 {node_info_text}
 
@@ -884,7 +885,7 @@ def _get_node_states_for_validation(node_info: Dict[str, Any]) -> list:
         return ["unknown"]
 
 
-def create_prompt_step7(dataset_name: str, sample: dict, step6_result: dict, type: str = "v1"):
+def create_prompt_step7(dataset_name: str, sample: dict, step6_result: dict, step5_result: dict, options_node: dict, type: str = "v1"):
     """
     Create prompt for Step 7: Answer Extraction
     
@@ -896,6 +897,7 @@ def create_prompt_step7(dataset_name: str, sample: dict, step6_result: dict, typ
         dataset_name: "medqa" or "uniadilr"
         sample: Original data sample
         step6_result: Result from step6 containing MPE assignments
+        options_node: Options node from step2.5
         type: Template type (default "v1")
     
     Returns:
@@ -908,14 +910,12 @@ def create_prompt_step7(dataset_name: str, sample: dict, step6_result: dict, typ
     answer_choices = _get_answer_choices(dataset_name, sample)
     
     # Extract variable assignments from step6_result
-    variable_assignments_text = _format_variable_assignments(step6_result)
+    variable_assignments_text = _format_variable_assignments(step6_result, step5_result, options_node)
     
     # Build the complete prompt based on dataset type
+    print(f"DEBUG: mpe results: {variable_assignments_text}")
     if dataset_name == "medqa":
-        input_text = f"""MEDICAL QUESTION AND CONTEXT:
-{context}
-{question}
-
+        input_text = f"""
 ANSWER CHOICES:
 {answer_choices}
 
@@ -950,7 +950,7 @@ BAYESIAN NETWORK ANALYSIS RESULTS:
     return input_text
 
 
-def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
+def _format_variable_assignments(step6_result: Dict[str, Any], step5_result: Dict[str, Any], options_node: Dict[str, Any]) -> str:
     """
     Format variable assignments from step6 for display in step7 prompt.
     
@@ -958,7 +958,8 @@ def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
     
     Args:
         step6_result: Result from step6 containing MPE and visible nodes
-    
+        step5_result: Result from step5 containing the Bayesian Network
+        options_node: Options node from step2.5
     Returns:
         str: Formatted text showing all variable assignments
     """
@@ -972,13 +973,10 @@ def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
     visible_nodes = step3dot5_result.get("visible_nodes", {})
     
     # Get node information from step5 (Bayesian Network)
-    step5_result = step6_result.get("step5_result", {})
     bayesian_network = step5_result.get("bayesian_network", {})
     nodes = bayesian_network.get("nodes", {})
     
     # Get the options node from step2.5
-    step2dot5_result = step6_result.get("step2dot5_result", {})
-    options_node = step2dot5_result.get("options_node")
     options_node_name = options_node.get("name") if options_node else None
     
     if not mpe_assignment:
@@ -991,7 +989,12 @@ def _format_variable_assignments(step6_result: Dict[str, Any]) -> str:
     
     # Sort nodes by their index for consistent ordering
     sorted_node_ids = sorted(nodes.keys(), key=lambda x: nodes[x].get("index", 0))
-    
+
+    print(f"*******DEBUG: nodes: {nodes}")
+    print(f"*******DEBUG: mpe_assignment: {mpe_assignment}")
+    print(f"*******DEBUG: visible_nodes: {visible_nodes}")
+    print(f"*******DEBUG: options_node_name: {options_node_name}")
+    print(f"DEBUG: options_node_name: {options_node_name}")
     for node_id in sorted_node_ids:
         if node_id in mpe_assignment:
             node_info = nodes.get(node_id, {})

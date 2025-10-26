@@ -374,7 +374,7 @@ def main():
             # STEP 3.5: Identify Visible Nodes
             print_separator("STEP 3.5: Identify Visible Nodes")
             step3dot5_result = step3dot5(sample, idx, model_name, api_key, max_tokens, temperature,
-                                          thinking, sleep_time, dataset_name, step3_result)
+                                          thinking, sleep_time, dataset_name, step3_result, options_node)
         
             if step3dot5_result.get("successful_api_call") and step3dot5_result.get("right_format"):
                 print("✓ Step 3.5 completed successfully")
@@ -628,7 +628,7 @@ def main():
             # Use max_tokens from Chain of Thought or default to 2048 for step7
             max_tokens_step7 = model_config["max_tokens_by_prompt_type"].get("Chain of Thought", 2048)
             step7_result = step7(sample, idx, model_name, api_key, max_tokens_step7, temperature,
-                               thinking, sleep_time, dataset_name, step6_result)
+                               thinking, sleep_time, dataset_name, step6_result, step5_result, options_node)
         
             if step7_result.get("successful_api_call") and step7_result.get("right_format"):
                 print("✓ Step 7 completed successfully")

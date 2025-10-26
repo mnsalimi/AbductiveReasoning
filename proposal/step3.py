@@ -110,12 +110,13 @@ def _register_dag_structure(model_answer: Dict[str, Any]) -> Dict[str, Any]:
         node_id = f"node{i+1}"
         
         if isinstance(node, dict):
-            # New format with type information
+            # New format with type information and description
             node_info = {
                 "id": node_id,
                 "name": node["name"],
                 "type": node["type"],
                 "categories": node.get("categories"),
+                "description": node.get("description"),
                 "index": i
             }
             
@@ -133,6 +134,7 @@ def _register_dag_structure(model_answer: Dict[str, Any]) -> Dict[str, Any]:
                 "name": str(node),
                 "type": "binary",
                 "categories": None,
+                "description": None,
                 "index": i
             }
             binary_count += 1

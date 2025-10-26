@@ -83,34 +83,61 @@ def _parse_dag_content_strictly(dag_content: str) -> Tuple[Optional[list], Optio
 
 def _parse_node_with_type(node_line: str) -> Optional[dict]:
     """
-    Parse a node line to extract name, type, and categories.
+    Parse a node line to extract name, type, categories, and description.
     
     Expected formats:
-    - "node_name (binary)"
-    - "node_name (categorical: cat1, cat2, cat3)"
+    - "node_name (binary) - Description"
+    - "node_name (categorical: cat1, cat2, cat3) - Description"
     
-    Returns dict with: {"name": str, "type": str, "categories": list or None}
+    Returns dict with: {"name": str, "type": str, "categories": list or None, "description": str or None}
     """
-    # Try to match binary nodes first
-    binary_match = re.match(r"^(.+?)\s*\(binary\)\s*$", node_line)
+    # Try to match binary nodes with description
+    binary_match = re.match(r"^(.+?)\s*\(binary\)\s*-\s*(.+)$", node_line)
     if binary_match:
         return {
             "name": binary_match.group(1).strip(),
             "type": "binary",
-            "categories": None
+            "categories": None,
+            "description": binary_match.group(2).strip()
         }
     
-    # Try to match categorical nodes
-    categorical_match = re.match(r"^(.+?)\s*\(categorical:\s*(.+?)\)\s*$", node_line)
+    # Try to match binary nodes without description (backward compatibility)
+    binary_match_no_desc = re.match(r"^(.+?)\s*\(binary\)\s*$", node_line)
+    if binary_match_no_desc:
+        return {
+            "name": binary_match_no_desc.group(1).strip(),
+            "type": "binary",
+            "categories": None,
+            "description": None
+        }
+    
+    # Try to match categorical nodes with description
+    categorical_match = re.match(r"^(.+?)\s*\(categorical:\s*(.+?)\)\s*-\s*(.+)$", node_line)
     if categorical_match:
         node_name = categorical_match.group(1).strip()
         categories_str = categorical_match.group(2).strip()
+        description = categorical_match.group(3).strip()
         # Split categories by comma and clean them
         categories = [cat.strip() for cat in categories_str.split(',') if cat.strip()]
         return {
             "name": node_name,
             "type": "categorical",
-            "categories": categories
+            "categories": categories,
+            "description": description
+        }
+    
+    # Try to match categorical nodes without description (backward compatibility)
+    categorical_match_no_desc = re.match(r"^(.+?)\s*\(categorical:\s*(.+?)\)\s*$", node_line)
+    if categorical_match_no_desc:
+        node_name = categorical_match_no_desc.group(1).strip()
+        categories_str = categorical_match_no_desc.group(2).strip()
+        # Split categories by comma and clean them
+        categories = [cat.strip() for cat in categories_str.split(',') if cat.strip()]
+        return {
+            "name": node_name,
+            "type": "categorical",
+            "categories": categories,
+            "description": None
         }
     
     # If neither pattern matches, return None (parsing failed)
@@ -122,6 +149,7 @@ def _fix_invalid_nodes(nodes: List[Dict]) -> List[Dict]:
     Post-process parsed nodes to fix common issues:
     - Convert categorical nodes with only 1 category to binary
     - Remove empty categories
+    - Preserve descriptions during fixes
     
     Args:
         nodes: List of node dictionaries
@@ -142,14 +170,16 @@ def _fix_invalid_nodes(nodes: List[Dict]) -> List[Dict]:
                 fixed_nodes.append({
                     "name": node["name"],
                     "type": "binary",
-                    "categories": None
+                    "categories": None,
+                    "description": node.get("description")
                 })
             else:
                 # Keep as categorical with cleaned categories
                 fixed_nodes.append({
                     "name": node["name"],
                     "type": "categorical",
-                    "categories": categories
+                    "categories": categories,
+                    "description": node.get("description")
                 })
         else:
             fixed_nodes.append(node)
@@ -383,12 +413,19 @@ def create_prompt_step2(dataset_name: str, sample: dict, step1_result: dict, typ
         formatted_nodes = []
         for i, node in enumerate(nodes):
             if isinstance(node, dict):
-                # New format with type information
+                # New format with type information and description
+                description = node.get("description", "")
                 if node["type"] == "binary":
-                    formatted_nodes.append(f"node{i+1}: {node['name']} (binary)")
+                    if description:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (binary) - {description}")
+                    else:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (binary)")
                 elif node["type"] == "categorical":
                     categories_str = ", ".join(node["categories"])
-                    formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str})")
+                    if description:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str}) - {description}")
+                    else:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str})")
             else:
                 # Old format (backward compatibility) - assume binary
                 formatted_nodes.append(f"node{i+1}: {node} (binary)")
@@ -598,6 +635,7 @@ DAG NODES (detailed information):
     for node_id, node_data in sorted(nodes.items(), key=lambda x: x[1]["index"]):
         node_name = node_data["name"]
         node_type = node_data["type"]
+        node_description = node_data.get("description", "")
         
         # Get possible states/values
         if node_type == "binary":
@@ -608,7 +646,12 @@ DAG NODES (detailed information):
         else:
             states = "unknown"
         
-        node_info_text += f"- {node_id}: {node_name} (type: {node_type}, possible values: {states})\n"
+        # Build node info line with optional description
+        node_line = f"- {node_id}: {node_name} (type: {node_type}"
+        if node_description:
+            node_line += f", description: {node_description}"
+        node_line += f", possible values: {states})\n"
+        node_info_text += node_line
     
     # Build the complete prompt based on dataset type
     if dataset_name == "medqa":
@@ -1180,12 +1223,19 @@ def create_prompt_step2dot5(dataset_name: str, sample: dict, step2_result: dict,
         formatted_nodes = []
         for i, node in enumerate(nodes):
             if isinstance(node, dict):
-                # New format with type information
+                # New format with type information and description
+                description = node.get("description", "")
                 if node["type"] == "binary":
-                    formatted_nodes.append(f"node{i+1}: {node['name']} (binary)")
+                    if description:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (binary) - {description}")
+                    else:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (binary)")
                 elif node["type"] == "categorical":
                     categories_str = ", ".join(node["categories"])
-                    formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str})")
+                    if description:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str}) - {description}")
+                    else:
+                        formatted_nodes.append(f"node{i+1}: {node['name']} (categorical: {categories_str})")
             else:
                 # Old format (backward compatibility) - assume binary
                 formatted_nodes.append(f"node{i+1}: {node} (binary)")

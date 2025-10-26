@@ -612,13 +612,16 @@ def _create_cpt_batch_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], 
     # Get node states
     node_states = _get_node_states(node_info)
     
-    # Build the node information section
+    # Build the node information section with description
+    node_description = node_info.get("description", "")
     node_section = f"""
 TARGET NODE INFORMATION:
 - Node Name: {node_info['name']}
 - Node Type: {node_info['type']}
-- Possible States: {', '.join(node_states)}
-"""
+- Possible States: {', '.join(node_states)}"""
+    if node_description:
+        node_section += f"\n- Description: {node_description}"
+    node_section += "\n"
     
     # Build parent information
     if parent_info["has_parents"]:
@@ -626,7 +629,11 @@ TARGET NODE INFORMATION:
 PARENT NODES INFORMATION:
 """
         for parent_id, parent_data in parent_info["parents"].items():
-            parent_section += f"- {parent_data['name']} ({parent_data['type']}): {', '.join(parent_data['states'])}\n"
+            parent_desc = parent_data.get("description", "")
+            parent_section += f"- {parent_data['name']} ({parent_data['type']}): {', '.join(parent_data['states'])}"
+            if parent_desc:
+                parent_section += f" - {parent_desc}"
+            parent_section += "\n"
     else:
         parent_section = "\nPARENT NODES INFORMATION:\n- This node has no parents (root node)\n"
     
@@ -760,13 +767,16 @@ def _create_cpt_row_prompt(sample: Dict[str, Any], node_info: Dict[str, Any], pa
     # Get node states
     node_states = _get_node_states(node_info)
     
-    # Build the node information section
+    # Build the node information section with description
+    node_description = node_info.get("description", "")
     node_section = f"""
 TARGET NODE INFORMATION:
 - Node Name: {node_info['name']}
 - Node Type: {node_info['type']}
-- Possible States: {', '.join(node_states)}
-"""
+- Possible States: {', '.join(node_states)}"""
+    if node_description:
+        node_section += f"\n- Description: {node_description}"
+    node_section += "\n"
     
     # Build parent information and specific condition
     if parent_info["has_parents"]:
@@ -774,7 +784,11 @@ TARGET NODE INFORMATION:
 PARENT NODES INFORMATION:
 """
         for parent_id, parent_data in parent_info["parents"].items():
-            parent_section += f"- {parent_data['name']} ({parent_data['type']}): {', '.join(parent_data['states'])}\n"
+            parent_desc = parent_data.get("description", "")
+            parent_section += f"- {parent_data['name']} ({parent_data['type']}): {', '.join(parent_data['states'])}"
+            if parent_desc:
+                parent_section += f" - {parent_desc}"
+            parent_section += "\n"
         
         # Format the specific condition
         if condition == "NO_PARENTS":
@@ -987,7 +1001,7 @@ def _get_node_states(node_info: Dict[str, Any]) -> List[str]:
 
 
 def _get_parent_info(node_info: Dict[str, Any], registered_dag: Dict[str, Any]) -> Dict[str, Any]:
-    """Get information about parent nodes."""
+    """Get information about parent nodes including their descriptions."""
     node_id = node_info["id"]
     parent_ids = registered_dag["adjacency_list"][node_id]["parents"]
     
@@ -1000,7 +1014,8 @@ def _get_parent_info(node_info: Dict[str, Any], registered_dag: Dict[str, Any]) 
         parents[parent_id] = {
             "name": parent_node["name"],
             "type": parent_node["type"],
-            "states": _get_node_states(parent_node)
+            "states": _get_node_states(parent_node),
+            "description": parent_node.get("description")
         }
     
     return {"has_parents": True, "parents": parents}

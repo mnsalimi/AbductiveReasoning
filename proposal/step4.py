@@ -609,7 +609,6 @@ def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_
                 last_error = f"Failed to parse CPT row response: {parsed_row['error']}"
                 if retry_count < max_retries:
                     print(f"        ⚠️  Attempt {retry_count} failed, retrying...")
-                    import time
                     time.sleep(0.5)  # Short delay between retries
                 continue
                 
@@ -617,7 +616,6 @@ def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_
             last_error = f"CPT row generation failed: {e}"
             if retry_count < max_retries:
                 print(f"        ⚠️  Attempt {retry_count} failed: {e}, retrying...")
-                import time
                 time.sleep(0.5)  # Short delay between retries
             continue
     
@@ -688,7 +686,6 @@ def _generate_cpt_batch(sample: Dict[str, Any], node_info: Dict[str, Any], paren
                 last_error = f"Failed to parse CPT batch response: {parsed_batch['error']}"
                 if retry_count < max_retries:
                     print(f"        ⚠️  Attempt {retry_count} failed, retrying...")
-                    import time
                     time.sleep(0.5)
                 continue
                 
@@ -696,7 +693,6 @@ def _generate_cpt_batch(sample: Dict[str, Any], node_info: Dict[str, Any], paren
             last_error = f"CPT batch generation failed: {e}"
             if retry_count < max_retries:
                 print(f"        ⚠️  Attempt {retry_count} failed: {e}, retrying...")
-                import time
                 time.sleep(0.5)
             continue
     

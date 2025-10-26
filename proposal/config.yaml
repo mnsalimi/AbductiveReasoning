@@ -69,10 +69,10 @@ prompt_templates:
   medqa_template:
     step1: |
       You are a professional medical scientist and biologist.
-      You’re given a medical context and background.
+      You're given a medical context and background.
       You will create a focused Directed Acyclic Graph (DAG) modeling the primary causal relationships presented in the context. Your main goal is to represent the interactions between entities explicitly mentioned in the text.
-      You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding ‘Smoking’ as a cause for ‘Lung Cancer’ even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
-      For each node, you must specify if it’s binary or categorical:
+      You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding 'Smoking' as a cause for 'Lung Cancer' even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
+      For each node, you must specify if it's binary or categorical:
       Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
       Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories but NOT exceed 10 values, if the node has less than 2 categories, use binary)
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
@@ -105,11 +105,22 @@ prompt_templates:
       edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
       </dag>
 
+      CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
+      ✓ CORRECT: edge1: node2 -> node7  (uses node IDs: node2, node7)
+      ✓ CORRECT: edge2: node5 -> node3  (uses node IDs: node5, node3)
+      ✗ ABSOLUTELY WRONG: edge1: Hypertension -> Diabetes  (uses node NAMES instead of IDs - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge1: Hypertension_Untreated -> Myocardial_Ischemia  (uses node NAMES - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge1: node1_name -> node2_name  (uses placeholder text instead of actual IDs)
+      
+      ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node3, etc.) NEVER use node names
+      ** The format "edge1: node2 -> node7" means "edge from node2 to node7" where node2 and node7 refer to the node IDs in the NODES section
+      ** Example: If you defined "node2: Hypertension (binary)" and "node7: Diabetes (binary)", the edge MUST be "edge1: node2 -> node7" NOT "edge1: Hypertension -> Diabetes"
+      ** Example: If you defined "node3: Smoking_Status (binary)" and "node8: Lung_Cancer (binary)", the edge MUST be "edge2: node3 -> node8" NOT "edge2: Smoking_Status -> Lung_Cancer"
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
-      ** for binary nodes: use format “node_name (binary)”
+      ** for binary nodes: use format "node_name (binary)"
       ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …)" - MUST have at least 2 but NOT exceed 10 categories listed
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
-      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what’s mentioned in the context
+      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** you should only output the DAG in the exact format above. No other text, no other format.
       ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
 
@@ -155,6 +166,14 @@ prompt_templates:
       edge{last_new_edge_number}: node{last_node_number} -> node{first_node_number}
       </additions>
 
+      CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
+      ✓ CORRECT: edge11: node2 -> node7  (uses node IDs: node2, node7)
+      ✓ CORRECT: edge12: node5 -> node13  (uses node IDs: node5, node13)
+      ✗ ABSOLUTELY WRONG: edge11: Hypertension -> Diabetes  (uses node NAMES - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge11: Beta_Blocker -> Treatment  (uses node NAMES - THIS WILL FAIL)
+      
+      ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node3, etc.) NEVER use node names
+      ** Example: If Step 1 has "node2: Hypertension (binary)" and you add "node12: Treatment (categorical: ...)", the edge MUST be "edge11: node2 -> node12" NOT "edge11: Hypertension -> Treatment"
       ** If there are NO new nodes to add, write "NEW_NODES: None" under the NEW_NODES section
       ** If there are NO new edges to add, write "NEW_EDGES: None" under the NEW_EDGES section
       ** N is the total number of nodes from Step 1, so your new nodes should start at node{N+1}
@@ -232,6 +251,12 @@ prompt_templates:
       ...
       </modifications>
 
+      CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
+      ✓ CORRECT: edge18: node5 -> node15  (uses node IDs: node5, node15)
+      ✗ ABSOLUTELY WRONG: edge18: Diagnosis -> Treatment  (uses node NAMES - THIS WILL FAIL)
+      
+      ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node15, etc.) NEVER use node names
+      ** Example: If you have "node7: Severity (categorical: mild, severe)" and "node15: Treatment (categorical: ...)", edge MUST be "edge18: node7 -> node15" NOT "edge18: Severity -> Treatment"
       ** If there are NO nodes to remove, write "NODES_TO_REMOVE: None"
       ** The OPTIONS_NODE section is MANDATORY - it must contain the node representing answer options
       ** If options are already correct, write "OPTIONS_NODE: None" and skip modifications
@@ -403,10 +428,10 @@ prompt_templates:
   uniadilr_template:
     step1: |
       You are a professional medical scientist and biologist.
-      You’re given a medical context and background.
+      You're given a medical context and background.
       You will create a focused Directed Acyclic Graph (DAG) modeling the primary causal relationships presented in the context. Your main goal is to represent the interactions between entities explicitly mentioned in the text.
-      You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding ‘Smoking’ as a cause for ‘Lung Cancer’ even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
-      For each node, you must specify if it’s binary or categorical:
+      You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding 'Smoking' as a cause for 'Lung Cancer' even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
+      For each node, you must specify if it's binary or categorical:
       Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
       Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories but NOT exceed 10 values, otherwise use binary)
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
@@ -439,11 +464,22 @@ prompt_templates:
       edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
       </dag>
 
+      CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
+      ✓ CORRECT: edge1: node2 -> node7  (uses node IDs: node2, node7)
+      ✓ CORRECT: edge2: node5 -> node3  (uses node IDs: node5, node3)
+      ✗ ABSOLUTELY WRONG: edge1: Hypertension -> Diabetes  (uses node NAMES instead of IDs - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge1: Hypertension_Untreated -> Myocardial_Ischemia  (uses node NAMES - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge1: node1_name -> node2_name  (uses placeholder text instead of actual IDs)
+      
+      ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node3, etc.) NEVER use node names
+      ** The format "edge1: node2 -> node7" means "edge from node2 to node7" where node2 and node7 refer to the node IDs in the NODES section
+      ** Example: If you defined "node2: Hypertension (binary)" and "node7: Diabetes (binary)", the edge MUST be "edge1: node2 -> node7" NOT "edge1: Hypertension -> Diabetes"
+      ** Example: If you defined "node3: Smoking_Status (binary)" and "node8: Lung_Cancer (binary)", the edge MUST be "edge2: node3 -> node8" NOT "edge2: Smoking_Status -> Lung_Cancer"
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
-      ** for binary nodes: use format “node_name (binary)”
+      ** for binary nodes: use format "node_name (binary)"
       ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …)" - MUST have at least 2 but NOT exceed 10 categories listed
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
-      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what’s mentioned in the context
+      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** you should only output the DAG in the exact format above. No other text, no other format.
       ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
 
@@ -489,6 +525,14 @@ prompt_templates:
       edge{last_new_edge_number}: node{last_node_number} -> node{first_node_number}
       </additions>
 
+      CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
+      ✓ CORRECT: edge11: node2 -> node7  (uses node IDs: node2, node7)
+      ✓ CORRECT: edge12: node5 -> node13  (uses node IDs: node5, node13)
+      ✗ ABSOLUTELY WRONG: edge11: Premise -> Conclusion  (uses node NAMES - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge11: Evidence -> Hypothesis  (uses node NAMES - THIS WILL FAIL)
+      
+      ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node3, etc.) NEVER use node names
+      ** Example: If Step 1 has "node2: Evidence (binary)" and you add "node12: Hypothesis (categorical: ...)", the edge MUST be "edge11: node2 -> node12" NOT "edge11: Evidence -> Hypothesis"
       ** If there are NO new nodes to add, write "NEW_NODES: None" under the NEW_NODES section
       ** If there are NO new edges to add, write "NEW_EDGES: None" under the NEW_EDGES section
       ** N is the total number of nodes from Step 1, so your new nodes should start at node{N+1}
@@ -561,6 +605,12 @@ prompt_templates:
       ...
       </modifications>
 
+      CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
+      ✓ CORRECT: edge18: node5 -> node15  (uses node IDs: node5, node15)
+      ✗ ABSOLUTELY WRONG: edge18: Evidence -> Hypothesis_Conclusion  (uses node NAMES - THIS WILL FAIL)
+      
+      ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node15, etc.) NEVER use node names
+      ** Example: If you have "node7: Evidence (binary)" and "node15: Hypothesis_Conclusion (categorical: ...)", edge MUST be "edge18: node7 -> node15" NOT "edge18: Evidence -> Hypothesis_Conclusion"
       ** If there are NO nodes to remove, write "NODES_TO_REMOVE: None"
       ** The OPTIONS_NODE section is MANDATORY - it must contain the node representing hypothesis conclusion
       ** If conclusion is already correct, write "OPTIONS_NODE: None" and skip modifications

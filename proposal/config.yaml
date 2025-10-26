@@ -77,26 +77,26 @@ prompt_templates:
       Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories but NOT exceed 10 values, if the node has less than 2 categories, use binary)
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
       EXAMPLES OF CORRECT NODE DEFINITIONS:
-      ✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
+      ✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly) - The age group classification of the patient
       ✗ WRONG: Patient_Age_Group (categorical: elderly) ← Only one category!
-      ✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination)
+      ✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination) - The type of cancer treatment being administered
       ✗ WRONG: Treatment_Type (categorical: chemotherapy) ← Only one category!
-      ✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical)
+      ✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical) - The severity level of the disease condition
       ✗ WRONG: Disease_Severity (categorical: moderate) ← Only one category!
-      ✓ CORRECT: Smoking_Status (binary) ← Only two states: smoker/non-smoker
+      ✓ CORRECT: Smoking_Status (binary) - Whether the patient has a history of smoking ← Only two states: smoker/non-smoker
       ✗ WRONG: Smoking_Status (categorical: smoker) ← Should be binary!
-      ✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic)
+      ✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic) - The pharmacological class of the medication
       ✗ WRONG: Drug_Class (categorical: antibiotic) ← Only one category!
       Your output DAG should be in the exact following format:
       <reasoning> your full reasoning comes here </reasoning>
       <dag>
       NODES:
-      node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3, …, last_category_name)
-      node3: node3_name (binary)
-      node4: node4_name (categorical: category1, category2, category3, …, last_category_name)
+      node1: node1_name (binary) - Context-specific description (1-2 sentences)
+      node2: node2_name (categorical: category1, category2, category3, …, last_category_name) - Context-specific description (1-2 sentences)
+      node3: node3_name (binary) - Context-specific description (1-2 sentences)
+      node4: node4_name (categorical: category1, category2, category3, …, last_category_name) - Context-specific description (1-2 sentences)
       …
-      node{last_node_number}: last_node_name (binary)
+      node{last_node_number}: last_node_name (binary) - Context-specific description (1-2 sentences)
       EDGES:
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}
@@ -117,8 +117,13 @@ prompt_templates:
       ** Example: If you defined "node2: Hypertension (binary)" and "node7: Diabetes (binary)", the edge MUST be "edge1: node2 -> node7" NOT "edge1: Hypertension -> Diabetes"
       ** Example: If you defined "node3: Smoking_Status (binary)" and "node8: Lung_Cancer (binary)", the edge MUST be "edge2: node3 -> node8" NOT "edge2: Smoking_Status -> Lung_Cancer"
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
-      ** for binary nodes: use format "node_name (binary)"
-      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …)" - MUST have at least 2 but NOT exceed 10 categories listed
+      ** for binary nodes: use format "node_name (binary) - Description"
+      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …) - Description [MUST have at least 2 values but NOT exceed 10 categories listed]"
+      ** CRITICAL: Each node MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
+      ** The description should be SPECIFIC to this medical case and context, explaining what this node represents in THIS scenario
+      ** For example: instead of "The findings from imaging examination", write "The findings from the chest X-ray showing bilateral infiltrates in this pneumonia patient"
+      ** Descriptions should provide meaningful clinical context based on the given information, making it clear what specific aspect of the case this node represents
+      ** MUST have at least 2 categories listed for categorical nodes
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** you should only output the DAG in the exact format above. No other text, no other format.
@@ -136,16 +141,16 @@ prompt_templates:
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
 
       EXAMPLES OF CORRECT NODE DEFINITIONS:
-      ✓ CORRECT: Imaging_Result (categorical: normal, mild_abnormality, moderate_abnormality, severe_abnormality)
+      ✓ CORRECT: Imaging_Result (categorical: normal, mild_abnormality, moderate_abnormality, severe_abnormality) - The findings from medical imaging examination
       ✗ WRONG: Imaging_Result (categorical: normal) ← Only one category!
 
-      ✓ CORRECT: Blood_Pressure_Level (categorical: hypotensive, normal, prehypertensive, hypertensive)
+      ✓ CORRECT: Blood_Pressure_Level (categorical: hypotensive, normal, prehypertensive, hypertensive) - The categorized blood pressure measurement
       ✗ WRONG: Blood_Pressure_Level (categorical: hypertensive) ← Only one category!
 
-      ✓ CORRECT: Diabetes_Present (binary)  ← Only two states: present/absent
+      ✓ CORRECT: Diabetes_Present (binary) - Whether the patient has diabetes mellitus ← Only two states: present/absent
       ✗ WRONG: Diabetes_Present (categorical: present) ← Should be binary!
 
-      ✓ CORRECT: Cancer_Stage (categorical: stage_I, stage_II, stage_III, stage_IV)
+      ✓ CORRECT: Cancer_Stage (categorical: stage_I, stage_II, stage_III, stage_IV) - The TNM staging classification of cancer
       ✗ WRONG: Cancer_Stage (categorical: stage_III) ← Only one category!
 
       Your output should be in the exact following format:
@@ -155,10 +160,10 @@ prompt_templates:
       </analysis>
       <additions>
       NEW_NODES:
-      node{N+1}: new_node1_name (binary)
-      node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name)
+      node{N+1}: new_node1_name (binary) - Context-specific description (1-2 sentences)
+      node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name) - Context-specific description (1-2 sentences)
       ...
-      node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
+      node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name) - Context-specific description (1-2 sentences)
       NEW_EDGES:
       edge{M+1}: node{i} -> node{j}
       edge{M+2}: node{x} -> node{y}
@@ -179,8 +184,13 @@ prompt_templates:
       ** N is the total number of nodes from Step 1, so your new nodes should start at node{N+1}
       ** M is the total number of edges from Step 1, so your new edges should start at edge{M+1}
       ** Node numbering in new edges can reference both existing nodes (node1 to nodeN) and new nodes (node{N+1} onwards)
-      ** For binary nodes: use format "node_name (binary)"
-      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 but NOT exceed 10 categories listed
+      ** For binary nodes: use format "node_name (binary) - Description"
+      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...) - Description [MUST have at least 2 categories but NOT exceed 10 categories listed]"
+      ** CRITICAL: Each new node MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
+      ** The description should be SPECIFIC to this medical case, question, and answer choices, explaining what this node represents in THIS scenario
+      ** Descriptions should incorporate information from the context AND the question to make it clear how this node relates to differentiating between answer choices
+      ** For example: "The presence of fever >38.5°C that helps distinguish between bacterial vs viral infection in this case"
+      ** MUST have at least 2 categories listed for categorical nodes
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
@@ -239,9 +249,9 @@ prompt_templates:
       node{j}
       ...
       OPTIONS_NODE:
-      node{N+1}: node_name (categorical: full_text_of_option_A, full_text_of_option_B, full_text_of_option_C, full_text_of_option_D)
+      node{N+1}: node_name (categorical: full_text_of_option_A, full_text_of_option_B, full_text_of_option_C, full_text_of_option_D) - Context-specific description (1-2 sentences)
       NODES_TO_ADD:
-      node{N+2}: other_node_name (binary|categorical: ...)
+      node{N+2}: other_node_name (binary|categorical: ...) - Context-specific description (1-2 sentences)
       ...
       EDGES_TO_REMOVE: 
       edge{k}: node{x} -> node{y}
@@ -267,6 +277,8 @@ prompt_templates:
       ** New node numbering continues from the current maximum (after accounting for removals)
       ** New edge numbering continues from the current maximum (after accounting for removals)
       ** CRITICAL: Use the FULL TEXT of answer options as categories, NOT letters or abbreviations
+      ** CRITICAL: All new nodes (OPTIONS_NODE and NODES_TO_ADD) MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
+      ** Descriptions should be SPECIFIC to this medical case, incorporating context and question information
 
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
@@ -274,11 +286,13 @@ prompt_templates:
       You are given a Bayesian Network node and a SPECIFIC condition of its parent nodes. Your task is to provide the conditional probability distribution for this node given this specific parent condition.
       
       You will be provided with:
-      1. The target node information (name, type, possible states/categories)
+      1. The target node information (name, type, possible states/categories and a general description))
       2. Parent nodes information (if any)
       3. The SPECIFIC parent condition/states you need to analyze
       4. The original context that led to this Bayesian network
       
+      Note: Node descriptions are provided to help you understand what each node represents in general terms.
+
       For the given parent condition, you need to estimate the conditional probability of each state of the target node.
       
       IMPORTANT: You must express probabilities using ONLY these qualitative terms below:
@@ -313,10 +327,12 @@ prompt_templates:
       You are given a Bayesian Network node and MULTIPLE CONDITIONS of its parent nodes. Your task is to provide the conditional probability distribution for this node given EACH of the parent conditions listed.
       
       You will be provided with:
-      1. The target node information (name, type, possible states/categories)
+      1. The target node information (name, type, possible states/categories and a general description))
       2. Parent nodes information (if any)
       3. MULTIPLE parent conditions/states you need to analyze
       4. The original context that led to this Bayesian network
+      
+      Note: Node descriptions are provided to help you understand what each node represents in general terms.
       
       For EACH given parent condition, you need to estimate the conditional probability of each state of the target node.
       
@@ -427,8 +443,9 @@ prompt_templates:
 
   uniadilr_template:
     step1: |
-      You are a professional medical scientist and biologist.
-      You're given a medical context and background.
+      You are a professional logician and reasoning master.
+      You're given some context and background sentences. 
+
       You will create a focused Directed Acyclic Graph (DAG) modeling the primary causal relationships presented in the context. Your main goal is to represent the interactions between entities explicitly mentioned in the text.
       You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding 'Smoking' as a cause for 'Lung Cancer' even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
       For each node, you must specify if it's binary or categorical:
@@ -436,26 +453,26 @@ prompt_templates:
       Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories but NOT exceed 10 values, otherwise use binary)
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
       EXAMPLES OF CORRECT NODE DEFINITIONS:
-      ✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
-      ✗ WRONG: Patient_Age_Group (categorical: elderly) ← Only one category!
-      ✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination)
-      ✗ WRONG: Treatment_Type (categorical: chemotherapy) ← Only one category!
-      ✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical)
-      ✗ WRONG: Disease_Severity (categorical: moderate) ← Only one category!
-      ✓ CORRECT: Smoking_Status (binary) ← Only two states: smoker/non-smoker
-      ✗ WRONG: Smoking_Status (categorical: smoker) ← Should be binary!
-      ✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic)
-      ✗ WRONG: Drug_Class (categorical: antibiotic) ← Only one category!
+      ✓ CORRECT: Entity_Type (categorical: person, place, object, concept, event) - The classification of the entity in the reasoning context
+      ✗ WRONG: Entity_Type (categorical: person) ← Only one category!
+      ✓ CORRECT: Truth_Value (categorical: definitely_true, probably_true, uncertain, probably_false, definitely_false) - The degree of truth or certainty of a proposition
+      ✗ WRONG: Truth_Value (categorical: definitely_true) ← Only one category!
+      ✓ CORRECT: Temporal_Order (categorical: before, simultaneous, after) - The temporal relationship between events
+      ✗ WRONG: Temporal_Order (categorical: before) ← Only one category!
+      ✓ CORRECT: Proposition_Valid (binary) - Whether the logical proposition is valid or invalid ← Only two states: valid/invalid
+      ✗ WRONG: Proposition_Valid (categorical: valid) ← Should be binary!
+      ✓ CORRECT: Relationship_Type (categorical: causal, temporal, spatial, logical, conditional) - The type of relationship between entities
+      ✗ WRONG: Relationship_Type (categorical: causal) ← Only one category!
       Your output DAG should be in the exact following format:
       <reasoning> your full reasoning comes here </reasoning>
       <dag>
       NODES:
-      node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3, …, last_category_name)
-      node3: node3_name (binary)
-      node4: node4_name (categorical: category1, category2, category3, …, last_category_name)
+      node1: node1_name (binary) - Context-specific description (1-2 sentences)
+      node2: node2_name (categorical: category1, category2, category3, …, last_category_name) - Context-specific description (1-2 sentences)
+      node3: node3_name (binary) - Context-specific description (1-2 sentences)
+      node4: node4_name (categorical: category1, category2, category3, …, last_category_name) - Context-specific description (1-2 sentences)
       …
-      node{last_node_number}: last_node_name (binary)
+      node{last_node_number}: last_node_name (binary) - Context-specific description (1-2 sentences)
       EDGES:
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}
@@ -476,8 +493,12 @@ prompt_templates:
       ** Example: If you defined "node2: Hypertension (binary)" and "node7: Diabetes (binary)", the edge MUST be "edge1: node2 -> node7" NOT "edge1: Hypertension -> Diabetes"
       ** Example: If you defined "node3: Smoking_Status (binary)" and "node8: Lung_Cancer (binary)", the edge MUST be "edge2: node3 -> node8" NOT "edge2: Smoking_Status -> Lung_Cancer"
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
-      ** for binary nodes: use format "node_name (binary)"
-      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …)" - MUST have at least 2 but NOT exceed 10 categories listed
+      ** for binary nodes: use format "node_name (binary) - Description"
+      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, …) - Description [MUST have at least 2 values but NOT exceed 10 categories listed]"
+      ** CRITICAL: Each node MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
+      ** The description should be SPECIFIC to this logical reasoning and context, explaining what this node represents in THIS scenario
+      ** Descriptions should provide meaningful context based on the given information, making it clear what specific aspect of the reasoning this node represents
+      ** MUST have at least 2 categories listed for categorical nodes
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** you should only output the DAG in the exact format above. No other text, no other format.
@@ -495,17 +516,17 @@ prompt_templates:
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
 
       EXAMPLES OF CORRECT NODE DEFINITIONS:
-      ✓ CORRECT: Imaging_Result (categorical: normal, mild_abnormality, moderate_abnormality, severe_abnormality)
-      ✗ WRONG: Imaging_Result (categorical: normal) ← Only one category!
-
-      ✓ CORRECT: Blood_Pressure_Level (categorical: hypotensive, normal, prehypertensive, hypertensive)
-      ✗ WRONG: Blood_Pressure_Level (categorical: hypertensive) ← Only one category!
-
-      ✓ CORRECT: Diabetes_Present (binary)  ← Only two states: present/absent
-      ✗ WRONG: Diabetes_Present (categorical: present) ← Should be binary!
-
-      ✓ CORRECT: Cancer_Stage (categorical: stage_I, stage_II, stage_III, stage_IV)
-      ✗ WRONG: Cancer_Stage (categorical: stage_III) ← Only one category!
+      ✓ CORRECT: Logical_Operator (categorical: AND, OR, NOT, XOR, IMPLIES) - The type of logical operation being applied
+      ✗ WRONG: Logical_Operator (categorical: AND) ← Only one category!
+      
+      ✓ CORRECT: Confidence_Level (categorical: very_low, low, medium, high, very_high) - The degree of confidence in the reasoning
+      ✗ WRONG: Confidence_Level (categorical: high) ← Only one category!
+      
+      ✓ CORRECT: Statement_Consistent (binary) - Whether the statement is consistent with other statements ← Only two states: consistent/inconsistent
+      ✗ WRONG: Statement_Consistent (categorical: consistent) ← Should be binary!
+      
+      ✓ CORRECT: Evidence_Quality (categorical: weak, moderate, strong, conclusive) - The strength of the supporting evidence
+      ✗ WRONG: Evidence_Quality (categorical: strong) ← Only one category!
 
       Your output should be in the exact following format:
 
@@ -514,10 +535,10 @@ prompt_templates:
       </analysis>
       <additions>
       NEW_NODES:
-      node{N+1}: new_node1_name (binary)
-      node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name)
+      node{N+1}: new_node1_name (binary) - Context-specific description (1-2 sentences)
+      node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name) - Context-specific description (1-2 sentences)
       ...
-      node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
+      node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name) - Context-specific description (1-2 sentences)
       NEW_EDGES:
       edge{M+1}: node{i} -> node{j}
       edge{M+2}: node{x} -> node{y}
@@ -528,18 +549,23 @@ prompt_templates:
       CRITICAL EDGE FORMAT RULES - READ CAREFULLY:
       ✓ CORRECT: edge11: node2 -> node7  (uses node IDs: node2, node7)
       ✓ CORRECT: edge12: node5 -> node13  (uses node IDs: node5, node13)
-      ✗ ABSOLUTELY WRONG: edge11: Premise -> Conclusion  (uses node NAMES - THIS WILL FAIL)
-      ✗ ABSOLUTELY WRONG: edge11: Evidence -> Hypothesis  (uses node NAMES - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge11: Hypertension -> Diabetes  (uses node NAMES - THIS WILL FAIL)
+      ✗ ABSOLUTELY WRONG: edge11: Beta_Blocker -> Treatment  (uses node NAMES - THIS WILL FAIL)
       
       ** MANDATORY: Edges MUST ALWAYS use node IDs (node1, node2, node3, etc.) NEVER use node names
-      ** Example: If Step 1 has "node2: Evidence (binary)" and you add "node12: Hypothesis (categorical: ...)", the edge MUST be "edge11: node2 -> node12" NOT "edge11: Evidence -> Hypothesis"
+      ** Example: If Step 1 has "node2: Hypertension (binary)" and you add "node12: Treatment (categorical: ...)", the edge MUST be "edge11: node2 -> node12" NOT "edge11: Hypertension -> Treatment"
       ** If there are NO new nodes to add, write "NEW_NODES: None" under the NEW_NODES section
       ** If there are NO new edges to add, write "NEW_EDGES: None" under the NEW_EDGES section
       ** N is the total number of nodes from Step 1, so your new nodes should start at node{N+1}
       ** M is the total number of edges from Step 1, so your new edges should start at edge{M+1}
       ** Node numbering in new edges can reference both existing nodes (node1 to nodeN) and new nodes (node{N+1} onwards)
-      ** For binary nodes: use format "node_name (binary)"
-      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 but NOT exceed 10 categories listed
+      ** For binary nodes: use format "node_name (binary) - Description"
+      ** For categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...) - Description [MUST have at least 2 categories but NOT exceed 10 categories listed]"
+      ** CRITICAL: Each new node MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
+      ** The description should be SPECIFIC to this medical case, question, and answer choices, explaining what this node represents in THIS scenario
+      ** Descriptions should incorporate information from the context AND the question to make it clear how this node relates to differentiating between answer choices
+      ** For example: "The presence of fever >38.5°C that helps distinguish between bacterial vs viral infection in this case"
+      ** MUST have at least 2 categories listed for categorical nodes
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
@@ -593,9 +619,9 @@ prompt_templates:
       node{j}
       ...
       OPTIONS_NODE:
-      node{N+1}: node_name (categorical: conclusion_state1, conclusion_state2, conclusion_state3, ...)
+      node{N+1}: node_name (categorical: conclusion_state1, conclusion_state2, conclusion_state3, ...) - Context-specific description (1-2 sentences)
       NODES_TO_ADD:
-      node{N+2}: other_node_name (binary|categorical: ...)
+      node{N+2}: other_node_name (binary|categorical: ...) - Context-specific description (1-2 sentences)
       ...
       EDGES_TO_REMOVE: 
       edge{k}: node{x} -> node{y}
@@ -621,6 +647,8 @@ prompt_templates:
       ** New node numbering continues from the current maximum (after accounting for removals)
       ** New edge numbering continues from the current maximum (after accounting for removals)
       ** The categorical node representing the conclusion should have meaningful logical states
+      ** CRITICAL: All new nodes (OPTIONS_NODE and NODES_TO_ADD) MUST have a context-specific description (1-2 sentences) after the type specification, separated by " - "
+      ** Descriptions should be SPECIFIC to this logical reasoning case and hypothesis
 
     step4: |
       You are a professional expert in probability and statistics with deep knowledge in Bayesian networks and conditional probability distributions.
@@ -628,7 +656,7 @@ prompt_templates:
       You are given a Bayesian Network node and a SPECIFIC condition of its parent nodes. Your task is to provide the conditional probability distribution for this node given this specific parent condition based on logical reasoning principles.
       
       You will be provided with:
-      1. The target node information (name, type, possible states/categories)
+      1. The target node information (name, type, possible states/categories and a general description)
       2. Parent nodes information (if any)
       3. The SPECIFIC parent condition/states you need to analyze
       4. The original logical context that led to this Bayesian network
@@ -667,7 +695,7 @@ prompt_templates:
       You are given a Bayesian Network node and MULTIPLE CONDITIONS of its parent nodes. Your task is to provide the conditional probability distribution for this node given EACH of the parent conditions listed based on logical reasoning principles.
       
       You will be provided with:
-      1. The target node information (name, type, possible states/categories)
+      1. The target node information (name, type, possible states/categories and a general description))
       2. Parent nodes information (if any)
       3. MULTIPLE parent conditions/states you need to analyze
       4. The original logical context that led to this Bayesian network
@@ -785,5 +813,4 @@ datasets:
     prompts:
       - type: "v1"
         template: "uniadilr_template"
-
 

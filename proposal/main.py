@@ -348,7 +348,7 @@ def main():
                 
                 # Plot and save the DAG visualization
                 output_dir = os.path.join(os.path.dirname(__file__), "dag_visualizations", dataset_name, model_name)
-                output_path = os.path.join(output_dir, f"dag_sample_{idx}")
+                output_path = os.path.join(output_dir, f"dag_sample_{idx+1}")
                 plot_dag(dag, output_path, idx)
             else:
                 error_msg = step3_result.get('error', 'Unknown error')

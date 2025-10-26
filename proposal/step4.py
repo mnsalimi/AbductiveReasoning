@@ -6,7 +6,8 @@ from tqdm import tqdm
 
 def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_tokens: int, 
           temperature: float, thinking: bool, sleep_time: float, dataset_name: str, 
-          step3_result: Dict[str, Any], step3dot5_result: Dict[str, Any] = None, batch_size: int = 1) -> Dict[str, Any]:
+          step3_result: Dict[str, Any], step3dot5_result: Dict[str, Any] = None, batch_size: int = 1,
+          sample_start_time: float = None, sample_timeout: float = 0) -> Dict[str, Any]:
     """
     Step 4: CPT Creator - Generate Conditional Probability Tables for all nodes using LLMs.
     
@@ -57,6 +58,13 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
         }
     
     try:
+        # Function to check if timeout has been exceeded
+        def is_timeout_exceeded():
+            if sample_timeout <= 0 or sample_start_time is None:  # Timeout disabled
+                return False
+            elapsed = time.time() - sample_start_time
+            return elapsed > sample_timeout
+        
         # Extract visible nodes from step3dot5 if available
         visible_nodes = {}
         if (step3dot5_result and 
@@ -78,6 +86,24 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
         print(f"\n  🔧 Starting CPT generation for {total_nodes} nodes...")
         
         for node_idx, (node_id, node_info) in enumerate(registered_dag["nodes"].items(), 1):
+            # Check timeout before processing each node
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n  ⏱️  TIMEOUT EXCEEDED in Step 4: {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"  ⏭️  Processed {node_idx - 1}/{total_nodes} nodes before timeout")
+                return {
+                    "raw_data": sample,
+                    "successful_api_call": False,
+                    "right_format": False,
+                    "cpts": all_cpts,  # Return partial results
+                    "cpt_metadata": None,
+                    "cpt_generation_log": cpt_generation_log,
+                    "correct_answer": sample.get("answer_idx"),
+                    "idx": idx,
+                    "error": f"Step 4 timeout after processing {node_idx - 1}/{total_nodes} nodes ({elapsed:.2f}s)",
+                    "timeout": True
+                }
+            
             time.sleep(sleep_time)
             
             # Get parent information for logging
@@ -93,7 +119,8 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
             # Generate CPT for this node
             cpt_result = _generate_node_cpt(
                 sample, node_info, registered_dag, model_name, api_key, 
-                max_tokens, temperature, thinking, dataset_name, visible_nodes, batch_size
+                max_tokens, temperature, thinking, dataset_name, visible_nodes, batch_size,
+                sample_start_time, sample_timeout
             )
             
             if cpt_result["success"]:
@@ -259,7 +286,8 @@ def _format_cpt_generation_error(node_id: str, node_info: Dict[str, Any], cpt_re
 
 def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], registered_dag: Dict[str, Any],
                       model_name: str, api_key: str, max_tokens: int, temperature: float, 
-                      thinking: bool, dataset_name: str, visible_nodes: Dict[str, str] = None, batch_size: int = 1) -> Dict[str, Any]:
+                      thinking: bool, dataset_name: str, visible_nodes: Dict[str, str] = None, batch_size: int = 1,
+                      sample_start_time: float = None, sample_timeout: float = 0) -> Dict[str, Any]:
     """
     Generate CPT for a single node using LLM with row-by-row approach.
     
@@ -271,11 +299,19 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
         thinking: Whether model supports <think> blocks
         dataset_name: "medqa" or "uniadilr"
         visible_nodes: Optional dict of observed node_id -> value from step3dot5
+        sample_start_time: Start time of sample processing for timeout checking
+        sample_timeout: Timeout limit in seconds
     
     Returns:
         dict: Result with CPT or error information
     """
     try:
+        # Function to check if timeout has been exceeded
+        def is_timeout_exceeded():
+            if sample_timeout <= 0 or sample_start_time is None:  # Timeout disabled
+                return False
+            elapsed = time.time() - sample_start_time
+            return elapsed > sample_timeout
         # Get parent information
         parent_info = _get_parent_info(node_info, registered_dag)
         node_states = _get_node_states(node_info)
@@ -315,6 +351,19 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                    ncols=100)
         
         for batch in pbar:
+            # Check timeout before processing each batch
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                pbar.close()
+                return {
+                    "success": False,
+                    "error": f"Timeout exceeded while generating CPT for node {node_info['id']} ({elapsed:.2f}s)",
+                    "timeout": True,
+                    "partial_qualitative_cpt": qualitative_cpt,
+                    "partial_numerical_cpt": numerical_cpt,
+                    "raw_responses": all_raw_responses
+                }
+            
             # Update progress bar with batch info
             if batch[0] != "NO_PARENTS":
                 pbar.set_postfix_str(f"Processing {len(batch)} condition(s)")
@@ -325,7 +374,8 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                 combination = batch[0]
                 batch_result = _generate_cpt_row(
                     sample, node_info, parent_info, combination, registered_dag,
-                    model_name, api_key, max_tokens, temperature, thinking, dataset_name
+                    model_name, api_key, max_tokens, temperature, thinking, dataset_name,
+                    sample_start_time, sample_timeout
                 )
                 
                 if batch_result["success"]:
@@ -343,16 +393,28 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                             total_token_usage[key] += batch_result["token_usage"].get(key, 0)
                 else:
                     pbar.close()
-                    return {
-                        "success": False,
-                        "error": f"Failed to generate CPT row for condition {combination}: {batch_result['error']}",
-                        "raw_responses": all_raw_responses
-                    }
+                    # Check if it's a timeout error
+                    if batch_result.get("timeout"):
+                        return {
+                            "success": False,
+                            "error": batch_result['error'],
+                            "timeout": True,
+                            "partial_qualitative_cpt": qualitative_cpt,
+                            "partial_numerical_cpt": numerical_cpt,
+                            "raw_responses": all_raw_responses
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Failed to generate CPT row for condition {combination}: {batch_result['error']}",
+                            "raw_responses": all_raw_responses
+                        }
             else:
                 # Batch generation (multiple rows at once)
                 batch_result = _generate_cpt_batch(
                     sample, node_info, parent_info, batch, registered_dag,
-                    model_name, api_key, max_tokens, temperature, thinking, dataset_name
+                    model_name, api_key, max_tokens, temperature, thinking, dataset_name,
+                    sample_start_time, sample_timeout
                 )
                 
                 if batch_result["success"]:
@@ -376,11 +438,22 @@ def _generate_node_cpt(sample: Dict[str, Any], node_info: Dict[str, Any], regist
                             total_token_usage[key] += batch_result["token_usage"].get(key, 0)
                 else:
                     pbar.close()
-                    return {
-                        "success": False,
-                        "error": f"Failed to generate CPT batch: {batch_result['error']}",
-                        "raw_responses": all_raw_responses
-                    }
+                    # Check if it's a timeout error
+                    if batch_result.get("timeout"):
+                        return {
+                            "success": False,
+                            "error": batch_result['error'],
+                            "timeout": True,
+                            "partial_qualitative_cpt": qualitative_cpt,
+                            "partial_numerical_cpt": numerical_cpt,
+                            "raw_responses": all_raw_responses
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Failed to generate CPT batch: {batch_result['error']}",
+                            "raw_responses": all_raw_responses
+                        }
         
         pbar.close()  # Ensure progress bar is closed
         
@@ -482,8 +555,16 @@ def _generate_parent_combinations(parent_info: Dict[str, Any], visible_nodes: Di
 
 def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
                      condition: Any, registered_dag: Dict[str, Any], model_name: str, api_key: str,
-                     max_tokens: int, temperature: float, thinking: bool, dataset_name: str) -> Dict[str, Any]:
+                     max_tokens: int, temperature: float, thinking: bool, dataset_name: str,
+                     sample_start_time: float = None, sample_timeout: float = 0) -> Dict[str, Any]:
     """Generate a single CPT row for a specific parent condition with retry logic."""
+    
+    # Function to check if timeout has been exceeded
+    def is_timeout_exceeded():
+        if sample_timeout <= 0 or sample_start_time is None:  # Timeout disabled
+            return False
+        elapsed = time.time() - sample_start_time
+        return elapsed > sample_timeout
     
     # Retry logic: up to 3 attempts
     max_retries = 3
@@ -491,6 +572,15 @@ def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_
     last_error = None
     
     while retry_count < max_retries:
+        # Check timeout before each retry attempt
+        if is_timeout_exceeded():
+            elapsed = time.time() - sample_start_time
+            return {
+                "success": False,
+                "error": f"Timeout exceeded during CPT row generation (retry {retry_count}/{max_retries}, elapsed: {elapsed:.2f}s)",
+                "timeout": True
+            }
+        
         retry_count += 1
         
         try:
@@ -541,8 +631,16 @@ def _generate_cpt_row(sample: Dict[str, Any], node_info: Dict[str, Any], parent_
 
 def _generate_cpt_batch(sample: Dict[str, Any], node_info: Dict[str, Any], parent_info: Dict[str, Any],
                        conditions: List[Any], registered_dag: Dict[str, Any], model_name: str, api_key: str,
-                       max_tokens: int, temperature: float, thinking: bool, dataset_name: str) -> Dict[str, Any]:
+                       max_tokens: int, temperature: float, thinking: bool, dataset_name: str,
+                       sample_start_time: float = None, sample_timeout: float = 0) -> Dict[str, Any]:
     """Generate multiple CPT rows in a single LLM call with retry logic."""
+    
+    # Function to check if timeout has been exceeded
+    def is_timeout_exceeded():
+        if sample_timeout <= 0 or sample_start_time is None:  # Timeout disabled
+            return False
+        elapsed = time.time() - sample_start_time
+        return elapsed > sample_timeout
     
     # Retry logic: up to 3 attempts
     max_retries = 3
@@ -550,6 +648,15 @@ def _generate_cpt_batch(sample: Dict[str, Any], node_info: Dict[str, Any], paren
     last_error = None
     
     while retry_count < max_retries:
+        # Check timeout before each retry attempt
+        if is_timeout_exceeded():
+            elapsed = time.time() - sample_start_time
+            return {
+                "success": False,
+                "error": f"Timeout exceeded during CPT batch generation (retry {retry_count}/{max_retries}, elapsed: {elapsed:.2f}s)",
+                "timeout": True
+            }
+        
         retry_count += 1
         
         try:

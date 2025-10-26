@@ -2,6 +2,7 @@ import yaml
 import os
 import sys
 import builtins
+import time
 from loader import load_med_qa_dataset, load_uniadilr_hgc_dataset
 from step1 import step1
 from step2 import step2
@@ -43,6 +44,7 @@ def main():
     model_config = config["models"][model_name]
     api_key = config["api"]["api_key"]
     sleep_time = config["sleep_time"]
+    sample_timeout = config.get("sample_timeout", 3600)  # Default to 1 hour if not specified
     thinking = model_config["thinking"]
     temperature = model_config["temperature"]
     max_tokens = model_config["max_tokens_by_prompt_type"].get("CPT Creation", 4096)
@@ -60,9 +62,16 @@ def main():
     print(f"✓ Temperature: {temperature}")
     print(f"✓ Thinking mode: {thinking}")
     print(f"✓ Sleep time: {sleep_time}s")
+    if sample_timeout > 0:
+        print(f"✓ Sample timeout: {sample_timeout}s ({sample_timeout / 3600:.1f} hour)")
+    else:
+        print(f"✓ Sample timeout: disabled")
     
     # Process each sample through the complete pipeline
     for idx, sample in enumerate(dataset):
+        # Record start time for timeout tracking
+        sample_start_time = time.time()
+        
         # Prepare per-sample log file and duplicate prints into it (simple tee)
         logs_dir = os.path.join(os.path.dirname(__file__), "results", dataset_name, model_name, "logs")
         os.makedirs(logs_dir, exist_ok=True)
@@ -83,6 +92,13 @@ def main():
             except Exception:
                 pass
         
+        # Function to check if timeout has been exceeded
+        def is_timeout_exceeded():
+            if sample_timeout <= 0:  # Timeout disabled
+                return False
+            elapsed = time.time() - sample_start_time
+            return elapsed > sample_timeout
+        
         builtins.print = print_both
         try:
             print_separator(f"PROCESSING SAMPLE {idx + 1}/{len(dataset)}")
@@ -97,6 +113,13 @@ def main():
                 print(f"  Context: {sample.get('context', '')[:200]}...")
                 print(f"  Hypothesis: {sample.get('hypothesis', '')[:200]}...")
         
+            # Check timeout before starting
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1}")
+                continue
+            
             # STEP 1: Create BN Schema
             print_separator("STEP 1: Create BN Schema")
             step1_result = step1(sample, idx, model_name, api_key, max_tokens, temperature, 
@@ -114,6 +137,13 @@ def main():
             else:
                 print(f"✗ Step 1 failed: {step1_result.get('error', 'Unknown error')}")
                 continue
+            
+            # Check timeout before step 2
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 1")
+                continue
         
             # STEP 2: Refine BN Schema
             print_separator("STEP 2: Refine BN Schema")
@@ -130,6 +160,13 @@ def main():
                     print(f"  🔢 Tokens used: {step2_result['token_usage'].get('total_tokens', 0)}")
             else:
                 print(f"✗ Step 2 failed: {step2_result.get('error', 'Unknown error')}")
+                continue
+            
+            # Check timeout before step 2.5
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 2")
                 continue
         
             # STEP 2.5: Refine DAG to ensure answer options are properly represented
@@ -156,6 +193,13 @@ def main():
                     print(f"  🔢 Tokens used: {step2dot5_result['token_usage'].get('total_tokens', 0)}")
             else:
                 print(f"✗ Step 2.5 failed: {step2dot5_result.get('error', 'Unknown error')}")
+                continue
+            
+            # Check timeout before step 3
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 2.5")
                 continue
         
             # STEP 3: Register DAG
@@ -208,6 +252,13 @@ def main():
                         print(f"      ❌ {detail['node_id']} ('{detail['node_name']}'): "
                               f"{detail['num_categories']} categories (need {detail['required_minimum']})")
                 continue
+            
+            # Check timeout before step 3.5
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 3")
+                continue
         
             # STEP 3.5: Identify Visible Nodes
             print_separator("STEP 3.5: Identify Visible Nodes")
@@ -257,11 +308,19 @@ def main():
                         else:
                             print(f"      Attempt {i}: Parsing failed")
                 continue
+            
+            # Check timeout before step 4
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 3.5")
+                continue
         
             # STEP 4: CPT Creator
             print_separator("STEP 4: CPT Creator")
             step4_result = step4(sample, idx, model_name, api_key, max_tokens, temperature,
-                               thinking, sleep_time, dataset_name, step3_result, step3dot5_result, batch_size=5)
+                               thinking, sleep_time, dataset_name, step3_result, step3dot5_result, batch_size=5,
+                               sample_start_time=sample_start_time, sample_timeout=sample_timeout)
         
             if step4_result.get("successful_api_call") and step4_result.get("right_format"):
                 print("✓ Step 4 completed successfully")
@@ -293,14 +352,27 @@ def main():
                     print(f"  🔢 Total tokens used: {total_tokens}")
             else:
                 error_msg = step4_result.get('error', 'Unknown error')
-                print(f"✗ Step 4 failed")
-                print(f"\n{error_msg}")
+                is_timeout = step4_result.get('timeout', False)
+                
+                if is_timeout:
+                    print(f"⏱️  Step 4 timed out")
+                    print(f"\n{error_msg}")
+                else:
+                    print(f"✗ Step 4 failed")
+                    print(f"\n{error_msg}")
                 
                 # Show generation log summary if available
                 gen_log = step4_result.get("cpt_generation_log", [])
                 if gen_log:
                     successful = sum(1 for log in gen_log if log.get('success', False))
                     print(f"\n  📊 Progress: {successful}/{len(gen_log)} nodes completed before failure")
+                continue
+            
+            # Check timeout before step 5
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 4")
                 continue
         
             # STEP 5: Bayesian Network Construction
@@ -348,6 +420,13 @@ def main():
                 validation = step5_result.get("validation_result", {})
                 if validation and validation.get("errors"):
                     print(f"\n  📋 Validation errors: {len(validation['errors'])}")
+                continue
+            
+            # Check timeout before step 6
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 5")
                 continue
         
             # STEP 6: MPE Algorithm
@@ -425,6 +504,13 @@ def main():
                     for error in validation.get("errors", [])[:5]:  # Show first 5
                         print(f"      • {error}")
                 continue
+            
+            # Check timeout before step 7
+            if is_timeout_exceeded():
+                elapsed = time.time() - sample_start_time
+                print(f"\n⏱️  TIMEOUT EXCEEDED: Sample took {elapsed:.2f}s (limit: {sample_timeout}s)")
+                print(f"⏭️  Skipping sample {idx + 1} after Step 6")
+                continue
         
             # STEP 7: Answer Extraction
             print_separator("STEP 7: Answer Extraction")
@@ -487,7 +573,9 @@ def main():
                 save_step7_result(combined_result, dataset_name, model_name)
             
             print_separator("PIPELINE COMPLETED FOR SAMPLE")
+            sample_elapsed_time = time.time() - sample_start_time
             print(f"✓ All steps completed for sample {idx + 1}")
+            print(f"⏱️  Total time: {sample_elapsed_time:.2f}s ({sample_elapsed_time / 60:.2f} minutes)")
             
             # Print summary
             print("\n📊 SUMMARY:")

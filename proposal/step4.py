@@ -141,7 +141,7 @@ def step4(sample: Dict[str, Any], idx: int, model_name: str, api_key: str, max_t
                 total_api_calls += 1
                 skipped = cpt_result.get("skipped_combinations", 0)
                 total_skipped_combinations += skipped
-                queried = len(cpt_result['cpt'].get('numerical_cpt', {})) - skipped
+                queried = len(cpt_result['cpt'].get('numerical_cpt', {}))
                 print(f"      ✅ Success! Queried {queried} CPT row(s)" + (f", skipped {skipped} (contradicts evidence)" if skipped > 0 else ""))
             else:
                 cpt_generation_log.append({
@@ -1290,7 +1290,7 @@ def _create_cpt_metadata(all_cpts: Dict[str, Any], registered_dag: Dict[str, Any
         
         # Count queried rows (non-zero probability rows)
         skipped_combos = cpt.get("skipped_combinations", [])
-        total_queried_rows += len(cpt["numerical_cpt"]) - len(skipped_combos)
+        total_queried_rows += len(cpt["numerical_cpt"])
     
     # Success statistics
     successful_generations = sum(1 for log in generation_log if log["success"])

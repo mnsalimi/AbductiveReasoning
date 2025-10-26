@@ -37,7 +37,7 @@ def main():
     model_name = "GPT-OSS-120B"
 
     dataset_name = "medqa"  # or "uniadilr"
-    n_samples = 20
+    n_samples = 100
     
     # Get model-specific configuration
     model_config = config["models"][model_name]

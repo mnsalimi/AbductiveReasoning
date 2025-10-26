@@ -65,102 +65,86 @@ prompt_templates:
   medqa_template:
     step1: |
       You are a professional medical scientist and biologist.
-      You're given a medical context and background. 
-      You should create a DAG representing the relationships between the entities in the context and all of their related entities and elements outside the context.
-      ِYou should think thoroughly and create an exhaustive DAG that includes every causal relationship that is related to the context (from the provided text or outside it. Doesn't matter). Don't even omit one. All possibilties (even low) should be included.
-      
-      For each node, you must specify if it's binary or categorical:
-      - Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
-      - Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories, otherwise use binary)
-      
+      You’re given a medical context and background.
+      You will create a focused Directed Acyclic Graph (DAG) modeling the primary causal relationships presented in the context. Your main goal is to represent the interactions between entities explicitly mentioned in the text.
+      You may introduce a small number of external nodes ONLY if they represent immediate, clinically significant causes or effects of the core entities (e.g., adding ‘Smoking’ as a cause for ‘Lung Cancer’ even if not explicitly stated). Prioritize direct and well-established relationships. Avoid including distant, speculative, or multi-step causal chains that are not central to the provided text.
+      For each node, you must specify if it’s binary or categorical:
+      Binary nodes: can only have two states (present/absent, yes/no, positive/negative)
+      Categorical nodes: can have multiple specific categories/states (MUST have at least 2 categories, otherwise use binary)
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
-      
       EXAMPLES OF CORRECT NODE DEFINITIONS:
       ✓ CORRECT: Patient_Age_Group (categorical: pediatric, young_adult, middle_aged, elderly)
       ✗ WRONG: Patient_Age_Group (categorical: elderly) ← Only one category!
-      
       ✓ CORRECT: Treatment_Type (categorical: chemotherapy, radiation, surgery, immunotherapy, combination)
       ✗ WRONG: Treatment_Type (categorical: chemotherapy) ← Only one category!
-      
       ✓ CORRECT: Disease_Severity (categorical: mild, moderate, severe, critical)
       ✗ WRONG: Disease_Severity (categorical: moderate) ← Only one category!
-      
-      ✓ CORRECT: Smoking_Status (binary)  ← Only two states: smoker/non-smoker
+      ✓ CORRECT: Smoking_Status (binary) ← Only two states: smoker/non-smoker
       ✗ WRONG: Smoking_Status (categorical: smoker) ← Should be binary!
-      
       ✓ CORRECT: Drug_Class (categorical: antibiotic, antiviral, antifungal, antiparasitic)
       ✗ WRONG: Drug_Class (categorical: antibiotic) ← Only one category!
-      
       Your output DAG should be in the exact following format:
-
       <reasoning> your full reasoning comes here </reasoning>
       <dag>
-      NODES: 
+      NODES:
       node1: node1_name (binary)
-      node2: node2_name (categorical: category1, category2, category3, ..., last_category_name)
+      node2: node2_name (categorical: category1, category2, category3, …, last_category_name)
       node3: node3_name (binary)
-      node4: node4_name (categorical: category1, category2, category3, ..., last_category_name)
-      ...
+      node4: node4_name (categorical: category1, category2, category3, …, last_category_name)
+      …
       node{last_node_number}: last_node_name (binary)
-      EDGES: 
+      EDGES:
       edge1: node{i} -> node{j}
       edge2: node{x} -> node{y}
       edge3: node{z} -> node{w}
-      ...
+      …
       edge{last_edge_number}: node{last_node_number} -> node{first_node_number}
       </dag>
 
       ** the order of tags and nodes and edges must be strictly followed. the headers for nodes and edges must be strictly followed.
-      ** for binary nodes: use format "node_name (binary)"
-      ** for categorical nodes: use format "node_name (categorical: cat1, cat2, cat3, ...)" - MUST have at least 2 categories listed
+      ** for binary nodes: use format “node_name (binary)”
+      ** for categorical nodes: use format “node_name (categorical: cat1, cat2, cat3, …)” - MUST have at least 2 categories listed
       ** IMPORTANT: if a node only has 1 or 2 possible states, use binary type instead of categorical
-      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
+      ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what’s mentioned in the context
       ** you should only output the DAG in the exact format above. No other text, no other format.
       ** obviously, all of the nodes that are mentioned in edges should be included in the NODES section.
 
+
     step2: |
-      You are a professional medical scientist and biologist.
-      You previously created a Bayesian Network (BN) Schema representing causal relationships for a medical context. Now you need to refine and enhance this BN Schema by identifying and specifying any missing nodes or edges that should be added.
+      Carefully analyze the existing BN Schema from Step 1.
+      **Focus entirely on the reasoning path required to distinguish between the given answer choices.** The answer choices are your primary guide for what is relevant.
+      Identify any missing nodes or edges that are **absolutely critical** for connecting the evidence in the context to the conclusions presented in the answer choices.
+      **Do not add nodes or edges that are simply 'medically related' in a general sense.** An addition is only justified if it directly helps in evaluating the likelihood of one answer choice over another.
+      Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema).
+      For new nodes, specify if they are binary or categorical with their categories (categorical nodes MUST have at least 2 categories, otherwise use binary).
 
-      You will be given:
-      1. The original medical context and question
-      2. The answer choices for the question
-      3. The BN Schema from Step 1
-
-      Your task is to:
-      - Carefully analyze the existing BN Schema from Step 1
-      - Consider the specific answer choices to understand what diagnostic/reasoning paths are relevant
-      - Identify any missing nodes that are medically relevant to the context and answer choices
-      - Identify any missing edges (causal relationships) that should exist
-      - Output ONLY the new nodes and edges to ADD (do NOT repeat the existing schema)
-      - Ensure your additions are medically sound and comprehensive
-      - For new nodes, specify if they are binary or categorical with their categories (categorical nodes MUST have at least 2 categories, otherwise use binary)
-      
       CRITICAL: When defining categorical nodes, think about ALL POSSIBLE VALUES the variable can take, not just the value mentioned in the context.
-      
+
       EXAMPLES OF CORRECT NODE DEFINITIONS:
       ✓ CORRECT: Imaging_Result (categorical: normal, mild_abnormality, moderate_abnormality, severe_abnormality)
       ✗ WRONG: Imaging_Result (categorical: normal) ← Only one category!
-      
+
       ✓ CORRECT: Blood_Pressure_Level (categorical: hypotensive, normal, prehypertensive, hypertensive)
       ✗ WRONG: Blood_Pressure_Level (categorical: hypertensive) ← Only one category!
-      
+
       ✓ CORRECT: Diabetes_Present (binary)  ← Only two states: present/absent
       ✗ WRONG: Diabetes_Present (categorical: present) ← Should be binary!
-      
+
       ✓ CORRECT: Cancer_Stage (categorical: stage_I, stage_II, stage_III, stage_IV)
       ✗ WRONG: Cancer_Stage (categorical: stage_III) ← Only one category!
 
       Your output should be in the exact following format:
 
-      <analysis> your detailed analysis of what is missing from the original BN Schema and why these additions are necessary </analysis>
+      <analysis>
+      your detailed analysis of what is missing from the original BN Schema and why these additions are **necessary for differentiating between the given answer choices**.
+      </analysis>
       <additions>
-      NEW_NODES: 
+      NEW_NODES:
       node{N+1}: new_node1_name (binary)
       node{N+2}: new_node2_name (categorical: category1, category2, category3, ..., last_category_name)
       ...
       node{last_new_node_number}: last_new_node_name (binary|categorical: category1, category2, category3, ..., last_category_name)
-      NEW_EDGES: 
+      NEW_EDGES:
       edge{M+1}: node{i} -> node{j}
       edge{M+2}: node{x} -> node{y}
       ...
@@ -178,6 +162,7 @@ prompt_templates:
       ** REMEMBER: Define categories as ALL POSSIBLE VALUES, not just what's mentioned in the context
       ** The order of tags must be strictly followed: <analysis> then <additions> with NEW_NODES before NEW_EDGES
       ** Obviously, all nodes mentioned in new edges must either exist in Step 1 or be defined in NEW_NODES section
+
 
     step2dot5: |
       You are a professional medical scientist and biologist.

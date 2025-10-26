@@ -154,10 +154,64 @@ def main():
                 print("✓ Step 2 completed successfully")
                 refined_nodes = step2_result["model_answer"].get("nodes", [])
                 refined_edges = step2_result["model_answer"].get("edges", [])
-                print(f"  📊 Refined nodes: {len(refined_nodes)} (added {len(refined_nodes) - len(nodes)})")
-                print(f"  🔗 Refined edges: {len(refined_edges)} (added {len(refined_edges) - len(edges)})")
+                
+                # Compare with Step 1 to find additions/modifications using node names
+                old_node_names = {node['name'] for node in nodes}
+                new_node_names = {node['name'] for node in refined_nodes}
+                added_node_names = new_node_names - old_node_names
+                removed_node_names = old_node_names - new_node_names
+                
+                # Find modified nodes (same name but different properties)
+                modified_node_names = set()
+                old_nodes_dict = {node['name']: node for node in nodes}
+                new_nodes_dict = {node['name']: node for node in refined_nodes}
+                for node_name in old_node_names & new_node_names:
+                    old_node = old_nodes_dict[node_name]
+                    new_node = new_nodes_dict[node_name]
+                    if old_node != new_node:
+                        modified_node_names.add(node_name)
+                
+                # Compare edges (edges are strings like "node1 -> node2")
+                old_edges_set = set(edges)
+                new_edges_set = set(refined_edges)
+                added_edges = new_edges_set - old_edges_set
+                removed_edges = old_edges_set - new_edges_set
+                
+                print(f"  📊 Refined nodes: {len(refined_nodes)} (added {len(added_node_names)}, modified {len(modified_node_names)}, removed {len(removed_node_names)})")
+                print(f"  🔗 Refined edges: {len(refined_edges)} (added {len(added_edges)}, removed {len(removed_edges)})")
+                
+                # Display all nodes with their types and categories
+                print(f"\n  📋 All nodes after refinement:")
+                for idx_node, node in enumerate(refined_nodes, 1):
+                    node_id = f"node{idx_node}"
+                    node_name = node['name']
+                    node_type = node['type']
+                    status = ""
+                    if node_name in added_node_names:
+                        status = " [NEW]"
+                    elif node_name in modified_node_names:
+                        status = " [MODIFIED]"
+                    
+                    if node_type == "binary":
+                        print(f"      • {node_id}: '{node_name}' (binary){status}")
+                    else:
+                        categories = node.get('categories', [])
+                        print(f"      • {node_id}: '{node_name}' (categorical, {len(categories)} categories: {categories}){status}")
+                
+                # Display edge changes if any
+                if added_edges or removed_edges:
+                    print(f"\n  🔗 Edge changes:")
+                    if added_edges:
+                        print(f"      Added edges:")
+                        for edge in sorted(added_edges):
+                            print(f"        ➕ {edge}")
+                    if removed_edges:
+                        print(f"      Removed edges:")
+                        for edge in sorted(removed_edges):
+                            print(f"        ➖ {edge}")
+                
                 if step2_result.get("token_usage"):
-                    print(f"  🔢 Tokens used: {step2_result['token_usage'].get('total_tokens', 0)}")
+                    print(f"\n  🔢 Tokens used: {step2_result['token_usage'].get('total_tokens', 0)}")
             else:
                 print(f"✗ Step 2 failed: {step2_result.get('error', 'Unknown error')}")
                 continue
@@ -181,14 +235,71 @@ def main():
                 modifications = step2dot5_result["model_answer"].get("modifications_summary", {})
                 options_node = step2dot5_result.get("options_node")
                 
-                print(f"  📊 Final nodes: {len(modified_nodes)}")
-                print(f"  🔗 Final edges: {len(modified_edges)}")
-                print(f"  ➖ Nodes removed: {modifications.get('nodes_removed_count', 0)}")
-                print(f"  ➕ Nodes added: {modifications.get('nodes_added_count', 0)}")
-                print(f"  ➖ Edges removed: {modifications.get('edges_removed_count', 0)}")
-                print(f"  ➕ Edges added: {modifications.get('edges_added_count', 0)}")
+                # Compare with Step 2 to find additions/modifications/deletions using node names
+                old_node_names = {node['name'] for node in refined_nodes}
+                new_node_names = {node['name'] for node in modified_nodes}
+                added_node_names = new_node_names - old_node_names
+                removed_node_names = old_node_names - new_node_names
+                
+                # Find modified nodes (same name but different properties)
+                modified_node_names = set()
+                old_nodes_dict = {node['name']: node for node in refined_nodes}
+                new_nodes_dict = {node['name']: node for node in modified_nodes}
+                for node_name in old_node_names & new_node_names:
+                    old_node = old_nodes_dict[node_name]
+                    new_node = new_nodes_dict[node_name]
+                    if old_node != new_node:
+                        modified_node_names.add(node_name)
+                
+                # Compare edges (edges are strings like "node1 -> node2")
+                old_edges_set = set(refined_edges)
+                new_edges_set = set(modified_edges)
+                added_edges = new_edges_set - old_edges_set
+                removed_edges = old_edges_set - new_edges_set
+                
+                print(f"  📊 Final nodes: {len(modified_nodes)} (added {len(added_node_names)}, modified {len(modified_node_names)}, removed {len(removed_node_names)})")
+                print(f"  🔗 Final edges: {len(modified_edges)} (added {len(added_edges)}, removed {len(removed_edges)})")
+                
+                # Display all nodes with their types and categories
+                print(f"\n  📋 All nodes after option refinement:")
+                for idx_node, node in enumerate(modified_nodes, 1):
+                    node_id = f"node{idx_node}"
+                    node_name = node['name']
+                    node_type = node['type']
+                    status = ""
+                    if node_name in added_node_names:
+                        status = " [NEW]"
+                    elif node_name in modified_node_names:
+                        status = " [MODIFIED]"
+                    
+                    # Highlight the options node
+                    is_options = options_node and node_name == options_node.get('name')
+                    if is_options:
+                        status += " 🎯"
+                    
+                    if node_type == "binary":
+                        print(f"      • {node_id}: '{node_name}' (binary){status}")
+                    else:
+                        categories = node.get('categories', [])
+                        print(f"      • {node_id}: '{node_name}' (categorical, {len(categories)} categories: {categories}){status}")
+                
+                # Display edge changes if any
+                if added_edges or removed_edges:
+                    print(f"\n  🔗 Edge changes:")
+                    if removed_edges:
+                        print(f"      Removed edges:")
+                        for edge in sorted(removed_edges):
+                            print(f"        ➖ {edge}")
+                    if added_edges:
+                        print(f"      Added edges:")
+                        for edge in sorted(added_edges):
+                            print(f"        ➕ {edge}")
+                
                 if options_node:
-                    print(f"  🎯 Options node: '{options_node['name']}' with {len(options_node.get('categories', []))} categories")
+                    options_node_idx = next((i+1 for i, n in enumerate(modified_nodes) if n['name'] == options_node['name']), None)
+                    options_node_id = f"node{options_node_idx}" if options_node_idx else "unknown"
+                    print(f"\n  🎯 Options node: '{options_node['name']}' ({options_node_id}) with {len(options_node.get('categories', []))} categories")
+                
                 if step2dot5_result.get("token_usage"):
                     print(f"  🔢 Tokens used: {step2dot5_result['token_usage'].get('total_tokens', 0)}")
             else:

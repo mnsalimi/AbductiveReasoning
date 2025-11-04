@@ -53,3 +53,7 @@ proposal/debug_outputs/*
 *.png
 
 GRPO/dataset
+GRPO/unsloth_compiled_cache
+GRPO/training_log.log
+
+nimavenv

@@ -1,0 +1,871 @@
+#!/usr/bin/env python3
+"""
+AIMO Dataset Evaluation: Raw vs Fine-tuned Model
+
+Evaluates models on the AIMO (AI Mathematical Olympiad) dataset.
+
+Usage:
+    python evaluate_aimo_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
+"""
+
+import os
+import json
+import argparse
+import re
+from datetime import datetime
+from tqdm import tqdm
+import torch
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
+import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
+# Allow path injection from orchestrator
+RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
+    "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
+TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
+    "/home/moein_salimi/users/Nima/abductive_reasoning_finetuning/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
+CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
+OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
+    "/home/moein_salimi/users/Nima/abductive_reasoning_finetuning/aimo_evaluation_results")  # Change default per script
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+def find_best_checkpoint(training_dir):
+    """Find the best checkpoint based on validation metrics."""
+    print("\n📁 Finding best checkpoint...")
+    
+    val_metrics_path = os.path.join(training_dir, "val_metrics.json")
+    checkpoint_dir = os.path.join(training_dir, "checkpoint")
+    
+    if not os.path.exists(val_metrics_path):
+        print(f"⚠️  No val_metrics.json found, using latest checkpoint")
+        checkpoints = [d for d in os.listdir(checkpoint_dir) 
+                      if d.startswith('checkpoint-') and os.path.isdir(os.path.join(checkpoint_dir, d))]
+        if checkpoints:
+            latest = max(checkpoints, key=lambda x: int(x.split('-')[1]))
+            return os.path.join(checkpoint_dir, latest), 0.0
+        return None, 0.0
+    
+    with open(val_metrics_path, 'r') as f:
+        val_metrics = json.load(f)
+    
+    # Find epoch with highest avg_reward
+    best_epoch = None
+    best_score = 0.0
+    
+    for epoch_str, metrics in val_metrics.items():
+        if metrics['avg_reward'] > best_score:
+            best_score = metrics['avg_reward']
+            best_epoch = float(epoch_str)
+    
+    if best_epoch is None:
+        print("⚠️  No valid metrics found, using latest checkpoint")
+        checkpoints = [d for d in os.listdir(checkpoint_dir) 
+                      if d.startswith('checkpoint-') and os.path.isdir(os.path.join(checkpoint_dir, d))]
+        if checkpoints:
+            latest = max(checkpoints, key=lambda x: int(x.split('-')[1]))
+            return os.path.join(checkpoint_dir, latest), 0.0
+        return None, 0.0
+    
+    # Find closest checkpoint
+    checkpoints = [d for d in os.listdir(checkpoint_dir) 
+                  if d.startswith('checkpoint-') and os.path.isdir(os.path.join(checkpoint_dir, d))]
+    
+    if not checkpoints:
+        return None, 0.0
+    
+    checkpoint_steps = [(int(cp.split('-')[1]), cp) for cp in checkpoints]
+    checkpoint_steps.sort()
+    
+    max_checkpoint_step = max(checkpoint_steps)[0]
+    estimated_steps_per_epoch = max_checkpoint_step / 20.0
+    target_step = int(best_epoch * estimated_steps_per_epoch)
+    
+    best_checkpoint = min(checkpoint_steps, key=lambda x: abs(x[0] - target_step))
+    checkpoint_path = os.path.join(checkpoint_dir, best_checkpoint[1])
+    
+    print(f"✅ Best checkpoint: {best_checkpoint[1]}")
+    print(f"   Validation score: {best_score:.4f} at epoch {best_epoch:.2f}")
+    
+    return checkpoint_path, best_score
+
+def load_raw_model(device):
+    """Load the raw/base model."""
+    print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
+    
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        RAW_MODEL_PATH,
+        torch_dtype=torch.float16,
+        device_map={"": f"cuda:{device}"},
+        trust_remote_code=True,
+        load_in_4bit=True,
+    )
+    
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    model.eval()
+    print("✅ Raw model loaded successfully")
+    
+    return model, tokenizer
+
+def load_finetuned_model(checkpoint_path, device):
+    """Load the fine-tuned model with LoRA adapter."""
+    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
+    
+    # Load base model
+    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    
+    base_model = AutoModelForCausalLM.from_pretrained(
+        RAW_MODEL_PATH,
+        torch_dtype=torch.float16,
+        device_map={"": f"cuda:{device}"},
+        trust_remote_code=True,
+        load_in_4bit=True,
+    )
+    
+    # Load LoRA adapter
+    model = PeftModel.from_pretrained(base_model, checkpoint_path)
+    
+    if base_tokenizer.pad_token is None:
+        base_tokenizer.pad_token = base_tokenizer.eos_token
+    
+    model.eval()
+    print("✅ Fine-tuned model loaded successfully")
+    
+    return model, base_tokenizer
+
+def create_aimo_prompt(problem):
+    """Create a prompt for AIMO problem - handles LaTeX properly."""
+    system_prompt = """You are an expert mathematician specializing in competition mathematics (AMC, AIME, etc.).
+
+IMPORTANT INSTRUCTIONS:
+- Read the problem carefully, including all LaTeX mathematical notation
+- Solve the problem step by step
+- Provide your final answer as a single number
+- Format your final answer clearly as: "The answer is: [number]" or "Answer: [number]"
+- If the answer is a fraction, you can give it as a decimal or as "a/b"
+- Do not include any units or additional text after the number
+"""
+    
+    user_prompt = f"""Problem:
+{problem}
+
+Solve this problem and provide your final numerical answer."""
+    
+    return system_prompt, user_prompt
+
+
+def extract_answer(response):
+    """Extract the numerical answer from model response."""
+    response = response.strip()
+    
+    # Try to find various answer patterns
+    patterns = [
+        r'\\boxed\{([^}]+)\}',  # LaTeX boxed: \boxed{answer}
+        r'####\s*([^\n]+)',  # MATH dataset format: #### answer
+        r'(?:final\s+)?answer\s*:?\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)',  # "Answer: 142"
+        r'(?:the\s+)?answer\s+is\s*:?\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)',  # "The answer is: 142"
+        r'therefore\s*,?\s*(?:the\s+answer\s+is\s*)?\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)',  # "Therefore, 142"
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, response, re.IGNORECASE)
+        if matches:
+            answer = matches[-1].strip()
+            answer = answer.replace('$', '').replace(',', '').strip()
+            return answer
+    
+    # Look in the last 300 characters for any number
+    last_part = response[-300:]
+    
+    # Look for = number at the end
+    eq_match = re.search(r'=\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)\s*\.?\s*$', last_part)
+    if eq_match:
+        return eq_match.group(1).strip()
+    
+    # Look for standalone number in the last few lines
+    lines = response.split('\n')
+    for line in reversed(lines[-5:]):
+        line = line.strip()
+        if line:
+            # Match standalone number (possibly with decimal or fraction)
+            num_match = re.search(r'^([+-]?\d+(?:\.\d+)?(?:/\d+)?)\.?\s*$', line)
+            if num_match:
+                return num_match.group(1)
+            
+            # Match number after common answer indicators
+            indicator_match = re.search(r'(?:answer|result|solution)\s*:?\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)', line, re.IGNORECASE)
+            if indicator_match:
+                return indicator_match.group(1)
+    
+    return None
+
+
+def normalize_answer(ans):
+    """Normalize answers for comparison - handles integers, decimals, and fractions."""
+    if ans is None:
+        return None
+    
+    ans = str(ans).strip().lower()
+    
+    # Remove dollar signs, spaces, commas
+    ans = ans.replace('$', '').replace(' ', '').replace(',', '')
+    
+    # Handle LaTeX fractions: \frac{a}{b} -> a/b
+    ans = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1/\2', ans)
+    
+    # Remove other LaTeX commands
+    ans = ans.replace('\\', '')
+    
+    # Try to evaluate fractions to compare as floats
+    if '/' in ans:
+        try:
+            parts = ans.split('/')
+            if len(parts) == 2:
+                numerator = float(parts[0])
+                denominator = float(parts[1])
+                if denominator != 0:
+                    return str(numerator / denominator)
+        except:
+            pass
+    
+    # Try to convert to float for comparison
+    try:
+        return str(float(ans))
+    except:
+        return ans
+
+
+def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="test"):
+    """Evaluate model on AIMO dataset."""
+    print(f"\n🔍 Evaluating {model_name} on AIMO dataset...")
+    
+    # Load dataset
+    try:
+        dataset = load_dataset("AI-MO/aimo-validation-amc", split="train")
+        print(f"✅ Loaded {len(dataset)} samples from AIMO validation (AMC) dataset")
+        
+        # Debug: Print sample
+        print(f"\n📋 Sample from dataset:")
+        print(f"   Problem: {dataset[0]['problem'][:150]}...")
+        print(f"   Answer: {dataset[0]['answer']}")
+        print(f"   Answer type: {type(dataset[0]['answer'])}")
+        
+    except Exception as e:
+        print(f"❌ Error loading dataset: {e}")
+        return None
+    
+    if max_samples:
+        dataset = dataset.select(range(min(max_samples, len(dataset))))
+        print(f"📊 Evaluating on {len(dataset)} samples (limited)")
+    
+    results = []
+    correct = 0
+    total = 0
+    failed_extractions = 0
+    
+    # Process in batches
+    for batch_start in tqdm(range(0, len(dataset), batch_size), desc=f"Evaluating {model_name}"):
+        batch_end = min(batch_start + batch_size, len(dataset))
+        
+        # Get individual samples for this batch
+        batch_prompts = []
+        batch_true_answers = []
+        batch_problems = []
+        
+        for idx in range(batch_start, batch_end):
+            sample = dataset[idx]
+            system_prompt, user_prompt = create_aimo_prompt(sample['problem'])
+            
+            try:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+                formatted_prompt = tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+            except:
+                formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
+            
+            batch_prompts.append(formatted_prompt)
+            batch_true_answers.append(str(sample['answer']))
+            batch_problems.append(sample['problem'])
+        
+        # Tokenize batch with padding
+        inputs = tokenizer(
+            batch_prompts, 
+            return_tensors="pt", 
+            truncation=True, 
+            max_length=2048,
+            padding=True
+        )
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        
+        # Generate for batch
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=1024,
+                temperature=0.1,
+                do_sample=True,
+                top_p=0.95,
+                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+            )
+        
+        # Decode each response in batch
+        input_lengths = inputs['input_ids'].shape[1]
+        for i in range(len(batch_prompts)):
+            response = tokenizer.decode(outputs[i][input_lengths:], skip_special_tokens=True)
+            
+            true_answer = batch_true_answers[i]
+            problem = batch_problems[i]
+            idx = batch_start + i
+            
+            # Extract answer
+            predicted_answer = extract_answer(response)
+            
+            if predicted_answer is None:
+                failed_extractions += 1
+                predicted_answer = "FAILED_EXTRACTION"
+            
+            # Normalize and compare
+            norm_true = normalize_answer(true_answer)
+            norm_pred = normalize_answer(predicted_answer)
+            
+            # Compare with tolerance for floating point
+            is_correct = False
+            if norm_true and norm_pred and norm_pred != "failed_extraction":
+                try:
+                    true_val = float(norm_true)
+                    pred_val = float(norm_pred)
+                    # Allow small tolerance for floating point comparison
+                    is_correct = abs(true_val - pred_val) < 0.01
+                except:
+                    is_correct = norm_pred == norm_true
+            
+            if is_correct:
+                correct += 1
+            total += 1
+            
+            # Debug: Print first 3 comparisons
+            if idx < 3:
+                print(f"\n{'='*60}")
+                print(f"Sample {idx}:")
+                print(f"Problem: {problem[:200]}...")
+                print(f"True answer: {true_answer}")
+                print(f"Predicted answer: {predicted_answer}")
+                print(f"Normalized true: {norm_true}")
+                print(f"Normalized pred: {norm_pred}")
+                print(f"Correct: {is_correct}")
+                print(f"Response excerpt: {response[-200:]}")
+                print(f"{'='*60}")
+            
+            results.append({
+                'problem_id': idx,
+                'problem': problem,
+                'true_answer': true_answer,
+                'predicted_answer': predicted_answer,
+                'response': response,
+                'correct': is_correct
+            })
+    
+    accuracy = correct / total if total > 0 else 0.0
+    extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
+    
+    print(f"\n📊 {model_name} Results:")
+    print(f"   Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
+    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
+    print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
+    
+    return {
+        'accuracy': accuracy,
+        'correct': correct,
+        'total': total,
+        'failed_extractions': failed_extractions,
+        'extraction_rate': extraction_rate,
+        'results': results
+    }
+
+
+
+def save_results(raw_results, finetuned_results, best_checkpoint_info, output_dir):
+    """Save evaluation results to JSON files."""
+    os.makedirs(output_dir, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Save raw model results
+    raw_output = {
+        'model': RAW_MODEL_PATH,
+        'evaluation_time': timestamp,
+        'dataset': 'AIMO',
+        'metrics': {
+            'accuracy': raw_results['accuracy'],
+            'extraction_rate': raw_results['extraction_rate']
+        },
+        'correct': raw_results['correct'],
+        'total': raw_results['total'],
+        'failed_extractions': raw_results['failed_extractions'],
+        'detailed_results': raw_results['results']
+    }
+    
+    raw_file = os.path.join(output_dir, f"raw_model_aimo_results_{timestamp}.json")
+    with open(raw_file, 'w') as f:
+        json.dump(raw_output, f, indent=2)
+    print(f"\n💾 Raw model results saved to: {raw_file}")
+    
+    # Save fine-tuned model results
+    finetuned_output = {
+        'base_model': RAW_MODEL_PATH,
+        'checkpoint': best_checkpoint_info['path'],
+        'validation_score': best_checkpoint_info['score'],
+        'evaluation_time': timestamp,
+        'dataset': 'AIMO',
+        'metrics': {
+            'accuracy': finetuned_results['accuracy'],
+            'extraction_rate': finetuned_results['extraction_rate']
+        },
+        'correct': finetuned_results['correct'],
+        'total': finetuned_results['total'],
+        'failed_extractions': finetuned_results['failed_extractions'],
+        'detailed_results': finetuned_results['results']
+    }
+    
+    finetuned_file = os.path.join(output_dir, f"finetuned_model_aimo_results_{timestamp}.json")
+    with open(finetuned_file, 'w') as f:
+        json.dump(finetuned_output, f, indent=2)
+    print(f"💾 Fine-tuned model results saved to: {finetuned_file}")
+    
+    # Save comparison summary
+    improvement = finetuned_results['accuracy'] - raw_results['accuracy']
+    relative_improvement = (improvement / raw_results['accuracy'] * 100) if raw_results['accuracy'] > 0 else 0
+    
+    extraction_improvement = finetuned_results['extraction_rate'] - raw_results['extraction_rate']
+    
+    summary = {
+        'evaluation_time': timestamp,
+        'dataset': 'AIMO',
+        'split': 'test',
+        'num_samples': raw_results['total'],
+        'raw_model': {
+            'path': RAW_MODEL_PATH,
+            'metrics': {
+                'accuracy': raw_results['accuracy'],
+                'extraction_rate': raw_results['extraction_rate']
+            },
+            'correct': raw_results['correct'],
+            'total': raw_results['total'],
+            'failed_extractions': raw_results['failed_extractions']
+        },
+        'finetuned_model': {
+            'base_model': RAW_MODEL_PATH,
+            'checkpoint': best_checkpoint_info['path'],
+            'validation_score': best_checkpoint_info['score'],
+            'metrics': {
+                'accuracy': finetuned_results['accuracy'],
+                'extraction_rate': finetuned_results['extraction_rate']
+            },
+            'correct': finetuned_results['correct'],
+            'total': finetuned_results['total'],
+            'failed_extractions': finetuned_results['failed_extractions']
+        },
+        'comparison': {
+            'accuracy_improvement': improvement,
+            'accuracy_relative_improvement_percent': relative_improvement,
+            'extraction_improvement': extraction_improvement,
+            'overall_improved': improvement > 0
+        }
+    }
+    
+    summary_file = os.path.join(output_dir, f"aimo_comparison_summary_{timestamp}.json")
+    with open(summary_file, 'w') as f:
+        json.dump(summary, f, indent=2)
+    print(f"💾 Comparison summary saved to: {summary_file}")
+    
+    return summary
+
+def evaluate_all_checkpoints(args):
+    """Evaluate all checkpoints in a directory."""
+    checkpoint_dir = args.checkpoint_dir
+    
+    # Handle relative vs absolute paths
+    if not os.path.isabs(checkpoint_dir):
+        checkpoint_dir = os.path.abspath(checkpoint_dir)
+    
+    if not os.path.exists(checkpoint_dir):
+        print(f"❌ Error: Checkpoint directory does not exist: {checkpoint_dir}")
+        return
+    
+    print("="*80)
+    print("🚀 AIMO EVALUATION: ALL CHECKPOINTS")
+    print("="*80)
+    print(f"Checkpoint Directory: {checkpoint_dir}")
+    print(f"CUDA Device: {args.cuda_device}")
+    print(f"Batch Size: {args.batch_size}")
+    print(f"Split: {args.split}")
+    if args.max_samples:
+        print(f"Max Samples: {args.max_samples}")
+    print("="*80)
+    
+    # Find all checkpoint directories
+    all_items = os.listdir(checkpoint_dir)
+    checkpoint_dirs = [
+        d for d in all_items 
+        if d.startswith('checkpoint-') and os.path.isdir(os.path.join(checkpoint_dir, d))
+    ]
+    
+    if not checkpoint_dirs:
+        print(f"❌ No checkpoint directories found in: {checkpoint_dir}")
+        print(f"   Looking for directories named 'checkpoint-*'")
+        return
+    
+    # Sort checkpoints by number
+    checkpoint_dirs.sort(key=lambda x: int(x.split('-')[1]))
+    
+    print(f"\n📁 Found {len(checkpoint_dirs)} checkpoints:")
+    for ckpt in checkpoint_dirs:
+        print(f"   - {ckpt}")
+    print()
+    
+    # Optionally evaluate raw model once
+    raw_results = None
+    if not args.skip_raw:
+        print("\n" + "="*80)
+        print("🤖 EVALUATING RAW MODEL (once)")
+        print("="*80)
+        raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
+        raw_results = evaluate_on_aimo(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size, args.split)
+        if raw_results is None:
+            print("❌ Failed to evaluate raw model")
+            return
+        del raw_model
+        torch.cuda.empty_cache()
+        print(f"\n✅ Raw model evaluation complete")
+        print(f"   Accuracy: {raw_results['accuracy']:.4f} ({raw_results['accuracy']*100:.2f}%)")
+    
+    # Evaluate each checkpoint
+    all_checkpoint_results = []
+    
+    for i, ckpt_name in enumerate(checkpoint_dirs, 1):
+        checkpoint_path = os.path.join(checkpoint_dir, ckpt_name)
+        
+        print("\n" + "="*80)
+        print(f"🎯 EVALUATING CHECKPOINT {i}/{len(checkpoint_dirs)}: {ckpt_name}")
+        print("="*80)
+        
+        try:
+            # Load and evaluate checkpoint
+            finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
+            finetuned_results = evaluate_on_aimo(
+                finetuned_model, finetuned_tokenizer, args.max_samples, 
+                f"{ckpt_name}", args.batch_size, args.split
+            )
+            
+            if finetuned_results is None:
+                print(f"❌ Failed to evaluate {ckpt_name}")
+                continue
+                
+            del finetuned_model
+            torch.cuda.empty_cache()
+            
+            # Store results
+            checkpoint_info = {
+                'checkpoint_name': ckpt_name,
+                'checkpoint_path': checkpoint_path,
+                'results': finetuned_results
+            }
+            all_checkpoint_results.append(checkpoint_info)
+            
+            print(f"\n✅ {ckpt_name} evaluation complete")
+            print(f"   Accuracy: {finetuned_results['accuracy']:.4f} ({finetuned_results['accuracy']*100:.2f}%) - {finetuned_results['correct']}/{finetuned_results['total']} correct")
+            print(f"   Extraction Rate: {finetuned_results['extraction_rate']:.4f} ({finetuned_results['extraction_rate']*100:.2f}%)")
+            
+            # Show improvement vs raw model if available
+            if raw_results:
+                acc_improvement = finetuned_results['accuracy'] - raw_results['accuracy']
+                ext_improvement = finetuned_results['extraction_rate'] - raw_results['extraction_rate']
+                print(f"   📈 Improvement vs Raw: Accuracy {acc_improvement:+.4f} ({acc_improvement*100:+.2f}%), Extraction {ext_improvement:+.4f} ({ext_improvement*100:+.2f}%)")
+            
+        except Exception as e:
+            print(f"❌ Error evaluating {ckpt_name}: {e}")
+            continue
+    
+    # Save all results
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # Create summary comparison
+    print("\n" + "="*80)
+    print("📊 SUMMARY: ALL CHECKPOINTS COMPARISON (AIMO)")
+    print("="*80)
+    
+    if raw_results:
+        print(f"\n🤖 RAW MODEL:")
+        print(f"   Accuracy:        {raw_results['accuracy']:.4f} ({raw_results['accuracy']*100:.2f}%)")
+        print(f"   Extraction Rate: {raw_results['extraction_rate']:.4f} ({raw_results['extraction_rate']*100:.2f}%)")
+    
+    print(f"\n🎯 FINE-TUNED CHECKPOINTS:")
+    if raw_results:
+        print(f"   {'Checkpoint':<20} {'Accuracy':<15} {'Extraction':<15} {'Acc Δ':<12} {'Ext Δ':<12}")
+        print(f"   {'-'*80}")
+        
+        for ckpt_info in all_checkpoint_results:
+            res = ckpt_info['results']
+            acc_delta = res['accuracy'] - raw_results['accuracy']
+            ext_delta = res['extraction_rate'] - raw_results['extraction_rate']
+            
+            print(f"   {ckpt_info['checkpoint_name']:<20} "
+                  f"{res['accuracy']:.4f} ({res['accuracy']*100:5.2f}%) "
+                  f"{res['extraction_rate']:.4f}         "
+                  f"{acc_delta:+.4f}      "
+                  f"{ext_delta:+.4f}")
+    else:
+        print(f"   {'Checkpoint':<20} {'Accuracy':<15} {'Extraction Rate':<15}")
+        print(f"   {'-'*60}")
+        
+        for ckpt_info in all_checkpoint_results:
+            res = ckpt_info['results']
+            print(f"   {ckpt_info['checkpoint_name']:<20} "
+                  f"{res['accuracy']:.4f} ({res['accuracy']*100:5.2f}%) "
+                  f"{res['extraction_rate']:.4f} ({res['extraction_rate']*100:5.2f}%)")
+    
+    # Find best checkpoint
+    if all_checkpoint_results:
+        best_ckpt = max(all_checkpoint_results, key=lambda x: x['results']['accuracy'])
+        print(f"\n🏆 BEST CHECKPOINT: {best_ckpt['checkpoint_name']}")
+        print(f"   Accuracy: {best_ckpt['results']['accuracy']:.4f} ({best_ckpt['results']['accuracy']*100:.2f}%)")
+        print(f"   Extraction Rate: {best_ckpt['results']['extraction_rate']:.4f} ({best_ckpt['results']['extraction_rate']*100:.2f}%)")
+        
+        if raw_results:
+            best_acc_imp = best_ckpt['results']['accuracy'] - raw_results['accuracy']
+            best_rel_imp = (best_acc_imp / raw_results['accuracy'] * 100) if raw_results['accuracy'] > 0 else 0
+            print(f"   📈 Improvement vs Raw: Accuracy {best_acc_imp:+.4f} ({best_acc_imp*100:+.2f}%), Relative {best_rel_imp:+.2f}%")
+    
+    # Save detailed results to JSON
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    summary_data = {
+        'evaluation_time': timestamp,
+        'dataset': 'AIMO',
+        'split': args.split,
+        'checkpoint_directory': checkpoint_dir,
+        'num_checkpoints_evaluated': len(all_checkpoint_results),
+        'raw_model': {
+            'path': RAW_MODEL_PATH,
+            'results': raw_results if raw_results else 'not_evaluated'
+        },
+        'checkpoints': [
+            {
+                'name': ckpt_info['checkpoint_name'],
+                'path': ckpt_info['checkpoint_path'],
+                'metrics': {
+                    'accuracy': ckpt_info['results']['accuracy'],
+                    'extraction_rate': ckpt_info['results']['extraction_rate']
+                },
+                'improvements_vs_raw': {
+                    'accuracy_delta': ckpt_info['results']['accuracy'] - raw_results['accuracy'] if raw_results else None,
+                    'extraction_delta': ckpt_info['results']['extraction_rate'] - raw_results['extraction_rate'] if raw_results else None
+                } if raw_results else None
+            }
+            for ckpt_info in all_checkpoint_results
+        ]
+    }
+    
+    summary_file = os.path.join(OUTPUT_DIR, f"aimo_all_checkpoints_summary_{timestamp}.json")
+    with open(summary_file, 'w') as f:
+        json.dump(summary_data, f, indent=2)
+    
+    print(f"\n💾 All results saved to: {summary_file}")
+    print("="*80 + "\n")
+
+def print_comparison(summary):
+    """Print formatted comparison results."""
+    print("\n" + "="*80)
+    print("📊 AIMO EVALUATION: RAW vs FINE-TUNED MODEL")
+    print("="*80)
+    
+    raw_metrics = summary['raw_model']['metrics']
+    ft_metrics = summary['finetuned_model']['metrics']
+    
+    print("\n🤖 RAW MODEL:")
+    print(f"   Accuracy:  {raw_metrics['accuracy']:.4f} ({raw_metrics['accuracy']*100:.2f}%) - {summary['raw_model']['correct']}/{summary['raw_model']['total']} correct")
+    print(f"   Extraction Rate: {raw_metrics['extraction_rate']:.4f} ({raw_metrics['extraction_rate']*100:.2f}%)")
+    
+    print("\n🎯 FINE-TUNED MODEL:")
+    print(f"   Checkpoint: {os.path.basename(summary['finetuned_model']['checkpoint'])}")
+    val_score = summary['finetuned_model']['validation_score']
+    val_score_str = f"{val_score:.4f}" if isinstance(val_score, (int, float)) else str(val_score)
+    print(f"   Validation Score: {val_score_str}")
+    print(f"   Accuracy:  {ft_metrics['accuracy']:.4f} ({ft_metrics['accuracy']*100:.2f}%) - {summary['finetuned_model']['correct']}/{summary['finetuned_model']['total']} correct")
+    print(f"   Extraction Rate: {ft_metrics['extraction_rate']:.4f} ({ft_metrics['extraction_rate']*100:.2f}%)")
+    
+    print("\n📈 IMPROVEMENTS:")
+    comp = summary['comparison']
+    acc_imp = comp['accuracy_improvement']
+    acc_rel = comp['accuracy_relative_improvement_percent']
+    ext_imp = comp['extraction_improvement']
+    
+    print(f"   Accuracy:  {acc_imp:+.4f} ({acc_imp*100:+.2f}%) | Relative: {acc_rel:+.2f}%")
+    print(f"   Extraction: {ext_imp:+.4f} ({ext_imp*100:+.2f}%)")
+    
+    print("\n" + "-"*80)
+    
+    if comp['overall_improved']:
+        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on AIMO!")
+        print(f"   • Accuracy improved by {acc_rel:.2f}% (relative)")
+        print(f"   The model shows better olympiad-level math problem solving ability.")
+    elif acc_imp < 0:
+        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on AIMO.")
+        print(f"   • Accuracy decreased by {acc_rel:.2f}% (relative)")
+        print(f"   • This suggests potential overfitting to your training data.")
+    else:
+        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on AIMO performance.")
+        print(f"   The model maintained baseline olympiad math problem solving ability.")
+    
+    print("="*80 + "\n")
+
+def main():
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIMO dataset')
+    parser.add_argument('--max_samples', type=int, default=None, 
+                       help='Maximum number of samples to evaluate (default: all samples)')
+    parser.add_argument('--cuda_device', type=str, default='0',
+                       help='CUDA device to use (default: 0)')
+    parser.add_argument('--batch_size', type=int, default=1,
+                       help='Batch size for evaluation. Higher values (4-8) are faster but use more GPU memory (default: 1)')
+    parser.add_argument('--split', type=str, default='test', choices=['train', 'test', 'validation'],
+                       help='Dataset split to use (default: test)')
+    parser.add_argument('--skip_raw', action='store_true',
+                       help='Skip raw model evaluation (evaluate only fine-tuned model)')
+    parser.add_argument('--skip_finetuned', action='store_true',
+                       help='Skip fine-tuned model evaluation (evaluate only raw model)')
+    parser.add_argument('--checkpoint_path', type=str, default=None,
+                       help='Path to specific checkpoint to evaluate (e.g., /path/to/checkpoint-640). '
+                            'If not provided, automatically selects the best checkpoint based on validation metrics.')
+    parser.add_argument('--checkpoint_dir', type=str, default=None,
+                       help='Path to directory containing multiple checkpoints (e.g., /path/to/checkpoint/). '
+                            'Will evaluate ALL checkpoint-* directories found. Cannot be used with --checkpoint_path.')
+    
+    args = parser.parse_args()
+    
+    # Validate arguments
+    if args.checkpoint_path and args.checkpoint_dir:
+        print("❌ Error: Cannot use both --checkpoint_path and --checkpoint_dir")
+        print("   Use --checkpoint_path for a single checkpoint")
+        print("   Use --checkpoint_dir to evaluate all checkpoints in a directory")
+        return
+    
+    # Set CUDA device
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device
+    
+    # If checkpoint_dir is provided, evaluate all checkpoints
+    if args.checkpoint_dir:
+        evaluate_all_checkpoints(args)
+        return
+    
+    print("="*70)
+    print("🚀 AIMO EVALUATION: RAW vs FINE-TUNED")
+    print("="*70)
+    print(f"Raw Model: {RAW_MODEL_PATH}")
+    print(f"Training Dir: {TRAINING_DIR}")
+    print(f"CUDA Device: {args.cuda_device}")
+    print(f"Batch Size: {args.batch_size}")
+    print(f"Split: {args.split}")
+    if args.max_samples:
+        print(f"Max Samples: {args.max_samples}")
+    if args.skip_raw:
+        print(f"Mode: Fine-tuned model only")
+    elif args.skip_finetuned:
+        print(f"Mode: Raw model only")
+    else:
+        print(f"Mode: Both models (comparison)")
+    print("="*70)
+    
+    # Determine which checkpoint to use
+    if not args.skip_finetuned:
+        if args.checkpoint_path:
+            # Use user-provided checkpoint
+            checkpoint_path = args.checkpoint_path
+            
+            # Debug: show what we received
+            print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
+            
+            # Handle relative vs absolute paths
+            if not os.path.isabs(checkpoint_path):
+                checkpoint_path = os.path.abspath(checkpoint_path)
+                print(f"   Converted to absolute path: {checkpoint_path}")
+            
+            if not os.path.exists(checkpoint_path):
+                print(f"❌ Error: Checkpoint path does not exist: {checkpoint_path}")
+                print(f"   Please check the path and try again.")
+                return
+            
+            print(f"✅ Using user-specified checkpoint: {os.path.basename(checkpoint_path)}")
+            best_checkpoint_info = {
+                'path': checkpoint_path,
+                'score': 'N/A (manually specified)'
+            }
+        else:
+            # Auto-select best checkpoint
+            print("\n📁 No checkpoint path provided, auto-selecting best checkpoint...")
+            best_checkpoint_path, best_score = find_best_checkpoint(TRAINING_DIR)
+            if best_checkpoint_path is None:
+                print("❌ No valid checkpoint found!")
+                return
+            best_checkpoint_info = {
+                'path': best_checkpoint_path,
+                'score': best_score
+            }
+    else:
+        best_checkpoint_info = None
+    
+    # Evaluate raw model
+    if not args.skip_raw:
+        raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
+        raw_results = evaluate_on_aimo(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size, args.split)
+        if raw_results is None:
+            print("❌ Failed to evaluate raw model")
+            return
+        del raw_model  # Free memory
+        torch.cuda.empty_cache()
+    else:
+        raw_results = None
+        print("\n⏭️  Skipping raw model evaluation")
+    
+    # Evaluate fine-tuned model
+    if not args.skip_finetuned:
+        finetuned_model, finetuned_tokenizer = load_finetuned_model(best_checkpoint_info['path'], args.cuda_device)
+        finetuned_results = evaluate_on_aimo(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size, args.split)
+        if finetuned_results is None:
+            print("❌ Failed to evaluate fine-tuned model")
+            return
+        del finetuned_model  # Free memory
+        torch.cuda.empty_cache()
+    else:
+        finetuned_results = None
+        print("\n⏭️  Skipping fine-tuned model evaluation")
+    
+    # Save and display results
+    if raw_results and finetuned_results:
+        summary = save_results(raw_results, finetuned_results, best_checkpoint_info, OUTPUT_DIR)
+        print_comparison(summary)
+    elif raw_results:
+        print("\n✅ Raw model evaluation completed")
+    elif finetuned_results:
+        print("\n✅ Fine-tuned model evaluation completed")
+    
+    print(f"\n✅ All results saved to: {OUTPUT_DIR}")
+
+if __name__ == '__main__':
+    main()

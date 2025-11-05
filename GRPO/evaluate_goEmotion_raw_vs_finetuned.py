@@ -31,10 +31,10 @@ warnings.filterwarnings('ignore')
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Nima/abductive_reasoning_finetuning/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
+    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Nima/abductive_reasoning_finetuning/aimo_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/aimo_evaluation_results")  # Change default per script
 
 # GoEmotions emotion labels (27 emotions + neutral)
 GOEMOTION_LABELS = [

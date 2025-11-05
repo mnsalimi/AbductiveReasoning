@@ -22,8 +22,8 @@ import threading
 
 # Shared model/training paths (will be injected into evaluation scripts)
 RAW_MODEL_PATH = "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
-TRAINING_DIR = "/home/moein_salimi/users/Nima/abductive_reasoning_finetuning/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning"
-BASE_OUTPUT_DIR = "/home/moein_salimi/users/Nima/abductive_reasoning_finetuning"
+TRAINING_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning"
+BASE_OUTPUT_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO"
 
 # List of evaluation scripts to run
 EVALUATION_SCRIPTS = [

@@ -120,8 +120,8 @@ class EvaluationOrchestrator:
     """Manages execution of multiple evaluation scripts with organized logging."""
     
     def __init__(self, output_dir: str, parallel_count: int = 1,
-                 raw_model_path: str = None, training_dir: str = None,
-                 base_output_dir: str = None, realtime_logs: bool = True):
+        raw_model_path: str = None, training_dir: str = None,
+        base_output_dir: str = None, realtime_logs: bool = True):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.parallel_count = parallel_count
@@ -146,7 +146,7 @@ class EvaluationOrchestrator:
     def inject_paths_into_script(self, script_config: Dict) -> Dict[str, str]:
         """Create environment variables to inject paths into evaluation scripts."""
         output_dir = os.path.join(self.base_output_dir, 
-                                   script_config.get('output_subdir', 'evaluation_results'))
+        script_config.get('output_subdir', 'evaluation_results'))
         
         return {
             'EVAL_RAW_MODEL_PATH': self.raw_model_path,

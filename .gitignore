@@ -52,8 +52,13 @@ proposal/debug_outputs/
 proposal/debug_outputs/*
 *.png
 
-GRPO/dataset
+# GRPO/dataset
 GRPO/unsloth_compiled_cache
 GRPO/training_log.log
 
 nimavenv
+unsloth_compiled_cache
+
+GRPO/prompt_structure_log.txt
+GRPO/trainning_abductive.ipynb
+GRPO/multi_evaluation_results

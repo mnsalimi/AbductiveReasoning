@@ -22,7 +22,7 @@ import threading
 
 # Shared model/training paths (will be injected into evaluation scripts)
 RAW_MODEL_PATH = "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
-TRAINING_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning"
+TRAINING_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.04.22:13_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
 BASE_OUTPUT_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO"
 
 # List of evaluation scripts to run
@@ -93,7 +93,7 @@ EVALUATION_SCRIPTS = [
 
 # Default parameters shared across all scripts
 DEFAULT_PARAMS = {
-    'cuda_device': '0',
+    'cuda_device': '3',
     'batch_size': 1,
     'max_samples': None,
     'skip_raw': False,
@@ -103,10 +103,10 @@ DEFAULT_PARAMS = {
 }
 
 # Parallel execution settings
-DEFAULT_PARALLEL_COUNT = 2
+DEFAULT_PARALLEL_COUNT = 1
 
 # CUDA devices for parallel execution (will cycle through these IN ORDER)
-CUDA_DEVICES = ['2', '3']
+CUDA_DEVICES = ['3']
 
 # Output directory for consolidated orchestrator results
 ORCHESTRATOR_OUTPUT_DIR = './multi_evaluation_results'

@@ -115,7 +115,7 @@ def load_raw_model(device):
     model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
         torch_dtype=torch.float16,
-        device_map={"": f"cuda:{device}"},
+        device_map={"": f"cuda:0"},
         trust_remote_code=True,
         load_in_4bit=True,
     )
@@ -138,7 +138,7 @@ def load_finetuned_model(checkpoint_path, device):
     base_model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
         torch_dtype=torch.float16,
-        device_map={"": f"cuda:{device}"},
+        device_map={"": f"cuda:0"},
         trust_remote_code=True,
         load_in_4bit=True,
     )

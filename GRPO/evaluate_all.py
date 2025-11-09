@@ -27,6 +27,9 @@ RAW_MODEL_PATH = "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-b
 TRAINING_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/dt11.04.22:13_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
 BASE_OUTPUT_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO"
 
+NUM_EPOCHS = 20  # Default number of training epochs
+
+
 # List of evaluation scripts to run
 EVALUATION_SCRIPTS = [
     {
@@ -145,9 +148,11 @@ class EvaluationOrchestrator:
         # Master log file
         self.master_log = self.run_dir / 'master_log.txt'
         
+
     def find_best_checkpoint(self) -> Tuple[Optional[str], Optional[str]]:
         """
-        Finds the best checkpoint based on 'val_metrics.json' or falls back to the latest.
+        Finds the best checkpoint by mapping existing checkpoints to their epochs
+        and selecting the one with the highest validation reward.
         Returns (path_to_checkpoint, reason_string).
         """
         print(f"\n{'='*70}")
@@ -160,6 +165,7 @@ class EvaluationOrchestrator:
         print(f"📁 Training directory: {self.training_dir}")
         print(f"📁 Checkpoint directory: {checkpoint_dir}")
         print(f"📄 Val metrics file: {val_metrics_path}")
+        print(f"⚙️  Configured epochs: {NUM_EPOCHS}")
         print()
 
         # Check if checkpoint directory exists
@@ -215,121 +221,96 @@ class EvaluationOrchestrator:
                 val_metrics = json.load(f)
             
             print(f"✅ Found metrics for {len(val_metrics)} epoch(s)")
-            print(f"\n{'Epoch':<8} {'Avg Reward':<12} {'Status'}")
-            print(f"{'-'*40}")
             
-            # Find best epoch and display all metrics
-            best_score = -float('inf')
-            best_epoch = -1.0
-            
-            epochs_sorted = sorted([(float(k), v) for k, v in val_metrics.items()], 
-                                key=lambda x: x[0])
-            
-            for epoch, metrics in epochs_sorted:
-                avg_reward = metrics.get('avg_reward', -float('inf'))
-                is_best = ""
-                if avg_reward > best_score:
-                    best_score = avg_reward
-                    best_epoch = epoch
-                    is_best = "⭐ BEST"
-                
-                print(f"{epoch:<8.1f} {avg_reward:<12.4f} {is_best}")
-            
-            if best_epoch == -1.0:
-                reason = "Could not find 'avg_reward' in val_metrics.json, using latest."
-                print(f"\n⚠️  {reason}")
-                print(f"🎯 Selected: {latest_checkpoint_path}")
-                print(f"{'='*70}\n")
-                return latest_checkpoint_path, reason
-            
-            print(f"\n⭐ Best validation performance:")
-            print(f"   Epoch: {best_epoch}")
-            print(f"   Avg Reward: {best_score:.4f}")
-            
-            # Calculate steps per epoch
+            # Calculate steps per epoch using global NUM_EPOCHS
             max_checkpoint_step = checkpoint_steps[-1][0]
+            max_epoch_in_data = max(float(k) for k in val_metrics.keys())
             
-            # Try to get actual step from metrics if available
-            best_epoch_key = str(int(best_epoch))
-            actual_step = None
-            if best_epoch_key in val_metrics and 'step' in val_metrics[best_epoch_key]:
-                actual_step = val_metrics[best_epoch_key]['step']
-                print(f"   Actual Step: {actual_step} (from metrics)")
+            # Use NUM_EPOCHS for calculation
+            estimated_steps_per_epoch = max_checkpoint_step / NUM_EPOCHS
             
-            # Calculate target step
-            if actual_step is not None:
-                target_step = actual_step
-                print(f"\n📍 Using actual step from metrics: {target_step}")
-            else:
-                # Estimate based on available data
-                max_epoch = max(float(k) for k in val_metrics.keys())
-                estimated_steps_per_epoch = max_checkpoint_step / 20.0  # Assuming 20 epochs
-                target_step = int(best_epoch * estimated_steps_per_epoch)
-                
-                print(f"\n🔢 Estimation details:")
-                print(f"   Max checkpoint step: {max_checkpoint_step}")
-                print(f"   Assumed total epochs: 20.0")
-                print(f"   Max epoch in metrics: {max_epoch}")
-                print(f"   Estimated steps/epoch: {estimated_steps_per_epoch:.2f}")
-                print(f"   Target step (epoch {best_epoch} × {estimated_steps_per_epoch:.2f}): {target_step}")
-                
-                if max_epoch < 20.0:
-                    print(f"\n⚠️  WARNING: Max epoch ({max_epoch}) is less than assumed 20 epochs!")
-                    print(f"   This may indicate incomplete training or incorrect assumption.")
-                    # Provide alternative calculation
-                    alt_steps_per_epoch = max_checkpoint_step / max_epoch
-                    alt_target_step = int(best_epoch * alt_steps_per_epoch)
-                    print(f"   Alternative calculation: {max_checkpoint_step}/{max_epoch:.1f} = {alt_steps_per_epoch:.2f} steps/epoch")
-                    print(f"   Alternative target step: {alt_target_step}")
+            print(f"\n🔢 Steps per epoch estimation:")
+            print(f"   Max checkpoint step: {max_checkpoint_step}")
+            print(f"   Configured epochs: {NUM_EPOCHS}")
+            print(f"   Max epoch in metrics: {max_epoch_in_data}")
+            print(f"   Estimated steps/epoch: {estimated_steps_per_epoch:.2f}")
             
-            # Find nearest checkpoint
-            print(f"\n🔍 Finding nearest checkpoint to step {target_step}...")
-            print(f"\n{'Checkpoint':<20} {'Step':<8} {'Distance':<10} {'Status'}")
-            print(f"{'-'*50}")
+            if max_epoch_in_data != NUM_EPOCHS:
+                print(f"   ⚠️  Note: Data has {max_epoch_in_data} epochs, but using {NUM_EPOCHS} for calculation")
             
-            best_checkpoint_tuple = None
-            min_distance = float('inf')
+            # Map each checkpoint to its nearest epoch
+            print(f"\n🗺️  Mapping checkpoints to validation epochs:")
+            print(f"\n{'Checkpoint':<20} {'Step':<8} {'Est. Epoch':<12} {'Nearest Epoch':<14} {'Avg Reward':<12} {'Status'}")
+            print(f"{'-'*90}")
+            
+            checkpoint_mapping = []
             
             for step, name in checkpoint_steps:
-                distance = abs(step - target_step)
-                is_selected = ""
-                if distance < min_distance:
-                    min_distance = distance
-                    best_checkpoint_tuple = (step, name)
-                    is_selected = "✅ SELECTED"
+                # Calculate which epoch this checkpoint corresponds to
+                estimated_epoch = step / estimated_steps_per_epoch
                 
-                print(f"{name:<20} {step:<8} {distance:<10} {is_selected}")
+                # Find the nearest actual epoch in validation metrics
+                nearest_epoch = min(val_metrics.keys(), 
+                                key=lambda e: abs(float(e) - estimated_epoch))
+                nearest_epoch_float = float(nearest_epoch)
+                
+                # Get the reward for that epoch
+                avg_reward = val_metrics[nearest_epoch].get('avg_reward', -float('inf'))
+                
+                checkpoint_mapping.append({
+                    'name': name,
+                    'step': step,
+                    'estimated_epoch': estimated_epoch,
+                    'nearest_epoch': nearest_epoch_float,
+                    'avg_reward': avg_reward,
+                    'path': os.path.join(checkpoint_dir, name)
+                })
+                
+                print(f"{name:<20} {step:<8} {estimated_epoch:<12.2f} {nearest_epoch_float:<14.1f} {avg_reward:<12.4f}")
             
-            best_checkpoint_name = best_checkpoint_tuple[1]
-            best_checkpoint_step = best_checkpoint_tuple[0]
-            best_checkpoint_path = os.path.join(checkpoint_dir, best_checkpoint_name)
+            # Find the checkpoint with the highest reward
+            best_checkpoint = max(checkpoint_mapping, key=lambda x: x['avg_reward'])
             
-            step_difference = best_checkpoint_step - target_step
-            step_diff_sign = "+" if step_difference > 0 else ""
+            print(f"\n{'='*90}")
+            print(f"🏆 BEST CHECKPOINT AMONG AVAILABLE:")
+            print(f"{'='*90}")
+            
+            # Display comparison
+            print(f"\n{'Checkpoint':<20} {'Step':<8} {'Epoch':<8} {'Avg Reward':<12} {'Status'}")
+            print(f"{'-'*60}")
+            
+            for ckpt in sorted(checkpoint_mapping, key=lambda x: x['avg_reward'], reverse=True):
+                is_best = "✅ SELECTED" if ckpt['name'] == best_checkpoint['name'] else ""
+                print(f"{ckpt['name']:<20} {ckpt['step']:<8} {ckpt['nearest_epoch']:<8.1f} {ckpt['avg_reward']:<12.4f} {is_best}")
             
             print(f"\n🎯 SELECTED CHECKPOINT:")
-            print(f"   Path: {best_checkpoint_path}")
-            print(f"   Step: {best_checkpoint_step}")
-            print(f"   Target step: {target_step}")
-            print(f"   Difference: {step_diff_sign}{step_difference} steps")
-            print(f"   Distance: {min_distance} steps ({min_distance/max_checkpoint_step*100:.1f}% of max)")
+            print(f"   Name: {best_checkpoint['name']}")
+            print(f"   Path: {best_checkpoint['path']}")
+            print(f"   Step: {best_checkpoint['step']}")
+            print(f"   Estimated Epoch: {best_checkpoint['estimated_epoch']:.2f}")
+            print(f"   Mapped to Epoch: {best_checkpoint['nearest_epoch']:.1f}")
+            print(f"   Validation Reward: {best_checkpoint['avg_reward']:.4f}")
             
-            # Sanity check warnings
-            if min_distance > estimated_steps_per_epoch:
-                print(f"\n⚠️  WARNING: Selected checkpoint is {min_distance} steps away from target!")
-                print(f"   This is more than one epoch's worth of steps ({estimated_steps_per_epoch:.1f}).")
-                print(f"   Consider checking your checkpoint saving frequency or validation schedule.")
+            # Additional analysis
+            global_best_epoch = max(val_metrics.items(), 
+                                key=lambda x: x[1].get('avg_reward', -float('inf')))[0]
+            global_best_reward = val_metrics[global_best_epoch]['avg_reward']
             
-            if best_checkpoint_step == latest_checkpoint_step:
-                print(f"\n⚠️  NOTE: Selected checkpoint is the latest one.")
-                print(f"   This might indicate overfitting or that training should continue.")
+            if float(global_best_epoch) != best_checkpoint['nearest_epoch']:
+                reward_diff = best_checkpoint['avg_reward'] - global_best_reward
+                print(f"\n⚠️  NOTE: Global best epoch is {global_best_epoch} (reward: {global_best_reward:.4f})")
+                print(f"   But no checkpoint exists for that epoch.")
+                print(f"   Selected checkpoint has reward difference: {reward_diff:+.4f}")
+                print(f"   Consider saving checkpoints more frequently to capture peak performance.")
+            else:
+                print(f"\n✅ This checkpoint corresponds to the global best validation epoch!")
             
-            reason = (f"Highest validation avg_reward ({best_score:.4f}) at epoch {best_epoch}, "
-                    f"target step {target_step}, selected checkpoint at step {best_checkpoint_step} "
-                    f"({step_diff_sign}{step_difference} steps from target).")
+            reason = (f"Best available checkpoint at step {best_checkpoint['step']} "
+                    f"(epoch ~{best_checkpoint['nearest_epoch']:.1f}) "
+                    f"with validation avg_reward {best_checkpoint['avg_reward']:.4f}.")
             
-            print(f"{'='*70}\n")
-            return best_checkpoint_path, reason
+            print(f"{'='*90}\n")
+            return best_checkpoint['path'], reason
 
         except (json.JSONDecodeError, KeyError, Exception) as e:
             reason = f"Error processing val_metrics.json ({e}), using latest checkpoint."
@@ -337,6 +318,8 @@ class EvaluationOrchestrator:
             print(f"🎯 Selected: {latest_checkpoint_path}")
             print(f"{'='*70}\n")
             return latest_checkpoint_path, reason
+
+
 
 
     def inject_paths_into_script(self, script_config: Dict) -> Dict[str, str]:

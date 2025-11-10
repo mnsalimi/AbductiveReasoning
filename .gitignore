@@ -61,4 +61,5 @@ unsloth_compiled_cache
 
 GRPO/prompt_structure_log.txt
 GRPO/trainning_abductive.ipynb
-GRPO/multi_evaluation_results
+GRPO/Evaluation/multi_evaluation_results
+GRPO/Evaluation/*results

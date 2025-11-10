@@ -25,6 +25,10 @@ chmod +x run_evaluations.py
 
 ## Configuration
 
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
 ### Setting Up Paths
 
 Edit the configuration section at the top of the script:
@@ -52,7 +56,7 @@ Modify the `EVALUATION_SCRIPTS` list (you can comment others if you want to eval
 ```python
 EVALUATION_SCRIPTS = [
     {
-        'script': 'evaluate_aimo_raw_vs_finetuned.py',
+        'script': str(SCRIPT_DIR / 'evaluate_aimo_raw_vs_finetuned.py'),
         'name': 'AIMO Dataset Evaluation',
         'output_subdir': 'aimo_evaluation_results',
         'params': {

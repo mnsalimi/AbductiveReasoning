@@ -19,13 +19,18 @@ import time
 import threading
 
 # ============================================================================
+# Get the directory where this script is located
+# ============================================================================
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+# ============================================================================
 # CONFIGURATION SECTION - EASILY MODIFIABLE
 # ============================================================================
 
 # Shared model/training paths (will be injected into evaluation scripts)
 RAW_MODEL_PATH = "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
 TRAINING_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/dt11.04.22:13_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
-BASE_OUTPUT_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO"
+BASE_OUTPUT_DIR = str(SCRIPT_DIR)
 
 NUM_EPOCHS = 20  # Default number of training epochs
 
@@ -33,7 +38,7 @@ NUM_EPOCHS = 20  # Default number of training epochs
 # List of evaluation scripts to run
 EVALUATION_SCRIPTS = [
     {
-        'script': 'evaluate_aimo_raw_vs_finetuned.py',
+        'script': str(SCRIPT_DIR / 'evaluate_aimo_raw_vs_finetuned.py'),
         'name': 'AIMO Dataset Evaluation',
         'output_subdir': 'aimo_evaluation_results',
         'params': {
@@ -41,65 +46,65 @@ EVALUATION_SCRIPTS = [
         },
         'override_terminal': False
     },
-    {
-        'script': 'evaluate_aime_raw_vs_finetuned.py',
-        'name': 'AIME 2025 Dataset Evaluation',
-        'output_subdir': 'aime_evaluation_results',
-        'params': {
-            'split': 'train'
-        },
-        'override_terminal': False
-    },
-    {
-        'script': 'evaluate_copa_raw_vs_finetuned_guess_cause.py',
-        'name': 'COPA Dataset Evaluation (Guess Cause)',
-        'output_subdir': 'copa_evaluation_guess_cause_results',
-        'params': {
-            'split': 'train',
-        },
-        'override_terminal': False
-    },
-    {
-        'script': 'evaluate_copa_raw_vs_finetuned_guess_effect.py',
-        'name': 'COPA Dataset Evaluation (Guess effect)',
-        'output_subdir': 'copa_evaluation_guess_effect_results',
-        'params': {
-            'split': 'train',
-        },
-        'override_terminal': False
-    },
-    {
-        'script': 'evaluate_art_raw_vs_finetuned.py',
-        'name': 'ART Dataset Evaluation',
-        'output_subdir': 'art_evaluation_results',
-        'params': {
-        },
-        'override_terminal': False
-    },
-    {
-        'script': 'evaluate_goEmotion_raw_vs_finetuned.py',
-        'name': 'GoEmotion Dataset Evaluation',
-        'output_subdir': 'goEmotion_evaluation_results',
-        'params': {
-            'split': 'test',
-        },
-        'override_terminal': False
-    },
-    {
-        'script': 'evaluate_gsm8k_raw_vs_finetuned.py',
-        'name': 'GSM8K Dataset Evaluation',
-        'output_subdir': 'gsm8k_evaluation_results',
-        'params': {
-            'split': 'test',
-        },
-        'override_terminal': False
-    },
+    # {
+    #     'script': str(SCRIPT_DIR / 'evaluate_aime_raw_vs_finetuned.py'),
+    #     'name': 'AIME 2025 Dataset Evaluation',
+    #     'output_subdir': 'aime_evaluation_results',
+    #     'params': {
+    #         'split': 'train'
+    #     },
+    #     'override_terminal': False
+    # },
+    # {
+    #     'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_cause.py'),
+    #     'name': 'COPA Dataset Evaluation (Guess Cause)',
+    #     'output_subdir': 'copa_evaluation_guess_cause_results',
+    #     'params': {
+    #         'split': 'train',
+    #     },
+    #     'override_terminal': False
+    # },
+    # {
+    #     'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_effect.py'),
+    #     'name': 'COPA Dataset Evaluation (Guess effect)',
+    #     'output_subdir': 'copa_evaluation_guess_effect_results',
+    #     'params': {
+    #         'split': 'train',
+    #     },
+    #     'override_terminal': False
+    # },
+    # {
+    #     'script': str(SCRIPT_DIR /'evaluate_art_raw_vs_finetuned.py'),
+    #     'name': 'ART Dataset Evaluation',
+    #     'output_subdir': 'art_evaluation_results',
+    #     'params': {
+    #     },
+    #     'override_terminal': False
+    # },
+    # {
+    #     'script': str(SCRIPT_DIR /'evaluate_goEmotion_raw_vs_finetuned.py'),
+    #     'name': 'GoEmotion Dataset Evaluation',
+    #     'output_subdir': 'goEmotion_evaluation_results',
+    #     'params': {
+    #         'split': 'test',
+    #     },
+    #     'override_terminal': False
+    # },
+    # {
+    #     'script': str(SCRIPT_DIR /'evaluate_gsm8k_raw_vs_finetuned.py'),
+    #     'name': 'GSM8K Dataset Evaluation',
+    #     'output_subdir': 'gsm8k_evaluation_results',
+    #     'params': {
+    #         'split': 'test',
+    #     },
+    #     'override_terminal': False
+    # },
 ]
 
 # Default parameters shared across all scripts
 DEFAULT_PARAMS = {
     'cuda_device': '3',
-    'batch_size': 1,
+    'batch_size': 8,
     'max_samples': None,
     'skip_raw': False,
     'skip_finetuned': False,
@@ -114,7 +119,7 @@ DEFAULT_PARALLEL_COUNT = 1
 CUDA_DEVICES = ['3']
 
 # Output directory for consolidated orchestrator results
-ORCHESTRATOR_OUTPUT_DIR = './multi_evaluation_results'
+ORCHESTRATOR_OUTPUT_DIR = str(SCRIPT_DIR / 'multi_evaluation_results')
 
 # ============================================================================
 # END OF CONFIGURATION SECTION
@@ -127,6 +132,12 @@ class EvaluationOrchestrator:
     def __init__(self, output_dir: str, parallel_count: int = 1,
         raw_model_path: str = None, training_dir: str = None,
         base_output_dir: str = None, realtime_logs: bool = True):
+        
+        # Convert output_dir to absolute path based on script location
+        if not os.path.isabs(output_dir):
+            output_dir = os.path.join(SCRIPT_DIR, output_dir)
+
+        
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.parallel_count = parallel_count

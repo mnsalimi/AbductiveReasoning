@@ -46,59 +46,59 @@ EVALUATION_SCRIPTS = [
         },
         'override_terminal': False
     },
-    # {
-    #     'script': str(SCRIPT_DIR / 'evaluate_aime_raw_vs_finetuned.py'),
-    #     'name': 'AIME 2025 Dataset Evaluation',
-    #     'output_subdir': 'aime_evaluation_results',
-    #     'params': {
-    #         'split': 'train'
-    #     },
-    #     'override_terminal': False
-    # },
-    # {
-    #     'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_cause.py'),
-    #     'name': 'COPA Dataset Evaluation (Guess Cause)',
-    #     'output_subdir': 'copa_evaluation_guess_cause_results',
-    #     'params': {
-    #         'split': 'train',
-    #     },
-    #     'override_terminal': False
-    # },
-    # {
-    #     'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_effect.py'),
-    #     'name': 'COPA Dataset Evaluation (Guess effect)',
-    #     'output_subdir': 'copa_evaluation_guess_effect_results',
-    #     'params': {
-    #         'split': 'train',
-    #     },
-    #     'override_terminal': False
-    # },
-    # {
-    #     'script': str(SCRIPT_DIR /'evaluate_art_raw_vs_finetuned.py'),
-    #     'name': 'ART Dataset Evaluation',
-    #     'output_subdir': 'art_evaluation_results',
-    #     'params': {
-    #     },
-    #     'override_terminal': False
-    # },
-    # {
-    #     'script': str(SCRIPT_DIR /'evaluate_goEmotion_raw_vs_finetuned.py'),
-    #     'name': 'GoEmotion Dataset Evaluation',
-    #     'output_subdir': 'goEmotion_evaluation_results',
-    #     'params': {
-    #         'split': 'test',
-    #     },
-    #     'override_terminal': False
-    # },
-    # {
-    #     'script': str(SCRIPT_DIR /'evaluate_gsm8k_raw_vs_finetuned.py'),
-    #     'name': 'GSM8K Dataset Evaluation',
-    #     'output_subdir': 'gsm8k_evaluation_results',
-    #     'params': {
-    #         'split': 'test',
-    #     },
-    #     'override_terminal': False
-    # },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_aime_raw_vs_finetuned.py'),
+        'name': 'AIME 2025 Dataset Evaluation',
+        'output_subdir': 'aime_evaluation_results',
+        'params': {
+            'split': 'train'
+        },
+        'override_terminal': False
+    },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_cause.py'),
+        'name': 'COPA Dataset Evaluation (Guess Cause)',
+        'output_subdir': 'copa_evaluation_guess_cause_results',
+        'params': {
+            'split': 'train',
+        },
+        'override_terminal': False
+    },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_effect.py'),
+        'name': 'COPA Dataset Evaluation (Guess effect)',
+        'output_subdir': 'copa_evaluation_guess_effect_results',
+        'params': {
+            'split': 'train',
+        },
+        'override_terminal': False
+    },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_art_raw_vs_finetuned.py'),
+        'name': 'ART Dataset Evaluation',
+        'output_subdir': 'art_evaluation_results',
+        'params': {
+        },
+        'override_terminal': False
+    },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_goEmotion_raw_vs_finetuned.py'),
+        'name': 'GoEmotion Dataset Evaluation',
+        'output_subdir': 'goEmotion_evaluation_results',
+        'params': {
+            'split': 'test',
+        },
+        'override_terminal': False
+    },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_gsm8k_raw_vs_finetuned.py'),
+        'name': 'GSM8K Dataset Evaluation',
+        'output_subdir': 'gsm8k_evaluation_results',
+        'params': {
+            'split': 'test',
+        },
+        'override_terminal': False
+    },
 ]
 
 # Default parameters shared across all scripts

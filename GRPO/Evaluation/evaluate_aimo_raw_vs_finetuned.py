@@ -30,10 +30,10 @@ warnings.filterwarnings('ignore')
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/aimo_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/aimo_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -150,14 +150,16 @@ def create_aimo_prompt(problem):
     """Create a prompt for AIMO problem - handles LaTeX properly."""
     system_prompt = """You are an expert mathematician specializing in competition mathematics (AMC, AIME, etc.).
 
-IMPORTANT INSTRUCTIONS:
-- Read the problem carefully, including all LaTeX mathematical notation
-- Solve the problem step by step
-- Provide your final answer as a single number
-- Format your final answer clearly as: "The answer is: [number]" or "Answer: [number]"
-- If the answer is a fraction, you can give it as a decimal or as "a/b"
-- Do not include any units or additional text after the number
-"""
+First, read the problem carefully, including all LaTeX mathematical notation, and solve it step by step. Then give the final answer as a single number.
+
+Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+
+<reasoning>
+[here you write your chain-of-thought reasoning and intermediate steps]
+</reasoning>
+<answer>
+[here you output ONLY the final answer as a number, decimal, or fraction a/b, with no extra words]
+</answer>"""
     
     user_prompt = f"""Problem:
 {problem}
@@ -166,50 +168,47 @@ Solve this problem and provide your final numerical answer."""
     
     return system_prompt, user_prompt
 
+def extract_reasoning(response):
+    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
+    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
 
 def extract_answer(response):
-    """Extract the numerical answer from model response."""
-    response = response.strip()
-    
-    # Try to find various answer patterns
-    patterns = [
-        r'\\boxed\{([^}]+)\}',  # LaTeX boxed: \boxed{answer}
-        r'####\s*([^\n]+)',  # MATH dataset format: #### answer
-        r'(?:final\s+)?answer\s*:?\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)',  # "Answer: 142"
-        r'(?:the\s+)?answer\s+is\s*:?\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)',  # "The answer is: 142"
-        r'therefore\s*,?\s*(?:the\s+answer\s+is\s*)?\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)',  # "Therefore, 142"
-    ]
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, response, re.IGNORECASE)
-        if matches:
-            answer = matches[-1].strip()
-            answer = answer.replace('$', '').replace(',', '').strip()
-            return answer
-    
-    # Look in the last 300 characters for any number
-    last_part = response[-300:]
-    
-    # Look for = number at the end
-    eq_match = re.search(r'=\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)\s*\.?\s*$', last_part)
-    if eq_match:
-        return eq_match.group(1).strip()
-    
-    # Look for standalone number in the last few lines
-    lines = response.split('\n')
-    for line in reversed(lines[-5:]):
-        line = line.strip()
-        if line:
-            # Match standalone number (possibly with decimal or fraction)
-            num_match = re.search(r'^([+-]?\d+(?:\.\d+)?(?:/\d+)?)\.?\s*$', line)
-            if num_match:
-                return num_match.group(1)
-            
-            # Match number after common answer indicators
-            indicator_match = re.search(r'(?:answer|result|solution)\s*:?\s*\$?\s*([+-]?\d+(?:\.\d+)?(?:/\d+)?)', line, re.IGNORECASE)
-            if indicator_match:
-                return indicator_match.group(1)
-    
+    """Extract the numerical answer from the <answer>...</answer> block.
+
+    Supports integers, decimals, and simple fractions (a/b).
+    Returns the answer as a cleaned string, or None if not found.
+    """
+    if not response:
+        return None
+
+    # Find the content inside <answer>...</answer>
+    tag_match = re.search(
+        r'<answer>\s*(.*?)\s*</answer>',
+        response,
+        re.IGNORECASE | re.DOTALL
+    )
+    if not tag_match:
+        return None
+
+    answer_content = tag_match.group(1).strip()
+
+    # Handle possible \boxed{...} inside the answer block (extra robustness)
+    boxed_match = re.search(r'\\boxed\{([^}]+)\}', answer_content)
+    if boxed_match:
+        answer_content = boxed_match.group(1).strip()
+
+    # Clean common wrappers/symbols
+    answer_content = answer_content.replace('$', '').replace(',', '').strip()
+
+    # Look for a number / decimal / fraction inside the answer content
+    num_match = re.search(r'[+-]?\d+(?:\.\d+)?(?:/\d+)?', answer_content)
+    if num_match:
+        return num_match.group(0).strip()
+
+    # Fallback: if nothing matched, return None
     return None
 
 
@@ -318,10 +317,10 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=1024,
-                temperature=0.1,
-                do_sample=True,
-                top_p=0.95,
+                max_new_tokens=4096,
+                temperature=0.0,
+                do_sample=False,
+                # top_p=0.95,
                 pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
             )
         
@@ -336,6 +335,9 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
             
             # Extract answer
             predicted_answer = extract_answer(response)
+            
+            # Extract reasoning
+            reasoning = extract_reasoning(response)
             
             if predicted_answer is None:
                 failed_extractions += 1
@@ -378,7 +380,7 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
                 'problem': problem,
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
-                'response': response,
+                'reasoning': reasoning,
                 'correct': is_correct
             })
     
@@ -494,6 +496,68 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2)
     print(f"💾 Comparison summary saved to: {summary_file}")
+    
+    # Save disagreement and all cases summary
+    raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
+    ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
+    
+    disagreement_cases, all_cases = [], []
+    
+    for pid, raw_r in raw_by_id.items():
+        if pid not in ft_by_id:
+            continue
+        ft_r = ft_by_id[pid]
+        
+        all_cases.append({
+            "problem_id": pid,
+            "problem": raw_r["problem"],          
+            "true_answer": raw_r["true_answer"],  
+            "raw": {
+                "predicted_answer": raw_r["predicted_answer"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_answer": ft_r["predicted_answer"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            }
+        })
+        
+        if raw_r['correct'] == ft_r['correct']:
+            continue
+        
+        if raw_r['correct'] and not ft_r['correct']:
+            disagreement_type = "raw_correct_finetuned_wrong"
+        else:
+            disagreement_type = "finetuned_correct_raw_wrong"
+        
+        disagreement_cases.append({
+            "problem_id": pid,
+            "problem": raw_r["problem"],          
+            "true_answer": raw_r["true_answer"],
+            "raw": {
+                "predicted_answer": raw_r["predicted_answer"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_answer": ft_r["predicted_answer"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            },
+            "disagreement_type": disagreement_type
+        })
+    
+    disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+    with open(disagreement_file, "w") as f:
+        json.dump(disagreement_cases, f, indent=2)
+    print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    
+    all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+    with open(all_cases_file, "w") as f:
+        json.dump(all_cases, f, indent=2)
+    print(f"💾 All cases saved to: {all_cases_file}")
     
     return summary
 

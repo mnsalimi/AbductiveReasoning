@@ -446,12 +446,28 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     raw_by_id = {r['problem_id']: r for r in raw_results['results']}
     ft_by_id = {r['problem_id']: r for r in finetuned_results['results']}
     
-    disagreement_cases = []
+    disagreement_cases, all_cases = [], []
     
     for pid, raw_r in raw_by_id.items():
         if pid not in ft_by_id:
             continue
         ft_r = ft_by_id[pid]
+        
+        all_cases.append({
+            "problem_id": pid,
+            "problem": raw_r["problem"],          
+            "true_answer": raw_r["true_answer"],  
+            "raw": {
+                "predicted_answer": raw_r["predicted_answer"],
+                "response": raw_r["response"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_answer": ft_r["predicted_answer"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            }
+        })
         
         if raw_r['correct'] == ft_r['correct']:
             continue
@@ -472,7 +488,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "response": ft_r["response"],
+                "reasoning": ft_r["reasoning"],
                 "correct": ft_r["correct"]
             },
             "disagreement_type": disagreement_type
@@ -482,6 +498,11 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     with open(disagreement_file, "w") as f:
         json.dump(disagreement_cases, f, indent=2)
     print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    
+    all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+    with open(all_cases_file, "w") as f:
+        json.dump(all_cases, f, indent=2)
+    print(f"💾 All cases saved to: {all_cases_file}")
     
     return summary
 

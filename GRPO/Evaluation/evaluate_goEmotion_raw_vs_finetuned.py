@@ -34,7 +34,7 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/goemotion_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/goEmotion_evaluation_results")  # Change default per script
 
 # GoEmotions emotion labels (27 emotions + neutral)
 GOEMOTION_LABELS = [
@@ -184,7 +184,7 @@ Your entire output MUST use exactly the following format and nothing else (no te
     
     user_prompt = f"""Text: "{text}"
 
-What emotion(s) are expressed in this text? Provide your answer in the format "Emotions: [list]" or "Emotion: [emotion]"."""
+What emotion(s) are expressed in this text?"""
     
     return system_prompt, user_prompt
 
@@ -594,37 +594,36 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             }
         })
         
-    #     if raw_r['correct'] == ft_r['correct']:
-    #         continue
+        # if their emotion in common is the true label then continue
+        if len((set(raw_r['predicted_emotions']) & set(ft_r['predicted_emotions'])) & set(raw_r['true_emotions'])) > 0:
+            continue
         
-    #     if raw_r['correct'] and not ft_r['correct']:
-    #         disagreement_type = "raw_correct_finetuned_wrong"
-    #     else:
-    #         disagreement_type = "finetuned_correct_raw_wrong"
+        if len(set(raw_r['predicted_emotions']) & set(raw_r['true_emotions'])) > 0:
+            disagreement_type = "raw_correct_finetuned_wrong"
+        elif len(set(ft_r['predicted_emotions']) & set(raw_r['true_emotions'])) > 0:
+            disagreement_type = "finetuned_correct_raw_wrong"
+        else:
+            continue
         
-    #     disagreement_cases.append({
-    #         "problem_id": pid,
-    #         "premise": raw_r["premise"],          
-    #         "choice1": raw_r["choice1"],
-    #         "choice2": raw_r["choice2"],
-    #         "true_label": raw_r["true_label"],
-    #         "raw": {
-    #             "predicted_label": raw_r["predicted_label"],
-    #             "reasoning": raw_r["reasoning"],
-    #             "correct": raw_r["correct"]
-    #         },
-    #         "finetuned": {
-    #             "predicted_label": ft_r["predicted_label"],
-    #             "reasoning": ft_r["reasoning"],
-    #             "correct": ft_r["correct"]
-    #         },
-    #         "disagreement_type": disagreement_type
-    #     })
+        disagreement_cases.append({
+            "problem_id": pid,
+            "text": raw_r["text"],  
+            "true_emotions": raw_r["true_emotions"],
+            "raw": {
+                "predicted_emotions": raw_r["predicted_emotions"],
+                "reasoning": raw_r["reasoning"]
+            },
+            "finetuned": {
+                "predicted_emotions": ft_r["predicted_emotions"],
+                "reasoning": ft_r["reasoning"]
+            },
+            "disagreement_type": disagreement_type
+        })
     
-    # disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
-    # with open(disagreement_file, "w") as f:
-    #     json.dump(disagreement_cases, f, indent=2)
-    # print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+    with open(disagreement_file, "w") as f:
+        json.dump(disagreement_cases, f, indent=2)
+    print(f"💾 Disagreement cases saved to: {disagreement_file}")
     
     all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
     with open(all_cases_file, "w") as f:

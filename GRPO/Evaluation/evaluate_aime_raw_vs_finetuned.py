@@ -442,7 +442,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         json.dump(summary, f, indent=2)
     print(f"💾 Comparison summary saved to: {summary_file}")
     
-    # Save disagreement summary
+    # Save disagreement and all cases summary
     raw_by_id = {r['problem_id']: r for r in raw_results['results']}
     ft_by_id = {r['problem_id']: r for r in finetuned_results['results']}
     
@@ -459,7 +459,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "response": raw_r["response"],
+                "reasoning": raw_r["reasoning"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
@@ -483,7 +483,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "response": raw_r["response"],
+                "reasoning": raw_r["reasoning"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {

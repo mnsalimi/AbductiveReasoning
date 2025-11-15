@@ -31,10 +31,10 @@ warnings.filterwarnings('ignore')
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
+   "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/aimo_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/goEmotion_evaluation_results")  # Change default per script
 
 # GoEmotions emotion labels (27 emotions + neutral)
 GOEMOTION_LABELS = [
@@ -167,21 +167,33 @@ def create_goemotion_prompt(text):
     """
     emotions_list = ", ".join(GOEMOTION_LABELS)
     
-    system_prompt = f"""You are an expert emotion classifier. Analyze the given text and identify the emotion(s) expressed.
+    system_prompt = f"""You are an expert emotion classifier. Given a text and a list of possible emotions, identify all emotions expressed in the text.
 
 Available emotions: {emotions_list}
 
-IMPORTANT:
-- Identify ALL emotions present in the text (can be multiple)
-- Use only the emotions from the list above
-- Format your answer as: "Emotions: emotion1, emotion2, ..." or "Emotion: emotion1"
-- Be precise and consider the context"""
+First, think step by step and explain your reasoning about which emotions are present, considering context and nuance, in just one paragraph. Then list all and only the emotions that apply.
+
+Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+
+<reasoning>
+[here you write your chain-of-thought reasoning about which emotions are present and why]
+</reasoning>
+<answer>
+[here you output ONLY the emotion names from the available list, separated by commas if there are multiple; e.g. "joy, surprise" or "anger"]
+</answer>"""
     
     user_prompt = f"""Text: "{text}"
 
-What emotion(s) are expressed in this text? Provide your answer in the format "Emotions: [list]" or "Emotion: [emotion]"."""
+What emotion(s) are expressed in this text?"""
     
     return system_prompt, user_prompt
+
+def extract_reasoning(response):
+    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
+    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
 
 def extract_emotions(response, valid_emotions=GOEMOTION_LABELS):
     """Extract emotion labels from model response.
@@ -189,6 +201,15 @@ def extract_emotions(response, valid_emotions=GOEMOTION_LABELS):
     Returns:
         list: List of extracted emotion labels, or None if extraction fails
     """
+    # First try to extract <answer>...</answer> tags
+    tag_match = re.search(r'<answer>\s*([^<]+)\s*</answer>', response, re.IGNORECASE)
+    if tag_match:
+        answer_text = tag_match.group(1).strip()
+        emotions = [e.strip() for e in answer_text.split(',') if e.strip()]
+        
+        return list(set(emotions))  # Remove duplicates
+
+    # if not successful, follow the old logic
     response = response.strip().lower()
     
     # Try various patterns
@@ -357,10 +378,10 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=128,
-                temperature=0.1,
-                do_sample=True,
-                top_p=0.95,
+                max_new_tokens=2048,
+                temperature=0.0,
+                do_sample=False,
+                # top_p=0.95,
                 pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
             )
         
@@ -372,6 +393,9 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
             
             # Extract emotions from response
             predicted_emotions = extract_emotions(response)
+            
+            # Extract reasoning
+            reasoning = extract_reasoning(response)
             
             if predicted_emotions is None:
                 failed_extractions += 1
@@ -397,7 +421,7 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
                 'text': batch_data[i]['text'],
                 'true_emotions': true_emotions,
                 'predicted_emotions': predicted_emotions,
-                'response': response,
+                'reasoning': reasoning,
                 'exact_match': exact_match
             })
     
@@ -544,6 +568,67 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2)
     print(f"💾 Comparison summary saved to: {summary_file}")
+    
+    # Save disagreement and all cases summary
+    raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
+    ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
+    
+    disagreement_cases, all_cases = [], []
+    
+    for pid, raw_r in raw_by_id.items():
+        if pid not in ft_by_id:
+            continue
+        ft_r = ft_by_id[pid]
+        
+        all_cases.append({
+            "problem_id": pid,
+            "text": raw_r["text"],  
+            "true_emotions": raw_r["true_emotions"],
+            "raw": {
+                "predicted_emotions": raw_r["predicted_emotions"],
+                "reasoning": raw_r["reasoning"]
+            },
+            "finetuned": {
+                "predicted_emotions": ft_r["predicted_emotions"],
+                "reasoning": ft_r["reasoning"]
+            }
+        })
+        
+        # if their emotion in common is the true label then continue
+        if len((set(raw_r['predicted_emotions']) & set(ft_r['predicted_emotions'])) & set(raw_r['true_emotions'])) > 0:
+            continue
+        
+        if len(set(raw_r['predicted_emotions']) & set(raw_r['true_emotions'])) > 0:
+            disagreement_type = "raw_correct_finetuned_wrong"
+        elif len(set(ft_r['predicted_emotions']) & set(raw_r['true_emotions'])) > 0:
+            disagreement_type = "finetuned_correct_raw_wrong"
+        else:
+            continue
+        
+        disagreement_cases.append({
+            "problem_id": pid,
+            "text": raw_r["text"],  
+            "true_emotions": raw_r["true_emotions"],
+            "raw": {
+                "predicted_emotions": raw_r["predicted_emotions"],
+                "reasoning": raw_r["reasoning"]
+            },
+            "finetuned": {
+                "predicted_emotions": ft_r["predicted_emotions"],
+                "reasoning": ft_r["reasoning"]
+            },
+            "disagreement_type": disagreement_type
+        })
+    
+    disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+    with open(disagreement_file, "w") as f:
+        json.dump(disagreement_cases, f, indent=2)
+    print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    
+    all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+    with open(all_cases_file, "w") as f:
+        json.dump(all_cases, f, indent=2)
+    print(f"💾 All cases saved to: {all_cases_file}")
     
     return summary
 

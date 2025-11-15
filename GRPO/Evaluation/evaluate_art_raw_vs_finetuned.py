@@ -30,10 +30,10 @@ warnings.filterwarnings('ignore')
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/aimo_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/art_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -158,7 +158,16 @@ def create_art_prompt(obs1, obs2, hyp1, hyp2):
     """Create prompt for ART task."""
     system_prompt = """You are an expert in abductive reasoning. Given two observations and two hypotheses, select which hypothesis (1 or 2) best explains what happened between the observations.
 
-Answer with ONLY the number 1 or 2. No other text."""
+        First, think step by step and explain your abductive reasoning in just one paragraph. Then decide which hypothesis (1 or 2) is better.
+
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+
+        <reasoning>
+        [here you write your chain-of-thought reasoning about which hypothesis is better]
+        </reasoning>
+        <answer>
+        [here you output ONLY the number 1 or 2]
+        </answer>"""
     
     user_prompt = f"""Observation 1: {obs1}
 Observation 2: {obs2}
@@ -170,8 +179,22 @@ Which hypothesis better explains the transition from Observation 1 to Observatio
     
     return system_prompt, user_prompt
 
+def extract_reasoning(response):
+    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
+    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
 def extract_answer(response):
     """Extract the hypothesis number (1 or 2) from model response."""
+    # First try to extract <answer>...</answer> tags
+    tag_match = re.search(r'<answer>\s*([12])\s*</answer>', response, re.IGNORECASE)
+    if tag_match:
+        return int(tag_match.group(1))
+    
+    # if not successful, follow the old logic
     # Clean the response
     response = response.strip().lower()
     
@@ -292,10 +315,10 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=50,
-                temperature=1e-5,
-                do_sample=True,
-                top_p=0.95,
+                max_new_tokens=1024,
+                temperature=0.0,
+                do_sample=False,
+                # top_p=0.95,
                 pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
             )
         
@@ -307,6 +330,9 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
             
             # Extract answer
             predicted_label = extract_answer(response)
+            
+            # Extract reasoning
+            reasoning = extract_reasoning(response)
             
             if predicted_label is None:
                 failed_extractions += 1
@@ -327,7 +353,7 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
                 'hypothesis_2': batch_data[i]['hyp2'],
                 'true_label': true_label,
                 'predicted_label': predicted_label,
-                'response': response,
+                'reasoning': reasoning,
                 'correct': is_correct
             })
     
@@ -508,6 +534,74 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2)
     print(f"💾 Comparison summary saved to: {summary_file}")
+    
+    # Save disagreement and all cases summary
+    raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
+    ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
+    
+    disagreement_cases, all_cases = [], []
+    
+    for pid, raw_r in raw_by_id.items():
+        if pid not in ft_by_id:
+            continue
+        ft_r = ft_by_id[pid]
+        
+        all_cases.append({
+            "problem_id": pid,
+            "observation_1": raw_r["observation_1"],          
+            "observation_2": raw_r["observation_2"],  
+            "hypothesis_1": raw_r["hypothesis_1"],  
+            "hypothesis_2": raw_r["hypothesis_2"],
+            "true_label": raw_r["true_label"],  
+            "raw": {
+                "predicted_label": raw_r["predicted_label"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_label": ft_r["predicted_label"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            }
+        })
+        
+        if raw_r['correct'] == ft_r['correct']:
+            continue
+        
+        if raw_r['correct'] and not ft_r['correct']:
+            disagreement_type = "raw_correct_finetuned_wrong"
+        else:
+            disagreement_type = "finetuned_correct_raw_wrong"
+        
+        disagreement_cases.append({
+            "problem_id": pid,
+            "observation_1": raw_r["observation_1"],          
+            "observation_2": raw_r["observation_2"],  
+            "hypothesis_1": raw_r["hypothesis_1"],  
+            "hypothesis_2": raw_r["hypothesis_2"],
+            "true_label": raw_r["true_label"],  
+            "raw": {
+                "predicted_label": raw_r["predicted_label"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_label": ft_r["predicted_label"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            },
+            "disagreement_type": disagreement_type
+        })
+    
+    disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+    with open(disagreement_file, "w") as f:
+        json.dump(disagreement_cases, f, indent=2)
+    print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    
+    all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+    with open(all_cases_file, "w") as f:
+        json.dump(all_cases, f, indent=2)
+    print(f"💾 All cases saved to: {all_cases_file}")
     
     return summary
 

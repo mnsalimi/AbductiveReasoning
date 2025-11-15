@@ -30,10 +30,10 @@ warnings.filterwarnings('ignore')
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/abductive_dt10.25.17:43_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16_abductive-reasoning")
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/aimo_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/gsm8k_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -170,10 +170,16 @@ def create_gsm8k_prompt(problem):
     """Create a prompt for GSM8K math problem."""
     system_prompt = """You are an expert mathematician.
 
-IMPORTANT: 
-- Provide your final answer as a number
-- Format your answer as: "Answer: [number]" or "#### [number]"
-"""
+First, think step by step and explain your mathematical reasoning in just one paragraph. Then compute the final numerical answer.
+
+Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+
+<reasoning>
+[here you write your chain-of-thought reasoning and intermediate steps]
+</reasoning>
+<answer>
+[here you output ONLY the final numeric answer, e.g. 42 or 3.14]
+</answer>"""
     
     user_prompt = f"""Problem: {problem}
 
@@ -181,54 +187,45 @@ Solve this problem step by step, then provide your final numerical answer."""
     
     return system_prompt, user_prompt
 
+def extract_reasoning(response):
+    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
+    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
 def extract_answer(response):
-    """Extract the numerical answer from model response.
-    
-    Handles various answer formats including integers, decimals, and numbers with commas.
+    """Extract the numerical answer from the <answer>...</answer> block.
+
+    Handles integers, decimals, and numbers with commas.
     """
-    # Remove whitespace
-    response = response.strip()
-    
-    # Try to find various answer patterns
-    patterns = [
-        r'####\s*(-?\d+(?:,\d+)*(?:\.\d+)?)',  # GSM8K format: #### 123
-        r'[Aa]nswer\s*:?\s*\$?\s*(-?\d+(?:,\d+)*(?:\.\d+)?)',  # "Answer: 123" or "Answer: $123"
-        r'[Ff]inal\s+[Aa]nswer\s*:?\s*\$?\s*(-?\d+(?:,\d+)*(?:\.\d+)?)',  # "Final answer: 123"
-        r'[Tt]he\s+answer\s+is\s*:?\s*\$?\s*(-?\d+(?:,\d+)*(?:\.\d+)?)',  # "The answer is: 123"
-        r'[Tt]herefore\s*,?\s*\$?\s*(-?\d+(?:,\d+)*(?:\.\d+)?)',  # "Therefore, 123"
-        r'\\boxed\{(-?\d+(?:,\d+)*(?:\.\d+)?)\}',  # LaTeX boxed: \boxed{123}
-        r'=\s*\$?\s*(-?\d+(?:,\d+)*(?:\.\d+)?)\s*$',  # Ends with "= 123"
-    ]
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, response)
-        if matches:
-            # Get the last match (usually the final answer)
-            num_str = matches[-1].replace(',', '')
-            try:
-                # Try to convert to int if it's a whole number
-                if '.' in num_str:
-                    return float(num_str)
-                else:
-                    return int(num_str)
-            except ValueError:
-                continue
-    
-    # Try to find any number in the last 200 characters
-    last_part = response[-200:]
-    numbers = re.findall(r'-?\d+(?:,\d+)*(?:\.\d+)?', last_part)
-    if numbers:
-        for num_str in reversed(numbers):  # Check from end
-            num_str = num_str.replace(',', '')
-            try:
-                if '.' in num_str:
-                    return float(num_str)
-                else:
-                    return int(num_str)
-            except ValueError:
-                continue
-    
-    return None  # Unable to extract
+    if not response:
+        return None
+
+    # Find the content inside <answer>...</answer>
+    tag_match = re.search(r'<answer>\s*(.*?)\s*</answer>',
+                          response,
+                          re.IGNORECASE | re.DOTALL)
+    if not tag_match:
+        return None
+
+    answer_content = tag_match.group(1).strip()
+
+    # Look for a number inside the answer content
+    num_match = re.search(r'[-+]?\d+(?:,\d+)*(?:\.\d+)?', answer_content)
+    if not num_match:
+        return None
+
+    num_str = num_match.group(0).replace(',', '')
+
+    try:
+        # Convert to int if it's a whole number, else float
+        if '.' in num_str:
+            return float(num_str)
+        else:
+            return int(num_str)
+    except ValueError:
+        return None
 
 def evaluate_on_gsm8k(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="test"):
     """Evaluate model on GSM8K dataset with batch processing support."""
@@ -323,10 +320,10 @@ def evaluate_on_gsm8k(model, tokenizer, max_samples=None, model_name="Model", ba
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=512,
-                temperature=1e-5,  # Low temperature for more accurate answers
-                do_sample=True,
-                top_p=0.95,
+                max_new_tokens=2048,
+                temperature=0.0,  # Low temperature for more accurate answers
+                do_sample=False,
+                # top_p=0.95,
                 pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
             )
         
@@ -338,6 +335,9 @@ def evaluate_on_gsm8k(model, tokenizer, max_samples=None, model_name="Model", ba
             
             # Extract answer
             predicted_answer = extract_answer(response)
+            
+            # Extract reasoning
+            reasoning = extract_reasoning(response)
             
             if predicted_answer is None:
                 failed_extractions += 1
@@ -362,7 +362,7 @@ def evaluate_on_gsm8k(model, tokenizer, max_samples=None, model_name="Model", ba
                 'problem': batch_data[i]['problem'],
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
-                'response': response,
+                'reasoning': reasoning,
                 'correct': is_correct
             })
     
@@ -476,6 +476,68 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2)
     print(f"💾 Comparison summary saved to: {summary_file}")
+    
+    # Save disagreement and all cases summary
+    raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
+    ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
+    
+    disagreement_cases, all_cases = [], []
+    
+    for pid, raw_r in raw_by_id.items():
+        if pid not in ft_by_id:
+            continue
+        ft_r = ft_by_id[pid]
+        
+        all_cases.append({
+            "problem_id": pid,
+            "problem": raw_r["problem"],          
+            "true_answer": raw_r["true_answer"],  
+            "raw": {
+                "predicted_answer": raw_r["predicted_answer"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_answer": ft_r["predicted_answer"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            }
+        })
+        
+        if raw_r['correct'] == ft_r['correct']:
+            continue
+        
+        if raw_r['correct'] and not ft_r['correct']:
+            disagreement_type = "raw_correct_finetuned_wrong"
+        else:
+            disagreement_type = "finetuned_correct_raw_wrong"
+        
+        disagreement_cases.append({
+            "problem_id": pid,
+            "problem": raw_r["problem"],          
+            "true_answer": raw_r["true_answer"],
+            "raw": {
+                "predicted_answer": raw_r["predicted_answer"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_answer": ft_r["predicted_answer"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            },
+            "disagreement_type": disagreement_type
+        })
+    
+    disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+    with open(disagreement_file, "w") as f:
+        json.dump(disagreement_cases, f, indent=2)
+    print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    
+    all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+    with open(all_cases_file, "w") as f:
+        json.dump(all_cases, f, indent=2)
+    print(f"💾 All cases saved to: {all_cases_file}")
     
     return summary
 

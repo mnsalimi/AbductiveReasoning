@@ -65,4 +65,7 @@ for ckpt in "$CHECKPOINT_DIR"/checkpoint-*; do
         echo "Finished $script"
         echo "-------------------------------------"
     done
+    python3 GRPO/Evaluation/create_table.py \
+        --root "./GRPO/Evaluation/" \
+        --out_csv "./GRPO/Evaluation//metrics_summary.xlsx"
 done

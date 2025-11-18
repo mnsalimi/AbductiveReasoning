@@ -535,7 +535,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         **finetuned_results
     }
     
-    finetune_results_file = os.path.join(ckpt_output_dir, "all_casses.json")
+    finetune_results_file = os.path.join(ckpt_output_dir, "all_cases.json")
     with open(finetune_results_file, "w") as f:
         json.dump(finetune_results_with_meta, f, indent=2)
     print(f"💾 finetune model results saved to: {finetune_results_file}")

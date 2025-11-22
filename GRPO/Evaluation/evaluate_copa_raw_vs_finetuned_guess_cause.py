@@ -413,6 +413,205 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
     }
 
 
+def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
+    """Evaluate a model with automatic batch-size backoff to avoid CUDA OOM."""
+    results = None
+    batch_size = args.batch_size
+    
+    while batch_size >= 1 and results is None:
+        try:
+            print(f"\n🧪 Evaluating {model_name} with batch_size={batch_size}")
+            results = evaluate_on_copa(
+                model,
+                tokenizer,
+                args.max_samples,
+                model_name,
+                batch_size,
+                args.split
+            )
+            print(f"✅ {model_name} evaluation succeeded with batch_size={batch_size}")
+        except torch.cuda.OutOfMemoryError:
+            print(f"⚠️ CUDA OutOfMemoryError at batch_size={batch_size}, halving batch size...")
+            results = None
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower():
+                print(f"⚠️ RuntimeError OOM at batch_size={batch_size}, halving batch size...")
+                results = None
+            else:
+                raise
+        
+        if results is None:
+            torch.cuda.empty_cache()
+            batch_size = batch_size // 2
+    
+    if results is None:
+        print(f"❌ {model_name}: still out of memory even with batch_size < 1, giving up.")
+    
+    return results
+
+def ensure_raw_results_cached(args):
+    """
+    Ensure raw copa results are cached on disk for the current configuration.
+    Returns the loaded or newly computed raw_results dict.
+    """
+    dataset_name = "copa_guess_cause"
+    split = args.split
+    sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
+    
+    raw_results_dir = os.path.join(OUTPUT_DIR, "raw_model", dataset_name)
+    os.makedirs(raw_results_dir, exist_ok=True)
+    
+    raw_results_file = os.path.join(
+        raw_results_dir,
+        f"raw_results_{split}_{sample_tag}.json"
+    )
+    
+    if os.path.exists(raw_results_file):
+        print(f"\n📂 Found cached raw model results: {raw_results_file}")
+        with open(raw_results_file, "r") as f:
+            raw_results = json.load(f)
+        return raw_results
+    
+    print("\n🔁 No cached raw model results found for this configuration.")
+    print("   Running raw model once and caching per-sample results...")
+    
+    raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
+    raw_results = evaluate_model_with_dynamic_batch(
+        raw_model, raw_tokenizer, args, "Raw Model (cached)"
+    )
+    del raw_model
+    torch.cuda.empty_cache()
+    
+    if raw_results is None:
+        print("❌ Failed to compute raw model results; cannot cache.")
+        return None
+    
+    raw_results_with_meta = {
+        "model_path": RAW_MODEL_PATH,
+        "dataset": dataset_name,
+        "split": split,
+        "max_samples": args.max_samples,
+        **raw_results
+    }
+    
+    with open(raw_results_file, "w") as f:
+        json.dump(raw_results_with_meta, f, indent=2)
+    print(f"💾 Cached raw model results saved to: {raw_results_file}")
+    
+    return raw_results_with_meta
+
+def evaluate_checkpoint_cases(args, checkpoint_path):
+    """
+    Given a single checkpoint, evaluate it vs cached raw results and save:
+      - all_cases.json
+      - disagreement_cases.json
+    under: OUTPUT_DIR/<checkpoint_name>/copa/
+    """
+    print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
+    if not os.path.isabs(checkpoint_path):
+        checkpoint_path = os.path.abspath(checkpoint_path)
+        print(f"   Converted to absolute path: {checkpoint_path}")
+    
+    if not os.path.exists(checkpoint_path):
+        print(f"❌ Error: Checkpoint path does not exist: {checkpoint_path}")
+        print(f"   Please check the path and try again.")
+        return
+    
+    ckpt_name = os.path.basename(checkpoint_path.rstrip("/"))
+    print(f"✅ Using checkpoint for per-case evaluation: {ckpt_name}")
+    
+    # Get cached (or newly computed) raw results
+    raw_results = ensure_raw_results_cached(args)
+    if raw_results is None:
+        print("❌ Cannot evaluate checkpoint without raw model results.")
+        return
+    
+    # Evaluate fine-tuned checkpoint
+    finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
+    finetuned_results = evaluate_model_with_dynamic_batch(
+        finetuned_model,
+        finetuned_tokenizer,
+        args,
+        f"Fine-tuned Model ({ckpt_name})"
+    )
+    del finetuned_model
+    torch.cuda.empty_cache()
+    
+    if finetuned_results is None:
+        print("❌ Fine-tuned model evaluation failed; aborting.")
+        return
+    
+    # Build per-case comparison
+    dataset_name = "copa_guess_cause"
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), ckpt_name, dataset_name)
+    os.makedirs(ckpt_output_dir, exist_ok=True)
+    
+    raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
+    ft_by_id = {idx + 1: r for idx, r in enumerate(finetuned_results["results"])}
+    
+    disagreement_cases = []
+    
+    for pid, raw_r in raw_by_id.items():
+        if pid not in ft_by_id:
+            continue
+        ft_r = ft_by_id[pid]
+        
+        case_entry = {
+            "problem_id": pid,
+            "premise": raw_r["premise"],          
+            "choice1": raw_r["choice1"],
+            "choice2": raw_r["choice2"],  
+            "true_label": raw_r["true_label"],  
+            "raw": {
+                "predicted_label": raw_r["predicted_label"],
+                "reasoning": raw_r["reasoning"],
+                "correct": raw_r["correct"]
+            },
+            "finetuned": {
+                "predicted_label": ft_r["predicted_label"],
+                "reasoning": ft_r["reasoning"],
+                "correct": ft_r["correct"]
+            }
+        }
+        
+        if raw_r["correct"] == ft_r["correct"]:
+            continue
+        
+        if raw_r["correct"] and not ft_r["correct"]:
+            disagreement_type = "raw_correct_finetuned_wrong"
+        else:
+            disagreement_type = "finetuned_correct_raw_wrong"
+        
+        disagreement_cases.append({
+            **case_entry,
+            "disagreement_type": disagreement_type
+        })
+    
+    disagreement_file = os.path.join(ckpt_output_dir, "disagreement_cases.json")
+    with open(disagreement_file, "w") as f:
+        json.dump(disagreement_cases, f, indent=2)
+    print(f"💾 Disagreement cases saved to: {disagreement_file}")
+    
+    finetune_results_with_meta = {
+        "dataset": dataset_name,
+        "max_samples": args.max_samples,
+        **finetuned_results
+    }
+    
+    finetune_results_file = os.path.join(ckpt_output_dir, "all_cases.json")
+    with open(finetune_results_file, "w") as f:
+        json.dump(finetune_results_with_meta, f, indent=2)
+    print(f"💾 finetune model results saved to: {finetune_results_file}")
+    
+    return {
+        "raw_results": raw_results,
+        "finetuned_results": finetuned_results,
+        "all_cases_file": finetune_results_file,
+        "disagreement_file": disagreement_file
+    }
+
+
+
 def save_results(raw_results, finetuned_results, best_checkpoint_info, output_dir):
     """Save evaluation results to JSON files."""
     os.makedirs(output_dir, exist_ok=True)
@@ -638,6 +837,27 @@ def evaluate_all_checkpoints(args):
         print(f"   Accuracy: {raw_results['accuracy']:.4f}")
         print(f"   F1 Score: {raw_results['f1']:.4f}")
     
+    # Save results
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    summary_data = {
+        'evaluation_time': timestamp,
+        'dataset': 'COPA (cause questions only)',
+        'split': args.split,
+        'checkpoint_directory': checkpoint_dir,
+        'num_checkpoints_evaluated': len(checkpoint_dirs),
+        'raw_model': {
+            'path': RAW_MODEL_PATH,
+            'results': {k: v for k, v in raw_results.items() if k != 'results'} if raw_results else 'not_evaluated'
+        },
+        'checkpoints': []
+    }
+    
+    summary_file = os.path.join(OUTPUT_DIR, f"copa_all_checkpoints_summary_{timestamp}.json")
+    with open(summary_file, 'w') as f:
+        json.dump(summary_data, f, indent=2)
+    
     # Evaluate each checkpoint
     all_checkpoint_results = []
     
@@ -669,6 +889,21 @@ def evaluate_all_checkpoints(args):
                 'checkpoint_path': checkpoint_path,
                 'results': finetuned_results
             }
+            
+            summary_data["checkpoints"].append({
+                'name': checkpoint_info['checkpoint_name'],
+                'path': checkpoint_info['checkpoint_path'],
+                'metrics': {
+                    'accuracy': checkpoint_info['results']['accuracy'],
+                    'f1': checkpoint_info['results']['f1'],
+                    'precision': checkpoint_info['results']['precision'],
+                    'recall': checkpoint_info['results']['recall']
+                }
+            })
+            
+            with open(summary_file, 'w') as f:
+                json.dump(summary_data, f, indent=2)
+                
             all_checkpoint_results.append(checkpoint_info)
             
             print(f"\n✅ {ckpt_name} evaluation complete")
@@ -702,12 +937,12 @@ def evaluate_all_checkpoints(args):
         print(f"   {'Checkpoint':<20} {'Accuracy':<15} {'F1 Score':<15} {'Acc Δ':<12} {'F1 Δ':<12}")
         print(f"   {'-'*80}")
         
-        for ckpt_info in all_checkpoint_results:
-            res = ckpt_info['results']
+        for checkpoint_info in all_checkpoint_results:
+            res = checkpoint_info['results']
             acc_delta = res['accuracy'] - raw_results['accuracy']
             f1_delta = res['f1'] - raw_results['f1']
             
-            print(f"   {ckpt_info['checkpoint_name']:<20} "
+            print(f"   {checkpoint_info['checkpoint_name']:<20} "
                   f"{res['accuracy']:.4f}         "
                   f"{res['f1']:.4f}         "
                   f"{acc_delta:+.4f}      "
@@ -719,39 +954,6 @@ def evaluate_all_checkpoints(args):
         print(f"\n🏆 BEST CHECKPOINT: {best_ckpt['checkpoint_name']}")
         print(f"   Accuracy: {best_ckpt['results']['accuracy']:.4f}")
         print(f"   F1 Score: {best_ckpt['results']['f1']:.4f}")
-    
-    # Save results
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
-    summary_data = {
-        'evaluation_time': timestamp,
-        'dataset': 'COPA (cause questions only)',
-        'split': args.split,
-        'checkpoint_directory': checkpoint_dir,
-        'num_checkpoints_evaluated': len(all_checkpoint_results),
-        'raw_model': {
-            'path': RAW_MODEL_PATH,
-            'results': {k: v for k, v in raw_results.items() if k != 'results'} if raw_results else 'not_evaluated'
-        },
-        'checkpoints': [
-            {
-                'name': ckpt_info['checkpoint_name'],
-                'path': ckpt_info['checkpoint_path'],
-                'metrics': {
-                    'accuracy': ckpt_info['results']['accuracy'],
-                    'f1': ckpt_info['results']['f1'],
-                    'precision': ckpt_info['results']['precision'],
-                    'recall': ckpt_info['results']['recall']
-                }
-            }
-            for ckpt_info in all_checkpoint_results
-        ]
-    }
-    
-    summary_file = os.path.join(OUTPUT_DIR, f"copa_all_checkpoints_summary_{timestamp}.json")
-    with open(summary_file, 'w') as f:
-        json.dump(summary_data, f, indent=2)
     
     print(f"\n💾 All results saved to: {summary_file}")
     print("="*80 + "\n")
@@ -814,16 +1016,50 @@ def main():
                        help='Path to specific checkpoint to evaluate')
     parser.add_argument('--checkpoint_dir', type=str, default=None,
                        help='Path to directory containing multiple checkpoints')
+    parser.add_argument('--evaluate_checkpoints', type=int, default=0,
+                       help='If set to 1, run per-checkpoint mode: '
+                            'evaluate the given --checkpoint_path vs cached raw results and '
+                            'save all_cases/disagreement_cases under OUTPUT_DIR/checkpoint/dataset_name.')
     
     args = parser.parse_args()
     
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
         print("❌ Error: Cannot use both --checkpoint_path and --checkpoint_dir")
+        print("   Use --checkpoint_path for a single checkpoint")
+        print("   Use --checkpoint_dir to evaluate all checkpoints in a directory")
+        return
+    
+    if args.evaluate_checkpoints == 1 and args.checkpoint_dir:
+        print("❌ Error: --evaluate_checkpoints 1 is only supported with --checkpoint_path (single checkpoint).")
+        print("   Please pass a single --checkpoint_path, or omit --evaluate_checkpoints to use --checkpoint_dir.")
         return
     
     # Set CUDA device
     os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device
+    
+    # Special mode: per-checkpoint evaluation with cached raw results
+    if args.evaluate_checkpoints == 1:
+        if not args.checkpoint_path:
+            print("❌ Error: --evaluate_checkpoints 1 requires --checkpoint_path to be set.")
+            return
+        
+        print("="*80)
+        print("🚀 Copa guess cause PER-CHECKPOINT EVALUATION MODE")
+        print("="*80)
+        print(f"Raw Model:     {RAW_MODEL_PATH}")
+        print(f"Output Dir:    {OUTPUT_DIR}")
+        print(f"CUDA Device:   {args.cuda_device}")
+        print(f"Split:         {args.split}")
+        if args.max_samples:
+            print(f"Max Samples:   {args.max_samples}")
+        print(f"Checkpoint:    {args.checkpoint_path}")
+        print("="*80)
+        
+        evaluate_checkpoint_cases(args, args.checkpoint_path)
+        print(f"\n✅ Per-checkpoint evaluation finished for: {args.checkpoint_path}")
+        print(f"   Results root directory: {OUTPUT_DIR}")
+        return
     
     # If checkpoint_dir is provided, evaluate all checkpoints
     if args.checkpoint_dir:

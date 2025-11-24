@@ -303,7 +303,6 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
             input_length = inputs['input_ids'][i].shape[0]
             response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
             
-            print(f"\n\n{response}\n\n")
             # Extract answer
             predicted_answer = extract_answer(response)
             
@@ -316,7 +315,6 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
             
             # Check correctness
             true_answer = true_answers[i]
-            print(f"\n\n{true_answer}\n{predicted_answer}\n\n")
             is_correct = (predicted_answer == true_answer)
             if is_correct:
                 correct += 1
@@ -439,6 +437,21 @@ def ensure_raw_results_cached(args):
     
     return raw_results_with_meta
 
+def ensure_finetuned_results_cached(args, ckpt_name):
+    """
+    Ensure fine-tuned model results are cached on disk for the current configuration.
+    Returns the loaded or newly computed fine-tuned results dict.
+    """
+    dataset_name = "aime"
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name)
+    if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
+        print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
+        return True
+    
+    print("\n🔁 No cached fine-tuned model results found for this configuration.")
+    return False
+    
+
 def evaluate_checkpoint_cases(args, checkpoint_path):
     """
     Given a single checkpoint, evaluate it vs cached raw results and save:
@@ -458,11 +471,16 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     ckpt_name = os.path.basename(checkpoint_path.rstrip("/"))
     print(f"✅ Using checkpoint for per-case evaluation: {ckpt_name}")
-    
+
     # Get cached (or newly computed) raw results
     raw_results = ensure_raw_results_cached(args)
     if raw_results is None:
         print("❌ Cannot evaluate checkpoint without raw model results.")
+        return
+    
+    # Get cached (or newly computed) fine-tuned results
+    if ensure_finetuned_results_cached(args, ckpt_name):
+        print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
         return
     
     # Evaluate fine-tuned checkpoint
@@ -482,7 +500,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     # Build per-case comparison
     dataset_name = "aime"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -937,6 +955,7 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
+    global RAW_MODEL_PATH
     parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIME 2025 dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all 30 problems)')
@@ -960,7 +979,11 @@ def main():
                        help='If set to 1, run per-checkpoint mode: '
                             'evaluate the given --checkpoint_path vs cached raw results and '
                             'save all_cases/disagreement_cases under OUTPUT_DIR/checkpoint/dataset_name.')
-    
+    parser.add_argument('--run', type=str, default="run",
+                       help='Which training run to use for the output directory.')
+    parser.add_argument('--raw_path', type=str, default=None,
+                       help='The raw model path')
+        
     args = parser.parse_args()
     
     # Validate arguments
@@ -977,6 +1000,9 @@ def main():
     
     # Set CUDA device
     os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device
+
+    if args.raw_path:
+        RAW_MODEL_PATH = args.raw_path
     
     # Special mode: per-checkpoint evaluation with cached raw results
     if args.evaluate_checkpoints == 1:

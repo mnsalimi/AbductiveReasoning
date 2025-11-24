@@ -363,17 +363,17 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
             total += 1
             
             # Debug: Print first 3 comparisons
-            if idx < 3:
-                print(f"\n{'='*60}")
-                print(f"Sample {idx}:")
-                print(f"Problem: {problem[:200]}...")
-                print(f"True answer: {true_answer}")
-                print(f"Predicted answer: {predicted_answer}")
-                print(f"Normalized true: {norm_true}")
-                print(f"Normalized pred: {norm_pred}")
-                print(f"Correct: {is_correct}")
-                print(f"Response excerpt: {response[-200:]}")
-                print(f"{'='*60}")
+            # if idx < 3:
+            #     print(f"\n{'='*60}")
+            #     print(f"Sample {idx}:")
+            #     print(f"Problem: {problem[:200]}...")
+            #     print(f"True answer: {true_answer}")
+            #     print(f"Predicted answer: {predicted_answer}")
+            #     print(f"Normalized true: {norm_true}")
+            #     print(f"Normalized pred: {norm_pred}")
+            #     print(f"Correct: {is_correct}")
+            #     print(f"Response excerpt: {response[-200:]}")
+            #     print(f"{'='*60}")
             
             results.append({
                 'problem_id': idx,
@@ -490,6 +490,21 @@ def ensure_raw_results_cached(args):
     
     return raw_results_with_meta
 
+def ensure_finetuned_results_cached(args, ckpt_name):
+    """
+    Ensure fine-tuned model results are cached on disk for the current configuration.
+    Returns the loaded or newly computed fine-tuned results dict.
+    """
+    dataset_name = "aimo"
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name)
+    if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
+        print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
+        return True
+    
+    print("\n🔁 No cached fine-tuned model results found for this configuration.")
+    return False
+
+
 def evaluate_checkpoint_cases(args, checkpoint_path):
     """
     Given a single checkpoint, evaluate it vs cached raw results and save:
@@ -515,6 +530,11 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     if raw_results is None:
         print("❌ Cannot evaluate checkpoint without raw model results.")
         return
+
+    # Get cached (or newly computed) fine-tuned results
+    if ensure_finetuned_results_cached(args, ckpt_name):
+        print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
+        return
     
     # Evaluate fine-tuned checkpoint
     finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
@@ -533,7 +553,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     # Build per-case comparison
     dataset_name = "aimo"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), args.run ,ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -1002,6 +1022,7 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
+    global RAW_MODEL_PATH
     parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIMO dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all samples)')
@@ -1025,7 +1046,11 @@ def main():
                        help='If set to 1, run per-checkpoint mode: '
                             'evaluate the given --checkpoint_path vs cached raw results and '
                             'save all_cases/disagreement_cases under OUTPUT_DIR/checkpoint/dataset_name.')
-    
+    parser.add_argument('--run', type=str, default="run",
+                       help='Which training run to use for the output directory.')
+    parser.add_argument('--raw_path', type=str, default=None,
+                       help='The raw model path')
+        
     args = parser.parse_args()
     
     # Validate arguments
@@ -1042,6 +1067,9 @@ def main():
     
     # Set CUDA device
     os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device
+
+    if args.raw_path:
+        RAW_MODEL_PATH = args.raw_path
     
     # Special mode: per-checkpoint evaluation with cached raw results
     if args.evaluate_checkpoints == 1:

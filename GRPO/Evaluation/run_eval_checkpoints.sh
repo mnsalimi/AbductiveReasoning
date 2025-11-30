@@ -73,10 +73,10 @@ for ckpt_name in $(ls -1 "$CHECKPOINT_DIR" | grep '^checkpoint-' | sort -t- -k2,
 
         echo "Finished $script"
         echo "-------------------------------------"
+        python3 GRPO/Evaluation/create_table.py \
+            --root "./GRPO/Evaluation/" \
+            --out_csv "./GRPO/Evaluation//metrics_summary.xlsx" \
+            --run "$RUN_NAME" \
+            --base_model_name "qwen2.5-14B"
     done
-    python3 GRPO/Evaluation/create_table.py \
-        --root "./GRPO/Evaluation/" \
-        --out_csv "./GRPO/Evaluation//metrics_summary.xlsx" \
-        --run "$RUN_NAME" \
-        --base_model_name "qwen2.5-14B"
 done

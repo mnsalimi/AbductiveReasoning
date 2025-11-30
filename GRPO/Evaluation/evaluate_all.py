@@ -28,8 +28,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # ============================================================================
 
 # Shared model/training paths (will be injected into evaluation scripts)
-RAW_MODEL_PATH = "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
-TRAINING_DIR = "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/dt11.04.22:13_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
+RAW_MODEL_PATH = "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit"
+TRAINING_DIR = "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4"
 BASE_OUTPUT_DIR = str(SCRIPT_DIR)
 
 NUM_EPOCHS = 20  # Default number of training epochs
@@ -116,7 +116,7 @@ DEFAULT_PARAMS = {
 DEFAULT_PARALLEL_COUNT = 1
 
 # CUDA devices for parallel execution (will cycle through these IN ORDER)
-CUDA_DEVICES = ['3']
+CUDA_DEVICES = ['0']
 
 # Output directory for consolidated orchestrator results
 ORCHESTRATOR_OUTPUT_DIR = str(SCRIPT_DIR / 'multi_evaluation_results')

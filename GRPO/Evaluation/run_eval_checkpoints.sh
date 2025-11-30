@@ -10,12 +10,12 @@ scripts=(
     "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 
-BASE_RESULTS_DIR="/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results"
+BASE_RESULTS_DIR="/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results"
 
-RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
+RAW_MODEL_PATH="/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-unsloth-bnb-4bit"
 # RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit"
 
-RUN_NAME="dt11.18.17:40_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
+RUN_NAME="dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4"
 # RUN_NAME="dt11.23.10:54_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b8"
 
 TRAINING_DIR="$BASE_RESULTS_DIR/Training_${RUN_NAME}"
@@ -38,7 +38,7 @@ fi
 echo "Using checkpoint directory: $CHECKPOINT_DIR"
 echo
 
-COMMON_ARGS="--cuda_device 1 --evaluate_checkpoints 1"
+COMMON_ARGS="--cuda_device 0 --evaluate_checkpoints 1"
 
 declare -A BATCH_SIZES=(
     ["evaluate_medqa_raw_vs_finetuned.py"]=64
@@ -78,5 +78,5 @@ for ckpt_name in $(ls -1 "$CHECKPOINT_DIR" | grep '^checkpoint-' | sort -t- -k2,
         --root "./GRPO/Evaluation/" \
         --out_csv "./GRPO/Evaluation//metrics_summary.xlsx" \
         --run "$RUN_NAME" \
-        --base_model_name "qwen2.5-3B"
+        --base_model_name "qwen2.5-14B"
 done

@@ -93,21 +93,77 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     rows: List[Dict[str, Scalar]] = []
     all_metric_cols: Set[str] = set()
 
-    if not os.path.isdir(root_dir):
-        raise FileNotFoundError(f"Root directory not found: {root_dir}")
+    # Base directory for all results
+    base_results_dir = os.path.join(root_dir, "res") 
+
+    if not os.path.isdir(base_results_dir):
+        raise FileNotFoundError(f"Root directory not found: {base_results_dir}")
     
-    # ---- RAW MODEL ROW ----
-    ckpt_path = os.path.join(root_dir, "raw_model")  
-    row: Dict[str, Scalar] = {"checkpoint": f"{model_name}"}
-    for dataset_name in sorted(os.listdir(ckpt_path)):
-        dataset_path = os.path.join(ckpt_path, dataset_name)
-        dataset_name = dataset_name.lower()
-        if not os.path.isdir(dataset_path):
+    # --- RAW MODEL ROW ---
+    row: Dict[str, Scalar] = {"checkpoint": f"{model_name} (Raw)"}
+    
+    # 1. Iterate over all evaluation result directories in 'res'
+    for eval_dir_name in sorted(os.listdir(base_results_dir)):
+        eval_dir_path = os.path.join(base_results_dir, eval_dir_name)
+        if not os.path.isdir(eval_dir_path):
+            continue
+            
+        # Check if it's a raw results folder (not the checkpoint folder)
+        if not eval_dir_name.endswith("_evaluation_results") and not eval_dir_name.endswith("_evaluation_results_guess_effect"):
+            continue
+            
+        # Determine the base dataset name
+        if "_guess_effect" in eval_dir_name:
+            dataset_name_raw = eval_dir_name.split("_evaluation_results_guess_effect")[0]
+        else:
+            dataset_name_raw = eval_dir_name.split("_evaluation_results")[0]
+            
+        dataset_name_lower = dataset_name_raw.lower().replace("goemotion", "goemotion") # Ensure consistent casing
+        
+        # Try to find the raw results folder inside the dataset directory
+        raw_model_inner_path = os.path.join(eval_dir_path, "raw_model")
+        
+        # The final folder name inside 'raw_model' is usually the dataset name, but sometimes capitalized (like MedQA)
+        possible_inner_folders = [dataset_name_lower, dataset_name_lower.title(), dataset_name_raw]
+        
+        raw_results_dir = None
+        for inner_folder in possible_inner_folders:
+            candidate_path = os.path.join(raw_model_inner_path, inner_folder)
+            if os.path.isdir(candidate_path):
+                raw_results_dir = candidate_path
+                break
+        
+        if raw_results_dir is None:
             continue
 
-        json_path = os.path.join(dataset_path, "raw_results_train_all.json")
+        # Determine the correct JSON filename based on dataset pattern
+        if dataset_name_lower in ["aime", "art"]:
+            json_filename = "raw_results_train_all.json"
+        elif dataset_name_lower in ["aimo", "goemotion", "gsm8k", "medqa"]: # Added medqa and other test sets
+            json_filename = "raw_results_test_all.json"
+        elif dataset_name_lower in ["copa_guess_effect"]:
+            json_filename = "raw_results_validation_all.json"
+        else:
+            # Fallback
+            try:
+                potential_jsons = [f for f in os.listdir(raw_results_dir) if f.startswith("raw_results_") and f.endswith(".json")]
+                if len(potential_jsons) == 1:
+                    json_filename = potential_jsons[0]
+                else:
+                    continue
+            except FileNotFoundError:
+                continue
+
+        json_path = os.path.join(raw_results_dir, json_filename)
+        
         if not os.path.isfile(json_path):
-            continue
+            # Fallback to check if train/test/validation names were guessed wrong
+            if dataset_name_lower in ["aime", "art"]:
+                 json_path = os.path.join(raw_results_dir, "raw_results_test_all.json")
+                 if not os.path.isfile(json_path):
+                    continue
+            else:
+                continue
 
         try:
             metrics = load_metrics_from_json(json_path)
@@ -116,20 +172,21 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
             continue
 
         for metric_name, metric_value in metrics.items():
+            # Use the lowercase dataset name for column consistency
             if "hamming_accuracy" in metric_name:
-                col_name = f"{dataset_name}_hamming_acc"
+                col_name = f"{dataset_name_lower}_hamming_acc"
             elif "accuracy" in metric_name:
-                col_name = f"{dataset_name}_acc"
+                col_name = f"{dataset_name_lower}_acc"
             elif "macro_f1" in metric_name or "f1_macro" in metric_name:
-                col_name = f"{dataset_name}_f1"
+                col_name = f"{dataset_name_lower}_f1"
             elif "f1" in metric_name:
-                col_name = f"{dataset_name}_f1"
+                col_name = f"{dataset_name_lower}_f1"
             elif "precision" in metric_name:
-                col_name = f"{dataset_name}_precision"
+                col_name = f"{dataset_name_lower}_precision"
             elif "recall" in metric_name:
-                col_name = f"{dataset_name}_recall"
+                col_name = f"{dataset_name_lower}_recall"
             elif "exact_match_accuracy" in metric_name:
-                col_name = f"{dataset_name}_EM"
+                col_name = f"{dataset_name_lower}_EM"
             else:
                 continue
 
@@ -141,62 +198,73 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     rows.append(row)
 
     # ---- CHECKPOINT ROWS ----
-    root_dir = os.path.join(root_dir, run)
-    # Each subdirectory in root_dir is treated as a checkpoint
-    training_step = [int(dir.split("-")[-1]) for dir in os.listdir(root_dir)]
-    for ckpt_name in [f"checkpoint-{str(dir)}" for dir in sorted(training_step)]:
-        ckpt_path = os.path.join(root_dir, ckpt_name)
-        if not os.path.isdir(ckpt_path) or "checkpoint" not in ckpt_name:
-            continue
-        
-        if best_checkpoint and ckpt_name == best_checkpoint:
-            row: Dict[str, Scalar] = {"checkpoint": ckpt_name+"(best)"}
-        else:
-            row: Dict[str, Scalar] = {"checkpoint": ckpt_name}
+    run_dir = os.path.join(base_results_dir, run)
+    
+    if not os.path.isdir(run_dir):
+        print(f"[WARN] Run directory not found: {run_dir}. Skipping checkpoint parsing.")
+    else:
+        # Each subdirectory in run_dir is treated as a checkpoint
+        try:
+            training_step = [int(dir.split("-")[-1]) for dir in os.listdir(run_dir) if dir.startswith("checkpoint-")]
+        except ValueError:
+            print(f"[WARN] Could not parse checkpoint steps in {run_dir}. Skipping checkpoint parsing.")
+            training_step = []
 
-        # Each subdirectory here is treated as a dataset
-        for dataset_name in sorted(os.listdir(ckpt_path)):
-            dataset_path = os.path.join(ckpt_path, dataset_name)
-            dataset_name = dataset_name.lower()
-            if not os.path.isdir(dataset_path):
+        for ckpt_name in [f"checkpoint-{str(dir)}" for dir in sorted(training_step)]:
+            ckpt_path = os.path.join(run_dir, ckpt_name)
+            if not os.path.isdir(ckpt_path) or "checkpoint" not in ckpt_name:
                 continue
-
-            json_path = os.path.join(dataset_path, "all_cases.json")
-            if not os.path.isfile(json_path):
-                json_path = os.path.join(dataset_path, "all_casses.json")
-                if not os.path.isfile(json_path):
-                    continue
             
-            try:
-                metrics = load_metrics_from_json(json_path)
-            except Exception as e:
-                print(f"[WARN] Failed to read {json_path}: {e}")
-                continue
+            if best_checkpoint and ckpt_name == best_checkpoint:
+                row: Dict[str, Scalar] = {"checkpoint": ckpt_name+"(best)"}
+            else:
+                row: Dict[str, Scalar] = {"checkpoint": ckpt_name}
 
-            for metric_name, metric_value in metrics.items():
-                if "hamming_accuracy" in metric_name:
-                    col_name = f"{dataset_name}_hamming_acc"
-                elif "accuracy" in metric_name:
-                    col_name = f"{dataset_name}_acc"
-                elif "macro_f1" in metric_name or "f1_macro" in metric_name:
-                    col_name = f"{dataset_name}_f1"
-                elif "f1" in metric_name:
-                    col_name = f"{dataset_name}_f1"
-                elif "precision" in metric_name:
-                    col_name = f"{dataset_name}_precision"
-                elif "recall" in metric_name:
-                    col_name = f"{dataset_name}_recall"
-                elif "exact_match_accuracy" in metric_name:
-                    col_name = f"{dataset_name}_EM"
-                else:
+            # Each subdirectory here is treated as a dataset
+            for dataset_name in sorted(os.listdir(ckpt_path)):
+                dataset_path = os.path.join(ckpt_path, dataset_name)
+                dataset_name_lower = dataset_name.lower().replace("goemotion", "goemotion")
+                
+                if not os.path.isdir(dataset_path):
                     continue
 
-                # IMPORTANT CHANGE: store raw numeric values, not formatted strings
-                if col_name not in row:
-                    row[col_name] = metric_value
-                    all_metric_cols.add(col_name)
+                # Original logic for finding all_cases.json
+                json_path = os.path.join(dataset_path, "all_cases.json")
+                if not os.path.isfile(json_path):
+                    json_path = os.path.join(dataset_path, "all_casses.json") # typo handling
+                    if not os.path.isfile(json_path):
+                        continue
+                
+                try:
+                    metrics = load_metrics_from_json(json_path)
+                except Exception as e:
+                    print(f"[WARN] Failed to read {json_path}: {e}")
+                    continue
 
-        rows.append(row)
+                for metric_name, metric_value in metrics.items():
+                    if "hamming_accuracy" in metric_name:
+                        col_name = f"{dataset_name_lower}_hamming_acc"
+                    elif "accuracy" in metric_name:
+                        col_name = f"{dataset_name_lower}_acc"
+                    elif "macro_f1" in metric_name or "f1_macro" in metric_name:
+                        col_name = f"{dataset_name_lower}_f1"
+                    elif "f1" in metric_name:
+                        col_name = f"{dataset_name_lower}_f1"
+                    elif "precision" in metric_name:
+                        col_name = f"{dataset_name_lower}_precision"
+                    elif "recall" in metric_name:
+                        col_name = f"{dataset_name_lower}_recall"
+                    elif "exact_match_accuracy" in metric_name:
+                        col_name = f"{dataset_name_lower}_EM"
+                    else:
+                        continue
+
+                    # IMPORTANT CHANGE: store raw numeric values, not formatted strings
+                    if col_name not in row:
+                        row[col_name] = metric_value
+                        all_metric_cols.add(col_name)
+
+            rows.append(row)
 
     # Order columns: checkpoint first, then all metrics sorted
     ordered_cols = ["checkpoint"] + sorted(all_metric_cols)
@@ -435,7 +503,7 @@ def main():
     args = parser.parse_args()
 
     if args.best_checkpoint is None:
-        BASE_RESULTS_DIR="/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results"
+        BASE_RESULTS_DIR="/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results"
         TRAINING_DIR=f"{BASE_RESULTS_DIR}/Training_{args.run}"
         FINAL_DIR=f"{BASE_RESULTS_DIR}/{args.run}"
         if os.path.isdir(TRAINING_DIR):

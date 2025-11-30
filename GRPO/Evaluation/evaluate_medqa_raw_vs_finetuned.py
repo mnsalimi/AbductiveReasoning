@@ -212,7 +212,7 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
     
     # Load MedQA dataset
     print(f"Loading MedQA dataset (split={split})...")
-    dataset = load_dataset("json", data_files="/home/msalimi/users/sahand/AbductiveReasoning/datasets/data_clean/questions/US/test.jsonl")["train"]
+    dataset = load_dataset("json", data_files="/home/msalimi/users/sahand/AbductiveReasoning/datasets/MedQA/test.jsonl")["train"]
     
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))

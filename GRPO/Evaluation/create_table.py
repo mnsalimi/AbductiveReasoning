@@ -49,7 +49,7 @@ import numpy as np
 from typing import Dict, Any, List, Tuple, Set, Union
 import pandas as pd
 from openpyxl.styles import PatternFill, Font
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 import math
 
 from evaluate_aime_raw_vs_finetuned import find_best_checkpoint  
@@ -86,45 +86,69 @@ def load_metrics_from_json(json_path: str) -> Dict[str, Scalar]:
 
 
 def filter_metrics(metrics: Dict[str, Scalar]) -> Dict[str, Scalar]:
-    """Applies Task 1 logic: prefer f1, error if multiple and no f1."""
+    """
+    Applies Task 1 logic: prefer f1, then accuracy. 
+    Error if multiple metrics are found and neither f1 nor accuracy is present.
+    """
     
     # 1. Collect all valid metric keys
     valid_keys = [k for k in metrics.keys() if is_scalar(metrics[k])]
     
+    if len(valid_keys) <= 1:
+        # Only zero or one metric available -> Report it (or empty dict)
+        if len(valid_keys) == 1:
+            k = valid_keys[0]
+            return {k: metrics[k]}
+        return {}
+
+    # Multiple metrics available (len(valid_keys) > 1)
+    
     # 2. Check for F1 score variants
     f1_keys = [k for k in valid_keys if "f1" in k.lower()]
     
-    if len(valid_keys) > 1:
-        # Multiple metrics available
-        if not f1_keys:
-            # Multi metric, but F1 not present -> Raise Error
-            raise ValueError(f"Multiple metrics found but no F1 metric (found: {valid_keys}). Cannot select primary metric.")
-        else:
-            # Multiple metrics available, F1 present -> Select F1 (prioritize 'macro_f1' or similar general 'f1')
-            selected_f1_key = None
-            if "macro_f1" in f1_keys:
-                selected_f1_key = "macro_f1"
-            elif "f1_macro" in f1_keys:
-                selected_f1_key = "f1_macro"
-            elif "f1" in f1_keys:
-                selected_f1_key = "f1"
-            elif f1_keys:
-                selected_f1_key = f1_keys[0] # fallback to the first F1 variant
-            
-            if selected_f1_key and selected_f1_key in metrics:
-                return {selected_f1_key: metrics[selected_f1_key]}
-            
-            # Should not happen if f1_keys is not empty, but as a safeguard
-            raise ValueError(f"Internal error selecting F1 from {f1_keys}")
-            
-    elif len(valid_keys) == 1:
-        # Only one metric available -> Report it
-        k = valid_keys[0]
-        return {k: metrics[k]}
+    if f1_keys:
+        # F1 present -> Select F1 (prioritize 'macro_f1' or similar general 'f1')
+        selected_key = None
+        # Priority order for F1
+        if "macro_f1" in f1_keys:
+            selected_key = "macro_f1"
+        elif "f1_macro" in f1_keys:
+            selected_key = "f1_macro"
+        elif "f1" in f1_keys:
+            selected_key = "f1"
+        elif f1_keys:
+            selected_key = f1_keys[0] # fallback to the first F1 variant
         
-    # Zero metrics, return empty dict (handled by previous logic returning an empty dict)
-    return {}
+        if selected_key and selected_key in metrics:
+            return {selected_key: metrics[selected_key]}
+        
+        # Should not happen, but as a safeguard
+        raise ValueError(f"Internal error selecting F1 from {f1_keys}")
+    
+    # F1 not present -> Check for Accuracy
+    
+    # 3. Check for Accuracy variants
+    acc_keys = [k for k in valid_keys if "accuracy" in k.lower() or "acc" in k.lower()]
+    
+    if acc_keys:
+        # Accuracy present -> Select Accuracy (prioritize 'accuracy', 'acc')
+        selected_key = None
+        # Priority order for Accuracy
+        if "accuracy" in acc_keys:
+            selected_key = "accuracy"
+        elif "acc" in acc_keys:
+            selected_key = "acc"
+        elif acc_keys:
+            selected_key = acc_keys[0] # fallback to the first Accuracy variant
 
+        if selected_key and selected_key in metrics:
+            return {selected_key: metrics[selected_key]}
+
+        # Should not happen, but as a safeguard
+        raise ValueError(f"Internal error selecting Accuracy from {acc_keys}")
+
+    # Neither F1 nor Accuracy present, but multiple metrics exist -> Raise Error
+    raise ValueError(f"Multiple metrics found but neither F1 nor Accuracy is present (found: {valid_keys}). Cannot select primary metric.")
 
 def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model_name: str = "qwen2.5-3B") -> Tuple[List[Dict[str, Scalar]], List[str]]:
     """Walk the checkpoints directory and collect rows + column names.
@@ -432,65 +456,56 @@ def write_excel(
     green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
     green_font = Font(color="008000")
 
-    # --- 1. Prepare Workbook and Existing Data ---
+    # --- 1. Prepare Workbook and Existing Data Map ---
+    existing_ckpt_row_map = {}
+    
     if os.path.exists(out_path):
-        # Load existing workbook and sheet to preserve styles
+        # Load existing workbook to preserve styles
         try:
             wb = load_workbook(out_path)
         except Exception:
-            # If load fails (e.g., file corruption or locked), fall back to creating new
             print("[WARN] Could not load existing Excel file. Creating new sheet.")
-            os.remove(out_path) # Clean up potentially corrupted file
             return write_excel_new_style(rows, columns, out_path, sheet_name, best_checkpoint, model_name)
-
 
         if sheet_name in wb.sheetnames:
             ws = wb[sheet_name]
-            
-            # Read existing checkpoints from the sheet
-            existing_ckpts = []
             max_rows = ws.max_row
             
-            # Find all unique checkpoint names already written (starting from row 2, skipping header)
+            # Build map of existing checkpoint names to their row index (1-based)
+            # Row 1 is header. Row 2 is expected to be Raw Model.
             for r in range(2, max_rows + 1):
                 ckpt_name = ws.cell(row=r, column=1).value
-                if ckpt_name:
-                    existing_ckpts.append(str(ckpt_name))
-            
-            existing_ckpts = set(existing_ckpts)
+                # Only map finetuned checkpoints, Raw Model is handled separately (always row 2)
+                if ckpt_name and str(ckpt_name) != raw_model_name: 
+                    existing_ckpt_row_map[str(ckpt_name)] = r
 
-            # Determine the starting row for new data (next empty row)
-            start_row = max_rows + 1
+            raw_model_row = 2 
+            next_append_row = max_rows + 1
             
-            # Use Pandas to read the data needed for Raw Model comparison and get column mapping
             try:
-                # Ensure we have the raw model values for comparison (Raw Model is always the first row in df_new_full)
+                # Get raw values for comparison
                 raw_values = df_new_full[df_new_full['checkpoint'] == raw_model_name].iloc[0]
-                
-                # Filter new checkpoints that are NOT in the existing report
-                df_to_write = df_new_full[~df_new_full['checkpoint'].isin(existing_ckpts)]
-                df_to_write = df_to_write[df_to_write['checkpoint'] != raw_model_name]
-
-            except Exception:
-                # If reading old data fails (e.g., sheet structure changed), fall back to replacing/rewriting
-                print("[WARN] Failed to read sheet data for merging. Reverting to sheet replacement.")
+                df_to_process = df_new_full # Process ALL rows now
+            except Exception as e:
+                print(f"[WARN] Failed to read raw model data ({e}). Reverting to sheet replacement.")
                 return write_excel_new_style(rows, columns, out_path, sheet_name, best_checkpoint, model_name)
                 
         else:
             # Sheet does not exist, create it from scratch
             ws = wb.create_sheet(sheet_name)
-            if "Sheet" in wb.sheetnames: # Remove default sheet if present
+            if "Sheet" in wb.sheetnames:
                  wb.remove(wb["Sheet"])
             
             # Write headers
             ws.append(columns + ["better_metrics_than_raw", "better_datasets_than_raw"])
             
             raw_values = df_new_full[df_new_full['checkpoint'] == raw_model_name].iloc[0]
-            df_to_write = df_new_full # Write everything, including Raw model
-            start_row = 2 # Start writing data from row 2 (after header)
+            df_to_process = df_new_full # Write everything
+            raw_model_row = 2
+            next_append_row = 2 # Will be updated in the loop
     else:
-        # File does not exist, create workbook and sheet
-        wb = load_workbook()
+        # File does not exist, create new workbook
+        wb = Workbook() 
         ws = wb.active
         ws.title = sheet_name
         
@@ -498,30 +513,46 @@ def write_excel(
         ws.append(columns + ["better_metrics_than_raw", "better_datasets_than_raw"])
         
         raw_values = df_new_full[df_new_full['checkpoint'] == raw_model_name].iloc[0]
-        df_to_write = df_new_full # Write everything, including Raw model
-        start_row = 2 # Start writing data from row 2 (after header)
+        df_to_process = df_new_full # Write everything
+        raw_model_row = 2
+        next_append_row = 2 # Will be updated in the loop
 
-    # --- 2. Write and Format New/Missing Rows ---
+   # --- 2. Write and Format ALL Rows (Update or Append) ---
     
     # Map column names to their final Excel index (1-based)
     final_columns = columns + ["better_metrics_than_raw", "better_datasets_than_raw"]
     col_index_map = {col: idx + 1 for idx, col in enumerate(final_columns)}
     metric_cols = [c for c in columns if c != "checkpoint"] # Columns to be colored
 
-    current_row = start_row
-    
-    for _, row_data in df_to_write.iterrows():
+    for _, row_data in df_to_process.iterrows():
+        
+        ckpt_name = str(row_data['checkpoint'])
+        
+        # 1. Determine Target Row
+        if ckpt_name == raw_model_name:
+            target_row = raw_model_row # Always row 2
+            # Handle the case where the file was new and raw_model hasn't been written yet
+            if not os.path.exists(out_path) or sheet_name not in wb.sheetnames:
+                 next_append_row = max(next_append_row, target_row + 1)
+        elif ckpt_name in existing_ckpt_row_map:
+            target_row = existing_ckpt_row_map[ckpt_name] # Update existing row
+        else:
+            target_row = next_append_row # Append new row
+            existing_ckpt_row_map[ckpt_name] = target_row # Add to map for future updates
+            next_append_row += 1 # Increment for the next new row
+        
         better_metrics_count = 0
         better_datasets_set = set()
         
-        # Write data to cells and apply formatting
+        # 2. Write data to cells and apply formatting
         for col_name, excel_col in col_index_map.items():
             value = row_data.get(col_name)
-            cell = ws.cell(row=current_row, column=excel_col)
+            cell = ws.cell(row=target_row, column=excel_col)
             
             # --- Apply Data ---
-            if pd.isna(value) or value is None or math.isnan(value) if isinstance(value, float) else False:
-                cell.value = None
+            is_nan = pd.isna(value) or value is None or (isinstance(value, float) and math.isnan(value))
+            if is_nan:
+                cell.value = None # Writes a blank cell
             else:
                 if isinstance(value, (int, float)):
                     cell.value = np.round(value, 4)
@@ -535,7 +566,6 @@ def write_excel(
                 # Must be a numeric comparison
                 if isinstance(raw_val, (int, float)) and isinstance(cell.value, (int, float)):
                     if cell.value > raw_val:
-                        # Green fill for improvement
                         cell.fill = green_fill
                         better_metrics_count += 1
                         dataset_name = col_name.split("_", 1)[0]
@@ -546,18 +576,14 @@ def write_excel(
             
             # --- Color Checkpoint Name (Best Checkpoint) ---
             if col_name == "checkpoint" and best_checkpoint:
-                # Check for (best) suffix
                 if str(value).endswith("(best)"):
                     cell.font = green_font
                 else:
-                    # Ensure font is reset if not best, preserving other styles
                     cell.font = Font()
         
         # Write the summary columns
-        ws.cell(row=current_row, column=col_index_map["better_metrics_than_raw"]).value = better_metrics_count
-        ws.cell(row=current_row, column=col_index_map["better_datasets_than_raw"]).value = len(better_datasets_set)
-        
-        current_row += 1
+        ws.cell(row=target_row, column=col_index_map["better_metrics_than_raw"]).value = better_metrics_count
+        ws.cell(row=target_row, column=col_index_map["better_datasets_than_raw"]).value = len(better_datasets_set)
 
     # --- 3. Final Save ---
     try:

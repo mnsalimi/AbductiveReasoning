@@ -350,7 +350,8 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
             predicted_label = extract_answer(response)
             
             # Extract reasoning
-            reasoning = extract_reasoning(response)
+            # reasoning = extract_reasoning(response)
+            reasoning = response
             
             if predicted_label is None:
                 failed_extractions += 1

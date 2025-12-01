@@ -307,7 +307,8 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
             predicted_answer = extract_answer(response)
             
             # Extract reasoning
-            reasoning = extract_reasoning(response)
+            # reasoning = extract_reasoning(response)
+            reasoning = response
             
             if predicted_answer is None:
                 failed_extractions += 1

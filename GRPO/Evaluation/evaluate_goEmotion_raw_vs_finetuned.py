@@ -395,7 +395,8 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
             predicted_emotions = extract_emotions(response)
             
             # Extract reasoning
-            reasoning = extract_reasoning(response)
+            # reasoning = extract_reasoning(response)
+            reasoning = response
             
             if predicted_emotions is None:
                 failed_extractions += 1

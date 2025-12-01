@@ -332,7 +332,8 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
             predicted_label = extract_answer(response)
             
             # Extract reasoning
-            reasoning = extract_reasoning(response)
+            # reasoning = extract_reasoning(response)
+            reasoning = response
             
             if predicted_label is None:
                 failed_extractions += 1

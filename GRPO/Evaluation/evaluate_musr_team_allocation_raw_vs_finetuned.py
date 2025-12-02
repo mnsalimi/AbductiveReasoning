@@ -1032,6 +1032,8 @@ def main():
                        help='Which training run to use for the output directory.')
     parser.add_argument('--raw_path', type=str, default=None,
                        help='The raw model path')
+    parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
+                       help='Model output path, defaults to env variable.')
     
     args = parser.parse_args()
     

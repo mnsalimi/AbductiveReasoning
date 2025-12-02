@@ -64,3 +64,5 @@ GRPO/trainning_abductive.ipynb
 GRPO/Evaluation/multi_evaluation_results
 GRPO/Evaluation/*results
 GRPO/Evaluation/res
+
+GRPO/Evaluation/metrics*

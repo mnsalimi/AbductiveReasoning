@@ -16,6 +16,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
@@ -343,12 +344,36 @@ def evaluate_on_musr_object(model, tokenizer, max_samples=None, model_name="Mode
             })
     
     accuracy = correct / total if total > 0 else 0.0
+        
+    # Calculate comprehensive metrics
+    y_true = [r['true_answer'] for r in results]
+    y_pred = [r['predicted_answer'] for r in results]
+    
+    # Calculate precision, recall, f1 (macro and weighted averages)
+    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
+        y_true, y_pred, average='macro', zero_division=0
+    )
+    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
+        y_true, y_pred, average='weighted', zero_division=0
+    )
+    
+    # Per-class metrics
+    precision_per_class, recall_per_class, f1_per_class, support_per_class = precision_recall_fscore_support(
+        y_true, y_pred, average=None, zero_division=0
+    )
+    
+    # Confusion matrix
+    conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 2])
+
     
     # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     
     print(f"\n📊 {model_name} Results:")
     print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
+    print(f"   Precision: {precision_macro:.4f} (macro), {precision_weighted:.4f} (weighted)")
+    print(f"   Recall:    {recall_macro:.4f} (macro), {recall_weighted:.4f} (weighted)")
+    print(f"   F1-Score:  {f1_macro:.4f} (macro), {f1_weighted:.4f} (weighted)")
     print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%) - {total - failed_extractions}/{total} extracted")
     print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
     
@@ -358,6 +383,17 @@ def evaluate_on_musr_object(model, tokenizer, max_samples=None, model_name="Mode
         'total': total,
         'failed_extractions': failed_extractions,
         'extraction_rate': extraction_rate,
+        'precision_macro': precision_macro,
+        'precision_weighted': precision_weighted,
+        'recall_macro': recall_macro,
+        'recall_weighted': recall_weighted,
+        'f1_macro': f1_macro,
+        'f1_weighted': f1_weighted,
+        'precision_per_class': precision_per_class.tolist(),
+        'recall_per_class': recall_per_class.tolist(),
+        'f1_per_class': f1_per_class.tolist(),
+        'support_per_class': support_per_class.tolist(),
+        'confusion_matrix': conf_matrix.tolist(),
         'results': results
     }
 

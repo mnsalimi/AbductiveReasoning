@@ -15,6 +15,7 @@ import argparse
 import re
 from datetime import datetime
 from tqdm import tqdm
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
 import torch
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -29,12 +30,12 @@ warnings.filterwarnings('ignore')
 
 # Allow path injection from orchestrator
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
-    "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit")
+    "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4")
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/msalimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/MedQA_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/MedQA_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -212,7 +213,7 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
     
     # Load MedQA dataset
     print(f"Loading MedQA dataset (split={split})...")
-    dataset = load_dataset("json", data_files="/home/msalimi/users/sahand/AbductiveReasoning/datasets/MedQA/test.jsonl")["train"]
+    dataset = load_dataset("json", data_files="/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/data_clean/questions/US/test.jsonl")["train"]
     
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
@@ -246,7 +247,7 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
         batch_data = []
         
         for i in range(batch_size_actual):
-            problem = batch['question'][i]
+            problem = batch['question'][i] + "\n" + str(batch["options"][i])
             true_answer = str(batch['answer_idx'][i])
             
             # Create prompt
@@ -330,12 +331,35 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
             })
     
     accuracy = correct / total if total > 0 else 0.0
+
+    # Calculate comprehensive metrics
+    y_true = [r['true_answer'] for r in results]
+    y_pred = [r['predicted_answer'] for r in results]
+    
+    # Calculate precision, recall, f1 (macro and weighted averages)
+    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
+        y_true, y_pred, average='macro', zero_division=0
+    )
+    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
+        y_true, y_pred, average='weighted', zero_division=0
+    )
+    
+    # Per-class metrics
+    precision_per_class, recall_per_class, f1_per_class, support_per_class = precision_recall_fscore_support(
+        y_true, y_pred, average=None, zero_division=0
+    )
+    
+    # Confusion matrix
+    conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 2])
     
     # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     
     print(f"\n📊 {model_name} Results:")
     print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
+    print(f"   Precision: {precision_macro:.4f} (macro), {precision_weighted:.4f} (weighted)")
+    print(f"   Recall:    {recall_macro:.4f} (macro), {recall_weighted:.4f} (weighted)")
+    print(f"   F1-Score:  {f1_macro:.4f} (macro), {f1_weighted:.4f} (weighted)")
     print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%) - {total - failed_extractions}/{total} extracted")
     print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
     
@@ -345,7 +369,18 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
         'total': total,
         'failed_extractions': failed_extractions,
         'extraction_rate': extraction_rate,
-        'results': results
+        'results': results,
+        'precision_macro': precision_macro,
+        'precision_weighted': precision_weighted,
+        'recall_macro': recall_macro,
+        'recall_weighted': recall_weighted,
+        'f1_macro': f1_macro,
+        'f1_weighted': f1_weighted,
+        'precision_per_class': precision_per_class.tolist(),
+        'recall_per_class': recall_per_class.tolist(),
+        'f1_per_class': f1_per_class.tolist(),
+        'support_per_class': support_per_class.tolist(),
+        'confusion_matrix': conf_matrix.tolist(),
     }
 
 
@@ -982,8 +1017,6 @@ def main():
                        help='Which training run to use for the output directory.')
     parser.add_argument('--raw_path', type=str, default=None,
                        help='The raw model path')
-    parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
-                       help='Model output path, defaults to env variable.')
     
     args = parser.parse_args()
     

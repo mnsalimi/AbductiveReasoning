@@ -349,9 +349,6 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
         y_true, y_pred, average=None, zero_division=0
     )
     
-    # Confusion matrix
-    conf_matrix = confusion_matrix(y_true, y_pred, labels=[1, 2])
-    
     # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     
@@ -379,8 +376,7 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
         'precision_per_class': precision_per_class.tolist(),
         'recall_per_class': recall_per_class.tolist(),
         'f1_per_class': f1_per_class.tolist(),
-        'support_per_class': support_per_class.tolist(),
-        'confusion_matrix': conf_matrix.tolist(),
+        'support_per_class': support_per_class.tolist()
     }
 
 

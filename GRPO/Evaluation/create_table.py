@@ -35,7 +35,7 @@ Output:
   - Writes an Excel file with columns:
         checkpoint, dataset_metric1, dataset_metric2, ...
     and a sheet name controlled by --run.
-  - Cells better than the raw model are highlighted in yellow.
+  - Cells better than the raw model are highlighted in green.
   - Two extra summary columns are added at the end:
         better_metrics_than_raw
         better_datasets_than_raw
@@ -263,7 +263,7 @@ def append_rows_in_place(
     - For checkpoints that already exist in the sheet:
         * update all metric cells if values changed
         * recompute better_metrics_than_raw, better_datasets_than_raw
-        * update yellow highlighting
+        * update green highlighting
     - For new checkpoints:
         * append new rows
     - Preserve column widths and existing sheet (no full rewrite).
@@ -409,7 +409,7 @@ def write_excel(
     - If the target sheet already exists, we DO NOT touch its formatting:
       we just append new rows via append_rows_in_place().
     - Otherwise, create the sheet as before.
-    - Cells where checkpoint metric > raw_model metric are colored yellow.
+    - Cells where checkpoint metric > raw_model metric are colored green.
     - Two extra columns are appended:
         better_metrics_than_raw
         better_datasets_than_raw

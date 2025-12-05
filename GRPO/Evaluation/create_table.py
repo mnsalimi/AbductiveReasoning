@@ -35,7 +35,7 @@ Output:
   - Writes an Excel file with columns:
         checkpoint, dataset_metric1, dataset_metric2, ...
     and a sheet name controlled by --run.
-  - Cells better than the raw model are highlighted in green.
+  - Cells better than the raw model are highlighted in yellow.
   - Two extra summary columns are added at the end:
         better_metrics_than_raw
         better_datasets_than_raw
@@ -48,7 +48,7 @@ import csv
 import numpy as np
 from typing import Dict, Any, List, Tuple, Set, Union
 import pandas as pd
-from openpyxl.styles import PatternFill, Font
+from openpyxl.styles import PatternFill, Font, Alignment
 
 from evaluate_aime_raw_vs_finetuned import find_best_checkpoint  
 
@@ -263,7 +263,7 @@ def append_rows_in_place(
     - For checkpoints that already exist in the sheet:
         * update all metric cells if values changed
         * recompute better_metrics_than_raw, better_datasets_than_raw
-        * update green highlighting
+        * update yellow highlighting
     - For new checkpoints:
         * append new rows
     - Preserve column widths and existing sheet (no full rewrite).
@@ -314,6 +314,7 @@ def append_rows_in_place(
     first_data_row = 2
 
     existing_row_map: Dict[str, int] = {}
+    mx_row = 0
     chk_col = col_index["checkpoint"]
     for r_idx in range(first_data_row, ws.max_row + 1):
         val = ws.cell(row=r_idx, column=chk_col).value
@@ -321,6 +322,7 @@ def append_rows_in_place(
             ck = _checkpoint_key(str(val))
             if ck not in existing_row_map:
                 existing_row_map[ck] = r_idx
+                mx_row = max(mx_row, r_idx)
 
     green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
     no_fill = PatternFill() 
@@ -360,7 +362,8 @@ def append_rows_in_place(
         if ck_key in existing_row_map:
             excel_row = existing_row_map[ck_key]
         else:
-            excel_row = ws.max_row + 1
+            excel_row = mx_row + 1
+            mx_row += 1
             existing_row_map[ck_key] = excel_row
 
         for col_name in final_columns:
@@ -375,6 +378,8 @@ def append_rows_in_place(
                 value = row_data.get(col_name, "")
 
             cell.value = value
+
+            cell.alignment = Alignment(horizontal='center', vertical='center') 
 
             if col_name in metric_cols:
                 if metric_better_flags.get(col_name, False):
@@ -409,7 +414,7 @@ def write_excel(
     - If the target sheet already exists, we DO NOT touch its formatting:
       we just append new rows via append_rows_in_place().
     - Otherwise, create the sheet as before.
-    - Cells where checkpoint metric > raw_model metric are colored green.
+    - Cells where checkpoint metric > raw_model metric are colored yellow.
     - Two extra columns are appended:
         better_metrics_than_raw
         better_datasets_than_raw
@@ -485,6 +490,11 @@ def write_excel(
         with pd.ExcelWriter(out_path, mode="a", engine="openpyxl", if_sheet_exists="replace") as writer:
             df.to_excel(writer, index=False, sheet_name=sheet_name, columns=final_columns)
 
+            ws = writer.sheets[sheet_name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+
             if has_baseline and better_mask is not None and metric_cols:
                 ws = writer.sheets[sheet_name]
                 green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
@@ -500,6 +510,11 @@ def write_excel(
     else:
         with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name=sheet_name, columns=final_columns)
+
+            ws = writer.sheets[sheet_name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
 
             if has_baseline and better_mask is not None and metric_cols:
                 ws = writer.sheets[sheet_name]

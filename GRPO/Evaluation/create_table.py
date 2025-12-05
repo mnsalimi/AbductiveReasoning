@@ -618,6 +618,7 @@ def download_from_gdrive_if_exists(
     local_path: str,
     folder_id: str,
     oauth_client_json: str,
+    sheet_name: str
 ) -> bool:
     """
     If a file with the given name exists in the Drive folder, download it
@@ -626,7 +627,8 @@ def download_from_gdrive_if_exists(
     creds = get_oauth_credentials(oauth_client_json)
     service = build("drive", "v3", credentials=creds)
 
-    file_name = os.path.basename(local_path)
+    # file_name = os.path.basename(local_path)
+    file_name = sheet_name
     query = (
         f"name = '{file_name}' and "
         f"'{folder_id}' in parents and "
@@ -660,6 +662,7 @@ def upload_to_gdrive(
     folder_id: str,
     oauth_client_json: str,
     mime_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    sheet_name: str = "Sheet1",
 ) -> str:
     """
     Upload a local file to a Google Drive folder using OAuth user credentials.
@@ -673,7 +676,8 @@ def upload_to_gdrive(
     creds = get_oauth_credentials(oauth_client_json)
     service = build("drive", "v3", credentials=creds)
 
-    file_name = os.path.basename(local_path)
+    # file_name = os.path.basename(local_path)
+    file_name = sheet_name
 
     query = (
         f"name = '{file_name}' and "
@@ -738,6 +742,7 @@ def write_excel_to_gdrive(
         local_path=out_path,
         folder_id=gdrive_folder_id,
         oauth_client_json=gdrive_service_account_json,
+        sheet_name=sheet_name
     )
 
     if not exists_remote and not os.path.exists(out_path):
@@ -763,6 +768,7 @@ def write_excel_to_gdrive(
         local_path=out_path,
         folder_id=gdrive_folder_id,
         oauth_client_json=gdrive_service_account_json,
+        sheet_name=sheet_name,
     )
 
 
@@ -824,7 +830,7 @@ def main():
 
     rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name)
     # write_csv(rows, columns, args.out_csv)
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=args.run, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1jZNuQzbD7rJxJ4lIgy5w8WgCOfiZWX6J", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
+    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=args.run, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
 
 
 if __name__ == "__main__":

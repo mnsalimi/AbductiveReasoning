@@ -31,24 +31,24 @@ warnings.filterwarnings("ignore")
 
 RAW_MODEL_PATH = os.environ.get(
     "EVAL_RAW_MODEL_PATH",
-    "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit",
+    "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit",
 )
 
 TRAINING_DIR = os.environ.get(
     "EVAL_TRAINING_DIR",
-    "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4",
+    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4",
 )
 
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 
 OUTPUT_DIR = os.environ.get(
     "EVAL_OUTPUT_DIR",
-    "/home/msalimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/uniadilr_evaluation_results",
+    "/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/uniadilr_evaluation_results",
 )
 
 DEFAULT_VAL_SPLIT_PATH = os.environ.get(
     "UNIADILR_VAL_SPLIT",
-    "./dataset/train_split.json",
+    "/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/dataset/train_split.json",
 )
 
 # ============================================================================

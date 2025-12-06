@@ -30,12 +30,12 @@ warnings.filterwarnings('ignore')
 
 # Allow path injection from orchestrator
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
-    "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit")
+    "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4")
+    "/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-     "/home/msalimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/copa_evaluation_results_guess_cause")  # Change default per script
+     "/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/copa_evaluation_results_guess_cause")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -662,141 +662,142 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         json.dump(raw_output, f, indent=2)
     print(f"\n💾 Raw model results saved to: {raw_file}")
     
-    # Save fine-tuned model results
-    finetuned_output = {
-        'base_model': RAW_MODEL_PATH,
-        'checkpoint': best_checkpoint_info['path'],
-        'validation_score': best_checkpoint_info['score'],
-        'evaluation_time': timestamp,
-        'dataset': 'COPA (cause questions only)',
-        'metrics': {
-            'accuracy': finetuned_results['accuracy'],
-            'f1': finetuned_results['f1'],
-            'precision': finetuned_results['precision'],
-            'recall': finetuned_results['recall'],
-            'extraction_rate': finetuned_results['extraction_rate']
-        },
-        'correct_count': finetuned_results['correct_count'],
-        'total': finetuned_results['total'],
-        'failed_extractions': finetuned_results['failed_extractions'],
-        'detailed_results': finetuned_results['results'][:100]  # Save first 100 for space
-    }
-    
-    finetuned_file = os.path.join(output_dir, f"finetuned_model_copa_results_{timestamp}.json")
-    with open(finetuned_file, 'w') as f:
-        json.dump(finetuned_output, f, indent=2)
-    print(f"💾 Fine-tuned model results saved to: {finetuned_file}")
-    
-    # Save comparison summary
-    improvement_acc = finetuned_results['accuracy'] - raw_results['accuracy']
-    improvement_f1 = finetuned_results['f1'] - raw_results['f1']
-    
-    summary = {
-        'evaluation_time': timestamp,
-        'dataset': 'COPA (cause questions only)',
-        'split': 'validation',
-        'num_samples': raw_results['total'],
-        'raw_model': {
-            'path': RAW_MODEL_PATH,
-            'metrics': {
-                'accuracy': raw_results['accuracy'],
-                'f1': raw_results['f1'],
-                'precision': raw_results['precision'],
-                'recall': raw_results['recall'],
-                'extraction_rate': raw_results['extraction_rate']
-            }
-        },
-        'finetuned_model': {
+    if finetuned_results:
+        # Save fine-tuned model results
+        finetuned_output = {
             'base_model': RAW_MODEL_PATH,
             'checkpoint': best_checkpoint_info['path'],
             'validation_score': best_checkpoint_info['score'],
+            'evaluation_time': timestamp,
+            'dataset': 'COPA (cause questions only)',
             'metrics': {
                 'accuracy': finetuned_results['accuracy'],
                 'f1': finetuned_results['f1'],
                 'precision': finetuned_results['precision'],
                 'recall': finetuned_results['recall'],
                 'extraction_rate': finetuned_results['extraction_rate']
-            }
-        },
-        'comparison': {
-            'accuracy_improvement': improvement_acc,
-            'f1_improvement': improvement_f1,
-            'overall_improved': improvement_acc > 0
+            },
+            'correct_count': finetuned_results['correct_count'],
+            'total': finetuned_results['total'],
+            'failed_extractions': finetuned_results['failed_extractions'],
+            'detailed_results': finetuned_results['results'][:100]  # Save first 100 for space
         }
-    }
-    
-    summary_file = os.path.join(output_dir, f"copa_comparison_summary_{timestamp}.json")
-    with open(summary_file, 'w') as f:
-        json.dump(summary, f, indent=2)
-    print(f"💾 Comparison summary saved to: {summary_file}")
-    
-    # Save disagreement and all cases summary
-    raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
-    ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
-    
-    disagreement_cases, all_cases = [], []
-    
-    for pid, raw_r in raw_by_id.items():
-        if pid not in ft_by_id:
-            continue
-        ft_r = ft_by_id[pid]
         
-        all_cases.append({
-            "problem_id": pid,
-            "premise": raw_r["premise"],          
-            "choice1": raw_r["choice1"],
-            "choice2": raw_r["choice2"],  
-            "true_label": raw_r["true_label"],  
-            "raw": {
-                "predicted_label": raw_r["predicted_label"],
-                "reasoning": raw_r["reasoning"],
-                "correct": raw_r["correct"]
+        finetuned_file = os.path.join(output_dir, f"finetuned_model_copa_results_{timestamp}.json")
+        with open(finetuned_file, 'w') as f:
+            json.dump(finetuned_output, f, indent=2)
+        print(f"💾 Fine-tuned model results saved to: {finetuned_file}")
+        
+        # Save comparison summary
+        improvement_acc = finetuned_results['accuracy'] - raw_results['accuracy']
+        improvement_f1 = finetuned_results['f1'] - raw_results['f1']
+        
+        summary = {
+            'evaluation_time': timestamp,
+            'dataset': 'COPA (cause questions only)',
+            'split': 'validation',
+            'num_samples': raw_results['total'],
+            'raw_model': {
+                'path': RAW_MODEL_PATH,
+                'metrics': {
+                    'accuracy': raw_results['accuracy'],
+                    'f1': raw_results['f1'],
+                    'precision': raw_results['precision'],
+                    'recall': raw_results['recall'],
+                    'extraction_rate': raw_results['extraction_rate']
+                }
             },
-            "finetuned": {
-                "predicted_label": ft_r["predicted_label"],
-                "reasoning": ft_r["reasoning"],
-                "correct": ft_r["correct"]
+            'finetuned_model': {
+                'base_model': RAW_MODEL_PATH,
+                'checkpoint': best_checkpoint_info['path'],
+                'validation_score': best_checkpoint_info['score'],
+                'metrics': {
+                    'accuracy': finetuned_results['accuracy'],
+                    'f1': finetuned_results['f1'],
+                    'precision': finetuned_results['precision'],
+                    'recall': finetuned_results['recall'],
+                    'extraction_rate': finetuned_results['extraction_rate']
+                }
+            },
+            'comparison': {
+                'accuracy_improvement': improvement_acc,
+                'f1_improvement': improvement_f1,
+                'overall_improved': improvement_acc > 0
             }
-        })
+        }
         
-        if raw_r['correct'] == ft_r['correct']:
-            continue
+        summary_file = os.path.join(output_dir, f"copa_comparison_summary_{timestamp}.json")
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=2)
+        print(f"💾 Comparison summary saved to: {summary_file}")
         
-        if raw_r['correct'] and not ft_r['correct']:
-            disagreement_type = "raw_correct_finetuned_wrong"
-        else:
-            disagreement_type = "finetuned_correct_raw_wrong"
+        # Save disagreement and all cases summary
+        raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
+        ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
         
-        disagreement_cases.append({
-            "problem_id": pid,
-            "premise": raw_r["premise"],          
-            "choice1": raw_r["choice1"],
-            "choice2": raw_r["choice2"],
-            "true_label": raw_r["true_label"],
-            "raw": {
-                "predicted_label": raw_r["predicted_label"],
-                "reasoning": raw_r["reasoning"],
-                "correct": raw_r["correct"]
-            },
-            "finetuned": {
-                "predicted_label": ft_r["predicted_label"],
-                "reasoning": ft_r["reasoning"],
-                "correct": ft_r["correct"]
-            },
-            "disagreement_type": disagreement_type
-        })
+        disagreement_cases, all_cases = [], []
+        
+        for pid, raw_r in raw_by_id.items():
+            if pid not in ft_by_id:
+                continue
+            ft_r = ft_by_id[pid]
+            
+            all_cases.append({
+                "problem_id": pid,
+                "premise": raw_r["premise"],          
+                "choice1": raw_r["choice1"],
+                "choice2": raw_r["choice2"],  
+                "true_label": raw_r["true_label"],  
+                "raw": {
+                    "predicted_label": raw_r["predicted_label"],
+                    "reasoning": raw_r["reasoning"],
+                    "correct": raw_r["correct"]
+                },
+                "finetuned": {
+                    "predicted_label": ft_r["predicted_label"],
+                    "reasoning": ft_r["reasoning"],
+                    "correct": ft_r["correct"]
+                }
+            })
+            
+            if raw_r['correct'] == ft_r['correct']:
+                continue
+            
+            if raw_r['correct'] and not ft_r['correct']:
+                disagreement_type = "raw_correct_finetuned_wrong"
+            else:
+                disagreement_type = "finetuned_correct_raw_wrong"
+            
+            disagreement_cases.append({
+                "problem_id": pid,
+                "premise": raw_r["premise"],          
+                "choice1": raw_r["choice1"],
+                "choice2": raw_r["choice2"],
+                "true_label": raw_r["true_label"],
+                "raw": {
+                    "predicted_label": raw_r["predicted_label"],
+                    "reasoning": raw_r["reasoning"],
+                    "correct": raw_r["correct"]
+                },
+                "finetuned": {
+                    "predicted_label": ft_r["predicted_label"],
+                    "reasoning": ft_r["reasoning"],
+                    "correct": ft_r["correct"]
+                },
+                "disagreement_type": disagreement_type
+            })
+        
+        disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+        with open(disagreement_file, "w") as f:
+            json.dump(disagreement_cases, f, indent=2)
+        print(f"💾 Disagreement cases saved to: {disagreement_file}")
+        
+        all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+        with open(all_cases_file, "w") as f:
+            json.dump(all_cases, f, indent=2)
+        print(f"💾 All cases saved to: {all_cases_file}")
     
-    disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
-    with open(disagreement_file, "w") as f:
-        json.dump(disagreement_cases, f, indent=2)
-    print(f"💾 Disagreement cases saved to: {disagreement_file}")
-    
-    all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
-    with open(all_cases_file, "w") as f:
-        json.dump(all_cases, f, indent=2)
-    print(f"💾 All cases saved to: {all_cases_file}")
-    
-    return summary
+    return None
 
 def evaluate_all_checkpoints(args):
     """Evaluate all checkpoints in a directory."""
@@ -1020,7 +1021,7 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH
+    global RAW_MODEL_PATH, OUTPUT_DIR
     parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on COPA dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all samples)')
@@ -1028,7 +1029,7 @@ def main():
                        help='CUDA device to use (default: 0)')
     parser.add_argument('--batch_size', type=int, default=4,
                        help='Batch size for evaluation (default: 4)')
-    parser.add_argument('--split', type=str, default='validation', choices=['train', 'test', 'validation'],
+    parser.add_argument('--split', type=str, default='train', choices=['train', 'test', 'validation'],
                        help='Dataset split to use (default: validation)')
     parser.add_argument('--skip_raw', action='store_true',
                        help='Skip raw model evaluation')
@@ -1050,6 +1051,7 @@ def main():
                        help='Model output path, defaults to env variable.')
     
     args = parser.parse_args()
+    OUTPUT_DIR = args.output_path
     
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
@@ -1104,6 +1106,7 @@ def main():
     print(f"Training Dir: {TRAINING_DIR}")
     print(f"CUDA Device: {args.cuda_device}")
     print(f"Batch Size: {args.batch_size}")
+    print(f"Output Dir: {OUTPUT_DIR}")
     print(f"Split: {args.split}")
     print(f"Task: Identify CAUSE given EFFECT")
     if args.max_samples:
@@ -1165,9 +1168,9 @@ def main():
         print("\n⏭️  Skipping fine-tuned model evaluation")
     
     # Save and display results
-    if raw_results and finetuned_results:
+    if raw_results or finetuned_results:
         summary = save_results(raw_results, finetuned_results, best_checkpoint_info, OUTPUT_DIR)
-        print_comparison(summary)
+        # print_comparison(summary)
     
     print(f"\n✅ All results saved to: {OUTPUT_DIR}")
 

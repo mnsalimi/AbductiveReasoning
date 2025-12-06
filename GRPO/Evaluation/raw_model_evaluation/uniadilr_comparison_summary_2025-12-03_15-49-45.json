@@ -1,0 +1,17 @@
+{
+  "evaluation_time": "2025-12-03_15-49-45",
+  "dataset": "UniADILR",
+  "split_path": "/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/dataset/train_split.json",
+  "num_samples": 400,
+  "raw_model": {
+    "path": "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit",
+    "metrics": {
+      "exact_match_accuracy": 0.02,
+      "precision": 0.05479166666666666,
+      "recall": 0.0475,
+      "f1": 0.04908333333333333,
+      "extraction_rate": 0.0725
+    }
+  },
+  "finetuned_model": null
+}

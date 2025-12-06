@@ -630,7 +630,7 @@ def main():
     args = parser.parse_args()
 
     if args.best_checkpoint is None:
-        BASE_RESULTS_DIR="/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results"
+        BASE_RESULTS_DIR="/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results"
         TRAINING_DIR=f"{BASE_RESULTS_DIR}/Training_{args.run}"
         FINAL_DIR=f"{BASE_RESULTS_DIR}/{args.run}"
         if os.path.isdir(TRAINING_DIR):

@@ -244,7 +244,8 @@ def clean_sheet_name(name):
     invalid = ['\\', '/', '*', '?', ':', '[', ']']
     for c in invalid:
         name = name.replace(c, '_')
-    return name[:31]  # Excel also limits sheet names to 31 chars
+    # return name[:31]  # Excel also limits sheet names to 31 chars
+    return "Sheet1"
 
 def _checkpoint_key(name: str) -> str:
     """Normalize checkpoint name by stripping '(best)' etc."""
@@ -258,6 +259,7 @@ def append_rows_in_place(
     sheet_name: str,
     best_checkpoint: str,
     model_name: str,
+    old_sheet_name: str
 ) -> None:
     """
     Update an existing Excel sheet in-place:
@@ -270,9 +272,9 @@ def append_rows_in_place(
         * append new rows
     - Preserve column widths and existing sheet (no full rewrite).
     """
-    sheet_name = clean_sheet_name(sheet_name)
+    sheet_name = clean_sheet_name(old_sheet_name)
 
-    final_columns = columns + ["better_metrics_than_raw", "better_datasets_than_raw"]
+    final_columns = columns + ["better_datasets_than_raw"]
     metric_cols = [c for c in columns if c != "checkpoint"]
 
     dataset_to_cols: Dict[str, List[str]] = {}
@@ -408,6 +410,7 @@ def write_excel(
     columns: List[str],
     out_path: str,
     sheet_name: str = "Sheet1",
+    old_sheet_name: str = None,
     best_checkpoint: str = None,
     model_name: str = "qwen2.5-3B"
 ) -> None:
@@ -421,7 +424,7 @@ def write_excel(
         better_metrics_than_raw
         better_datasets_than_raw
     """
-    sheet_name = clean_sheet_name(sheet_name)
+    sheet_name = clean_sheet_name(old_sheet_name)
 
     if os.path.exists(out_path):
         try:
@@ -465,7 +468,7 @@ def write_excel(
         better_mask = df[metric_cols].gt(raw_values)
         better_mask = better_mask.fillna(False)
 
-        df["better_metrics_than_raw"] = better_mask.sum(axis=1)
+        # df["better_metrics_than_raw"] = better_mask.sum(axis=1)
 
         dataset_to_cols = {}
         for col in metric_cols:
@@ -481,10 +484,10 @@ def write_excel(
             better_datasets_counts.append(count)
         df["better_datasets_than_raw"] = better_datasets_counts
     else:
-        df["better_metrics_than_raw"] = 0
+        # df["better_metrics_than_raw"] = 0
         df["better_datasets_than_raw"] = 0
 
-    final_columns = columns + ["better_metrics_than_raw", "better_datasets_than_raw"]
+    final_columns = columns + ["better_datasets_than_raw"]
 
     mode = "a" if os.path.exists(out_path) else "w"
 
@@ -726,6 +729,7 @@ def write_excel_to_gdrive(
     columns: List[str],
     out_path: str,
     sheet_name: str,
+    old_sheet_name: str,
     best_checkpoint: str,
     model_name: str,
     gdrive_folder_id: str,
@@ -753,6 +757,7 @@ def write_excel_to_gdrive(
             columns=columns,
             out_path=out_path,
             sheet_name=sheet_name,
+            old_sheet_name=old_sheet_name,
             best_checkpoint=best_checkpoint,
             model_name=model_name,
         )
@@ -762,6 +767,7 @@ def write_excel_to_gdrive(
             columns=columns,
             out_path=out_path,
             sheet_name=sheet_name,
+            old_sheet_name=old_sheet_name,
             best_checkpoint=best_checkpoint,
             model_name=model_name,
         )
@@ -846,8 +852,9 @@ def main():
 
     rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name)
     # write_csv(rows, columns, args.out_csv)
+    old_sheet_name = args.run
     sheet_name = args.run.split("e20_")[0] + args.train_data + "_e20_" + args.run.split("e20_")[1]
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
+    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
 
 
 if __name__ == "__main__":

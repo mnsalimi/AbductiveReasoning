@@ -1,6 +1,9 @@
 #!/bin/bash
 
 scripts=(
+    # "evaluate_neulr_deductive_raw_vs_finetuned.py"
+    # "evaluate_neulr_inductive_raw_vs_finetuned.py"
+    # "evaluate_neulr_abductive_raw_vs_finetuned.py"
     "evaluate_musr_object_placements_raw_vs_finetuned.py"
     "evaluate_musr_murder_mystery_raw_vs_finetuned.py"
     "evaluate_musr_team_allocation_raw_vs_finetuned.py"
@@ -13,13 +16,17 @@ scripts=(
     "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 
-BASE_RESULTS_DIR="/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results"
+OUTPUT_DIR="/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/14B"
 
-RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
-# RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit"
+ROOT_DIR="./GRPO/Evaluation/14B"
 
-RUN_NAME="dt11.18.17:40_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
-# RUN_NAME="dt11.23.10:54_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b8"
+BASE_RESULTS_DIR="/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/results"
+
+# RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
+RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit"
+
+# RUN_NAME="dt11.18.17:40_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"
+RUN_NAME="dt12.03.23:22_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4"
 
 TRAINING_DIR="$BASE_RESULTS_DIR/Training_${RUN_NAME}"
 FINAL_DIR="$BASE_RESULTS_DIR/${RUN_NAME}"
@@ -41,19 +48,22 @@ fi
 echo "Using checkpoint directory: $CHECKPOINT_DIR"
 echo
 
-COMMON_ARGS="--cuda_device 1 --evaluate_checkpoints 1"
+COMMON_ARGS="--cuda_device 3 --evaluate_checkpoints 1"
 
 declare -A BATCH_SIZES=(
-    ["evaluate_medqa_raw_vs_finetuned.py"]=64
-    ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=32
-    ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=8 # Note that each batch has 4 questions!
-    ["evaluate_musr_team_allocation_raw_vs_finetuned.py"]=32
-    ["evaluate_gsm8k_raw_vs_finetuned.py"]=128
-    ["evaluate_aime_raw_vs_finetuned.py"]=256
-    ["evaluate_aimo_raw_vs_finetuned.py"]=64
-    ["evaluate_art_raw_vs_finetuned.py"]=256
-    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=256
-    ["evaluate_goEmotion_raw_vs_finetuned.py"]=128
+    ["evaluate_neulr_deductive_raw_vs_finetuned.py"]=8
+    ["evaluate_neulr_inductive_raw_vs_finetuned.py"]=8
+    ["evaluate_neulr_abductive_raw_vs_finetuned.py"]=8
+    ["evaluate_medqa_raw_vs_finetuned.py"]=16
+    ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=8
+    ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=4 # Note that each batch has 4 questions!
+    ["evaluate_musr_team_allocation_raw_vs_finetuned.py"]=16
+    ["evaluate_gsm8k_raw_vs_finetuned.py"]=64
+    ["evaluate_aime_raw_vs_finetuned.py"]=8
+    ["evaluate_aimo_raw_vs_finetuned.py"]=8
+    ["evaluate_art_raw_vs_finetuned.py"]=64
+    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=128
+    ["evaluate_goEmotion_raw_vs_finetuned.py"]=16
 )
 
 export TRAINING_BASE
@@ -75,14 +85,17 @@ for ckpt_name in $(ls -1 "$CHECKPOINT_DIR" | grep '^checkpoint-' | sort -t- -k2,
             --batch_size "$batch_size" \
             --checkpoint_path "$ckpt" \
             --run "$RUN_NAME" \
-            --raw_path "$RAW_MODEL_PATH"
+            --raw_path "$RAW_MODEL_PATH" \
+            --output_path "$OUTPUT_DIR"
 
         echo "Finished $script"
         echo "-------------------------------------"
-        python3 GRPO/Evaluation/create_table.py \
-            --root "./GRPO/Evaluation/" \
-            --out_csv "./GRPO/Evaluation//metrics_summary.xlsx" \
-            --run "$RUN_NAME" \
-            --base_model_name "qwen2.5-3B"
     done
+    python3 GRPO/Evaluation/create_table.py \
+        --root "$ROOT_DIR" \
+        --out_csv "./GRPO/Evaluation//metrics_summary.xlsx" \
+        --run "$RUN_NAME" \
+        --base_model_name "qwen2.5-14B" \
+        --base_result_dir "$BASE_RESULTS_DIR" \
+        --train_data "UniADILR" 
 done

@@ -28,12 +28,12 @@ warnings.filterwarnings('ignore')
 
 # Allow path injection from orchestrator
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
-    "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit")
+    "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4")
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/msalimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/art_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/art_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -457,7 +457,7 @@ def ensure_raw_results_cached(args):
     
     raw_results_file = os.path.join(
         raw_results_dir,
-        f"raw_results_{split}_{sample_tag}.json"
+        f"raw_results_train_all.json"
     )
     
     if os.path.exists(raw_results_file):
@@ -500,7 +500,7 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Returns the loaded or newly computed fine-tuned results dict.
     """
     dataset_name = "art"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
@@ -557,7 +557,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     # Build per-case comparison
     dataset_name = "art"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -1081,7 +1081,7 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH
+    global RAW_MODEL_PATH, OUTPUT_DIR
     parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on ART dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
         help='Maximum number of samples to evaluate (default: all)')
@@ -1114,6 +1114,8 @@ def main():
     
     args = parser.parse_args()
     
+    OUTPUT_DIR = args.output_path
+
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
         print("❌ Error: Cannot use both --checkpoint_path and --checkpoint_dir")

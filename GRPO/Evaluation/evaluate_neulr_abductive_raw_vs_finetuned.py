@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-AIMO Dataset Evaluation: Raw vs Fine-tuned Model
+neulr_abductive Dataset Evaluation: Raw vs Fine-tuned Model
 
-Evaluates models on the AIMO (AI Mathematical Olympiad) dataset.
+Evaluates models on the neulr_abductive math competition dataset.
+neulr_abductive answers are integers from 0-999.
 
 Usage:
-    python evaluate_aimo_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
+    python evaluate_neulr_abductive_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
 """
 
 import os
@@ -15,6 +16,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
@@ -33,7 +35,7 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/aimo_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/neulr_abductive_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -146,27 +148,52 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-def create_aimo_prompt(problem):
-    """Create a prompt for AIMO problem - handles LaTeX properly."""
-    system_prompt = """You are an expert mathematician specializing in competition mathematics (AMC, AIME, etc.).
 
-First, read the problem carefully, including all LaTeX mathematical notation, and solve it step by step. Then give the final answer as a single number.
-
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-<reasoning>
-[here you write your chain-of-thought reasoning and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY the final answer as a number, decimal, or fraction a/b, with no extra words]
-</answer>"""
+def create_neulr_abductive_prompt(problem, context):
+    """
+    Create a prompt for an abductive reasoning task (finding the premise that causes the conclusion).
+    Note: The 'problem' argument might be empty if the target is inside 'context'.
+    """
     
-    user_prompt = f"""Problem:
-{problem}
+    if "The fact is:" in context:
+        rules_block, target_fact = context.split("The fact is:", 1)
+        target_fact = target_fact.strip()
+    else:
+        rules_block = context
+        target_fact = problem 
 
-Solve this problem and provide your final numerical answer."""
-    
+    system_prompt = """
+    You are an expert Forensic Logic Analyst. 
+    You are provided with a set of Logical Rules and a final Observed Fact.
+
+    Your task is to perform Abductive Reasoning (Reverse Engineering):
+    1. Analyze the 'Observed Fact' (the conclusion).
+    2. Look through the 'Rules' to find which rule implies this conclusion (e.g., if you see "X is B" and a rule says "All A are B", the missing premise is "X is A").
+    3. Trace the logic backward to find the specific antecedent condition that makes the observation true.
+    4. Output the missing premise as a complete sentence, exactly matching the alphanumeric format of the text.
+
+    Your entire output MUST use exactly the following format:
+
+    <reasoning>
+    [Chain of thought: "Observed Z. Rule Y -> Z. Therefore, the answer must be Y."]
+    </reasoning>
+    <answer>
+    [The missing premise sentence. Example: NPsw0v0k is ADP37scy8.]
+    </answer>
+    """
+
+    user_prompt = f"""
+    Logical Rules and Known Facts:
+    {rules_block}
+
+    Observed Fact (The Conclusion):
+    {target_fact}
+
+    Based on the rules above, what underlying premise implies this Observed Fact?
+    """
+
     return system_prompt, user_prompt
+
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
@@ -175,100 +202,39 @@ def extract_reasoning(response):
         return match.group(1).strip()
     return None
 
-def extract_answer(response):
-    """Extract the numerical answer from the <answer>...</answer> block.
 
-    Supports integers, decimals, and simple fractions (a/b).
-    Returns the answer as a cleaned string, or None if not found.
+def extract_answer(response):
+    """
+    Extract the full sentence answer from the <answer> block.
+    Example: <answer>NPsw0v0k is ADP37scy8.</answer> -> Returns "NPsw0v0k is ADP37scy8."
     """
     if not response:
         return None
 
-    # Find the content inside <answer>...</answer>
-    tag_match = re.search(
-        r'<answer>\s*(.*?)\s*</answer>',
-        response,
-        re.IGNORECASE | re.DOTALL
-    )
-    if not tag_match:
-        return None
-
-    answer_content = tag_match.group(1).strip()
-
-    # Handle possible \boxed{...} inside the answer block (extra robustness)
-    boxed_match = re.search(r'\\boxed\{([^}]+)\}', answer_content)
-    if boxed_match:
-        answer_content = boxed_match.group(1).strip()
-
-    # Clean common wrappers/symbols
-    answer_content = answer_content.replace('$', '').replace(',', '').strip()
-
-    # Look for a number / decimal / fraction inside the answer content
-    num_match = re.search(r'[+-]?\d+(?:\.\d+)?(?:/\d+)?', answer_content)
-    if num_match:
-        return num_match.group(0).strip()
-
-    # Fallback: if nothing matched, return None
+    match = re.search(r'<answer>(.*?)</answer>', response, re.IGNORECASE | re.DOTALL)
+    
+    if match:
+        clean_answer = match.group(1).strip()
+        return clean_answer
+        
     return None
 
-
-def normalize_answer(ans):
-    """Normalize answers for comparison - handles integers, decimals, and fractions."""
-    if ans is None:
-        return None
+def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split='train'):
+    """Evaluate model on neulr_abductive dataset with batch processing support."""
+    print(f"\n🔍 Evaluating {model_name} on neulr_abductive dataset...")
+    print(f"   Batch size: {batch_size}")
+    print(f"   Split: {split}")
     
-    ans = str(ans).strip().lower()
-    
-    # Remove dollar signs, spaces, commas
-    ans = ans.replace('$', '').replace(' ', '').replace(',', '')
-    
-    # Handle LaTeX fractions: \frac{a}{b} -> a/b
-    ans = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1/\2', ans)
-    
-    # Remove other LaTeX commands
-    ans = ans.replace('\\', '')
-    
-    # Try to evaluate fractions to compare as floats
-    if '/' in ans:
-        try:
-            parts = ans.split('/')
-            if len(parts) == 2:
-                numerator = float(parts[0])
-                denominator = float(parts[1])
-                if denominator != 0:
-                    return str(numerator / denominator)
-        except:
-            pass
-    
-    # Try to convert to float for comparison
-    try:
-        return str(float(ans))
-    except:
-        return ans
-
-
-def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="test"):
-    """Evaluate model on AIMO dataset."""
-    print(f"\n🔍 Evaluating {model_name} on AIMO dataset...")
-    
-    # Load dataset
-    try:
-        dataset = load_dataset("AI-MO/aimo-validation-amc", split="train")
-        print(f"✅ Loaded {len(dataset)} samples from AIMO validation (AMC) dataset")
-        
-        # Debug: Print sample
-        print(f"\n📋 Sample from dataset:")
-        print(f"   Problem: {dataset[0]['problem'][:150]}...")
-        print(f"   Answer: {dataset[0]['answer']}")
-        print(f"   Answer type: {type(dataset[0]['answer'])}")
-        
-    except Exception as e:
-        print(f"❌ Error loading dataset: {e}")
-        return None
+    # Load neulr_abductive dataset
+    print(f"Loading neulr_abductive dataset (split={split})...")
+    # Updated path to match your request implies using the json loader
+    dataset = load_dataset("json", data_files="/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/NeuLR/abductive_neutral.json")["train"]
     
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
-        print(f"📊 Evaluating on {len(dataset)} samples (limited)")
+        print(f"Evaluating on {len(dataset)} samples (limited)")
+    else:
+        print(f"Evaluating on {len(dataset)} samples (full dataset)")
     
     results = []
     correct = 0
@@ -276,17 +242,38 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
     failed_extractions = 0
     
     # Process in batches
-    for batch_start in tqdm(range(0, len(dataset), batch_size), desc=f"Evaluating {model_name}"):
-        batch_end = min(batch_start + batch_size, len(dataset))
+    num_batches = (len(dataset) + batch_size - 1) // batch_size
+    
+    for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
+        # Get batch
+        start_idx = batch_idx * batch_size
+        end_idx = min(start_idx + batch_size, len(dataset))
+        batch = dataset[start_idx:end_idx]
         
-        # Get individual samples for this batch
-        batch_prompts = []
-        batch_true_answers = []
-        batch_problems = []
+        # Handle both single sample and batch cases
+        if not isinstance(batch['context'], list):
+            batch = {k: [v] for k, v in batch.items()}
         
-        for idx in range(batch_start, batch_end):
-            sample = dataset[idx]
-            system_prompt, user_prompt = create_aimo_prompt(sample['problem'])
+        batch_size_actual = len(batch["context"])
+
+
+        # Prepare prompts for batch
+        formatted_prompts = []
+        true_answers = []
+        batch_data = []
+        
+        for i in range(batch_size_actual):
+            # We extract it loosely here for logging, but pass strictly to the prompt function.
+            context = batch["context"][i]
+            if "The fact is:" in context:
+                problem = context.split("The fact is:", 1)[1].strip()
+            else:
+                problem = context 
+            
+            true_answer = str(batch["label"][i])
+
+            # Create prompt
+            system_prompt, user_prompt = create_neulr_abductive_prompt(problem, context)
             
             try:
                 messages = [
@@ -294,22 +281,27 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
                     {"role": "user", "content": user_prompt}
                 ]
                 formatted_prompt = tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True
                 )
             except:
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
             
-            batch_prompts.append(formatted_prompt)
-            batch_true_answers.append(str(sample['answer']))
-            batch_problems.append(sample['problem'])
+            formatted_prompts.append(formatted_prompt)
+            true_answers.append(true_answer)
+            batch_data.append({
+                'question': problem,
+                'id': batch['id'][i] if 'id' in batch else start_idx + i
+            })
         
         # Tokenize batch with padding
         inputs = tokenizer(
-            batch_prompts, 
-            return_tensors="pt", 
-            truncation=True, 
-            max_length=2048,
-            padding=True
+            formatted_prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=2048
         )
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
         
@@ -317,21 +309,18 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=4096,
-                temperature=0.0,
+                max_new_tokens=4096,  # Need more tokens for math reasoning
+                temperature=0.0,  # Low temperature for more accurate answers
                 do_sample=False,
                 # top_p=0.95,
-                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
             )
         
-        # Decode each response in batch
-        input_lengths = inputs['input_ids'].shape[1]
-        for i in range(len(batch_prompts)):
-            response = tokenizer.decode(outputs[i][input_lengths:], skip_special_tokens=True)
-            
-            true_answer = batch_true_answers[i]
-            problem = batch_problems[i]
-            idx = batch_start + i
+        # Process each output in batch
+        for i in range(batch_size_actual):
+            # Decode response (skip input tokens)
+            input_length = inputs['input_ids'][i].shape[0]
+            response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
             
             # Extract answer
             predicted_answer = extract_answer(response)
@@ -342,43 +331,25 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
             
             if predicted_answer is None:
                 failed_extractions += 1
-                predicted_answer = "FAILED_EXTRACTION"
+                predicted_answer = "-1"  # Mark as failed string
             
-            # Normalize and compare
-            norm_true = normalize_answer(true_answer)
-            norm_pred = normalize_answer(predicted_answer)
+            # Check correctness
+            true_answer = true_answers[i]
             
-            # Compare with tolerance for floating point
-            is_correct = False
-            if norm_true and norm_pred and norm_pred != "failed_extraction":
-                try:
-                    true_val = float(norm_true)
-                    pred_val = float(norm_pred)
-                    # Allow small tolerance for floating point comparison
-                    is_correct = abs(true_val - pred_val) < 0.01
-                except:
-                    is_correct = norm_pred == norm_true
+            # This ensures "Fact." == "Fact"
+            norm_predicted = str(predicted_answer).strip().rstrip('.')
+            norm_true = str(true_answer).strip().rstrip('.')
+            
+            is_correct = (norm_predicted == norm_true)
             
             if is_correct:
                 correct += 1
             total += 1
             
-            # Debug: Print first 3 comparisons
-            # if idx < 3:
-            #     print(f"\n{'='*60}")
-            #     print(f"Sample {idx}:")
-            #     print(f"Problem: {problem[:200]}...")
-            #     print(f"True answer: {true_answer}")
-            #     print(f"Predicted answer: {predicted_answer}")
-            #     print(f"Normalized true: {norm_true}")
-            #     print(f"Normalized pred: {norm_pred}")
-            #     print(f"Correct: {is_correct}")
-            #     print(f"Response excerpt: {response[-200:]}")
-            #     print(f"{'='*60}")
-            
+            # Store result
             results.append({
-                'problem_id': idx,
-                'problem': problem,
+                'problem_id': batch_data[i]['id'],
+                'question': batch_data[i]['question'],
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
                 'reasoning': reasoning,
@@ -386,11 +357,13 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
             })
     
     accuracy = correct / total if total > 0 else 0.0
+    
+    # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     
     print(f"\n📊 {model_name} Results:")
-    print(f"   Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
-    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
+    print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
+    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%) - {total - failed_extractions}/{total} extracted")
     print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
     
     return {
@@ -402,8 +375,6 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
         'results': results
     }
 
-
-
 def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     """Evaluate a model with automatic batch-size backoff to avoid CUDA OOM."""
     results = None
@@ -412,7 +383,7 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     while batch_size >= 1 and results is None:
         try:
             print(f"\n🧪 Evaluating {model_name} with batch_size={batch_size}")
-            results = evaluate_on_aimo(
+            results = evaluate_on_neulr_abductive(
                 model,
                 tokenizer,
                 args.max_samples,
@@ -442,10 +413,10 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
 
 def ensure_raw_results_cached(args):
     """
-    Ensure raw aimo results are cached on disk for the current configuration.
+    Ensure raw neulr_abductive results are cached on disk for the current configuration.
     Returns the loaded or newly computed raw_results dict.
     """
-    dataset_name = "aimo"
+    dataset_name = "neulr_abductive"
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
     
@@ -496,7 +467,7 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Ensure fine-tuned model results are cached on disk for the current configuration.
     Returns the loaded or newly computed fine-tuned results dict.
     """
-    dataset_name = "aimo"
+    dataset_name = "neulr_abductive"
     ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
@@ -504,14 +475,14 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     
     print("\n🔁 No cached fine-tuned model results found for this configuration.")
     return False
-
+    
 
 def evaluate_checkpoint_cases(args, checkpoint_path):
     """
     Given a single checkpoint, evaluate it vs cached raw results and save:
       - all_cases.json
       - disagreement_cases.json
-    under: OUTPUT_DIR/<checkpoint_name>/aimo/
+    under: OUTPUT_DIR/<checkpoint_name>/neulr_abductive/
     """
     print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
     if not os.path.isabs(checkpoint_path):
@@ -525,13 +496,13 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     ckpt_name = os.path.basename(checkpoint_path.rstrip("/"))
     print(f"✅ Using checkpoint for per-case evaluation: {ckpt_name}")
-    
+
     # Get cached (or newly computed) raw results
     raw_results = ensure_raw_results_cached(args)
     if raw_results is None:
         print("❌ Cannot evaluate checkpoint without raw model results.")
         return
-
+    
     # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):
         print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
@@ -553,8 +524,8 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         return
     
     # Build per-case comparison
-    dataset_name = "aimo"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run ,ckpt_name, dataset_name)
+    dataset_name = "neulr_abductive"
+    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -569,7 +540,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         
         case_entry = {
             "problem_id": pid,
-            "problem": raw_r["problem"],          
+            "problem": raw_r["question"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -620,7 +591,6 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     }
 
 
-
 def save_results(raw_results, finetuned_results, best_checkpoint_info, output_dir):
     """Save evaluation results to JSON files."""
     os.makedirs(output_dir, exist_ok=True)
@@ -631,7 +601,6 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     raw_output = {
         'model': RAW_MODEL_PATH,
         'evaluation_time': timestamp,
-        'dataset': 'AIMO',
         'metrics': {
             'accuracy': raw_results['accuracy'],
             'extraction_rate': raw_results['extraction_rate']
@@ -642,7 +611,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         'detailed_results': raw_results['results']
     }
     
-    raw_file = os.path.join(output_dir, f"raw_model_aimo_results_{timestamp}.json")
+    raw_file = os.path.join(output_dir, f"raw_model_results_{timestamp}.json")
     with open(raw_file, 'w') as f:
         json.dump(raw_output, f, indent=2)
     print(f"\n💾 Raw model results saved to: {raw_file}")
@@ -653,7 +622,6 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         'checkpoint': best_checkpoint_info['path'],
         'validation_score': best_checkpoint_info['score'],
         'evaluation_time': timestamp,
-        'dataset': 'AIMO',
         'metrics': {
             'accuracy': finetuned_results['accuracy'],
             'extraction_rate': finetuned_results['extraction_rate']
@@ -664,7 +632,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         'detailed_results': finetuned_results['results']
     }
     
-    finetuned_file = os.path.join(output_dir, f"finetuned_model_aimo_results_{timestamp}.json")
+    finetuned_file = os.path.join(output_dir, f"finetuned_model_results_{timestamp}.json")
     with open(finetuned_file, 'w') as f:
         json.dump(finetuned_output, f, indent=2)
     print(f"💾 Fine-tuned model results saved to: {finetuned_file}")
@@ -677,8 +645,8 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     
     summary = {
         'evaluation_time': timestamp,
-        'dataset': 'AIMO',
-        'split': 'test',
+        'dataset': 'yentinglin/neulr_abductive',
+        'split': 'train',
         'num_samples': raw_results['total'],
         'raw_model': {
             'path': RAW_MODEL_PATH,
@@ -710,14 +678,14 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         }
     }
     
-    summary_file = os.path.join(output_dir, f"aimo_comparison_summary_{timestamp}.json")
+    summary_file = os.path.join(output_dir, f"comparison_summary_{timestamp}.json")
     with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2)
     print(f"💾 Comparison summary saved to: {summary_file}")
     
     # Save disagreement and all cases summary
-    raw_by_id = {idx+1: r for idx, r in enumerate(raw_results['results'])}
-    ft_by_id = {idx+1: r for idx, r in enumerate(finetuned_results['results'])}
+    raw_by_id = {r['problem_id']: r for r in raw_results['results']}
+    ft_by_id = {r['problem_id']: r for r in finetuned_results['results']}
     
     disagreement_cases, all_cases = [], []
     
@@ -728,7 +696,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         all_cases.append({
             "problem_id": pid,
-            "problem": raw_r["problem"],          
+            "problem": raw_r["question"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -752,8 +720,8 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         disagreement_cases.append({
             "problem_id": pid,
-            "problem": raw_r["problem"],          
-            "true_answer": raw_r["true_answer"],
+            "problem": raw_r["question"],          
+            "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
                 "reasoning": raw_r["reasoning"],
@@ -792,12 +760,11 @@ def evaluate_all_checkpoints(args):
         return
     
     print("="*80)
-    print("🚀 AIMO EVALUATION: ALL CHECKPOINTS")
+    print("🚀 neulr_abductive EVALUATION: ALL CHECKPOINTS")
     print("="*80)
     print(f"Checkpoint Directory: {checkpoint_dir}")
     print(f"CUDA Device: {args.cuda_device}")
     print(f"Batch Size: {args.batch_size}")
-    print(f"Split: {args.split}")
     if args.max_samples:
         print(f"Max Samples: {args.max_samples}")
     print("="*80)
@@ -829,10 +796,7 @@ def evaluate_all_checkpoints(args):
         print("🤖 EVALUATING RAW MODEL (once)")
         print("="*80)
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_aimo(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size, args.split)
-        if raw_results is None:
-            print("❌ Failed to evaluate raw model")
-            return
+        raw_results = evaluate_on_neulr_abductive(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
         del raw_model
         torch.cuda.empty_cache()
         print(f"\n✅ Raw model evaluation complete")
@@ -844,8 +808,6 @@ def evaluate_all_checkpoints(args):
     
     summary_data = {
         'evaluation_time': timestamp,
-        'dataset': 'AIMO',
-        'split': args.split,
         'checkpoint_directory': checkpoint_dir,
         'num_checkpoints_evaluated': len(checkpoint_dirs),
         'raw_model': {
@@ -855,7 +817,7 @@ def evaluate_all_checkpoints(args):
         'checkpoints': []
     }
     
-    summary_file = os.path.join(OUTPUT_DIR, f"aimo_all_checkpoints_summary_{timestamp}.json")
+    summary_file = os.path.join(OUTPUT_DIR, f"all_checkpoints_summary_{timestamp}.json")
     with open(summary_file, 'w') as f:
         json.dump(summary_data, f, indent=2)
     
@@ -872,15 +834,10 @@ def evaluate_all_checkpoints(args):
         try:
             # Load and evaluate checkpoint
             finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
-            finetuned_results = evaluate_on_aimo(
+            finetuned_results = evaluate_on_neulr_abductive(
                 finetuned_model, finetuned_tokenizer, args.max_samples, 
-                f"{ckpt_name}", args.batch_size, args.split
+                f"{ckpt_name}", args.batch_size
             )
-            
-            if finetuned_results is None:
-                print(f"❌ Failed to evaluate {ckpt_name}")
-                continue
-                
             del finetuned_model
             torch.cuda.empty_cache()
             
@@ -906,7 +863,7 @@ def evaluate_all_checkpoints(args):
             
             with open(summary_file, 'w') as f:
                 json.dump(summary_data, f, indent=2)
-            
+                
             all_checkpoint_results.append(checkpoint_info)
             
             print(f"\n✅ {ckpt_name} evaluation complete")
@@ -928,7 +885,7 @@ def evaluate_all_checkpoints(args):
     
     # Create summary comparison
     print("\n" + "="*80)
-    print("📊 SUMMARY: ALL CHECKPOINTS COMPARISON (AIMO)")
+    print("📊 SUMMARY: ALL CHECKPOINTS COMPARISON")
     print("="*80)
     
     if raw_results:
@@ -979,7 +936,7 @@ def evaluate_all_checkpoints(args):
 def print_comparison(summary):
     """Print formatted comparison results."""
     print("\n" + "="*80)
-    print("📊 AIMO EVALUATION: RAW vs FINE-TUNED MODEL")
+    print("📊 neulr_abductive EVALUATION: RAW vs FINE-TUNED MODEL")
     print("="*80)
     
     raw_metrics = summary['raw_model']['metrics']
@@ -1009,30 +966,30 @@ def print_comparison(summary):
     print("\n" + "-"*80)
     
     if comp['overall_improved']:
-        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on AIMO!")
+        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on neulr_abductive!")
         print(f"   • Accuracy improved by {acc_rel:.2f}% (relative)")
-        print(f"   The model shows better olympiad-level math problem solving ability.")
+        print(f"   The model shows better math problem solving ability.")
     elif acc_imp < 0:
-        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on AIMO.")
+        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on neulr_abductive.")
         print(f"   • Accuracy decreased by {acc_rel:.2f}% (relative)")
         print(f"   • This suggests potential overfitting to your training data.")
     else:
-        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on AIMO performance.")
-        print(f"   The model maintained baseline olympiad math problem solving ability.")
+        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on neulr_abductive performance.")
+        print(f"   The model maintained baseline math problem solving ability.")
     
     print("="*80 + "\n")
 
 def main():
     global RAW_MODEL_PATH, OUTPUT_DIR
-    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIMO dataset')
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on neulr_abductive dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
-                       help='Maximum number of samples to evaluate (default: all samples)')
+                       help='Maximum number of samples to evaluate (default: all 30 problems)')
     parser.add_argument('--cuda_device', type=str, default='0',
                        help='CUDA device to use (default: 0)')
     parser.add_argument('--batch_size', type=int, default=1,
                        help='Batch size for evaluation. Higher values (4-8) are faster but use more GPU memory (default: 1)')
-    parser.add_argument('--split', type=str, default='test', choices=['train', 'test', 'validation'],
-                       help='Dataset split to use (default: test)')
+    parser.add_argument('--split', type=str, default='train', choices=['train', 'test', 'validation'],
+                       help='Dataset split to use (default: train). Note: neulr_abductive dataset may only have "train" split.')
     parser.add_argument('--skip_raw', action='store_true',
                        help='Skip raw model evaluation (evaluate only fine-tuned model)')
     parser.add_argument('--skip_finetuned', action='store_true',
@@ -1042,7 +999,7 @@ def main():
                             'If not provided, automatically selects the best checkpoint based on validation metrics.')
     parser.add_argument('--checkpoint_dir', type=str, default=None,
                        help='Path to directory containing multiple checkpoints (e.g., /path/to/checkpoint/). '
-                            'Will evaluate ALL checkpoint-* directories found. Cannot be used with --checkpoint_path.')
+                            'Will evaluate ALL checkpoint-* directories found. Cannot be used with --checkpoint_path.')    
     parser.add_argument('--evaluate_checkpoints', type=int, default=0,
                        help='If set to 1, run per-checkpoint mode: '
                             'evaluate the given --checkpoint_path vs cached raw results and '
@@ -1053,11 +1010,10 @@ def main():
                        help='The raw model path')
     parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
                        help='Model output path, defaults to env variable.')
-        
-    args = parser.parse_args()
-
-    OUTPUT_DIR = args.output_path
     
+    args = parser.parse_args()
+    
+    OUTPUT_DIR = args.output_path
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
         print("❌ Error: Cannot use both --checkpoint_path and --checkpoint_dir")
@@ -1083,7 +1039,7 @@ def main():
             return
         
         print("="*80)
-        print("🚀 AIMO PER-CHECKPOINT EVALUATION MODE")
+        print("🚀 neulr_abductive PER-CHECKPOINT EVALUATION MODE")
         print("="*80)
         print(f"Raw Model:     {RAW_MODEL_PATH}")
         print(f"Output Dir:    {OUTPUT_DIR}")
@@ -1105,13 +1061,12 @@ def main():
         return
     
     print("="*70)
-    print("🚀 AIMO EVALUATION: RAW vs FINE-TUNED")
+    print("🚀 neulr_abductive EVALUATION: RAW vs FINE-TUNED")
     print("="*70)
     print(f"Raw Model: {RAW_MODEL_PATH}")
     print(f"Training Dir: {TRAINING_DIR}")
     print(f"CUDA Device: {args.cuda_device}")
     print(f"Batch Size: {args.batch_size}")
-    print(f"Split: {args.split}")
     if args.max_samples:
         print(f"Max Samples: {args.max_samples}")
     if args.skip_raw:
@@ -1163,10 +1118,7 @@ def main():
     # Evaluate raw model
     if not args.skip_raw:
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_aimo(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size, args.split)
-        if raw_results is None:
-            print("❌ Failed to evaluate raw model")
-            return
+        raw_results = evaluate_on_neulr_abductive(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
         del raw_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1176,10 +1128,7 @@ def main():
     # Evaluate fine-tuned model
     if not args.skip_finetuned:
         finetuned_model, finetuned_tokenizer = load_finetuned_model(best_checkpoint_info['path'], args.cuda_device)
-        finetuned_results = evaluate_on_aimo(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size, args.split)
-        if finetuned_results is None:
-            print("❌ Failed to evaluate fine-tuned model")
-            return
+        finetuned_results = evaluate_on_neulr_abductive(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size)
         del finetuned_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1199,3 +1148,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

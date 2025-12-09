@@ -109,6 +109,8 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     ckpt_path = os.path.join(root_dir, "raw_model")  
     row: Dict[str, Scalar] = {"checkpoint": f"{model_name}"}
     for dataset_name in sorted(os.listdir(ckpt_path)):
+        if "neu" in dataset_name.lower():
+            continue
         dataset_path = os.path.join(ckpt_path, dataset_name)
         dataset_name = dataset_name.lower()
         if not os.path.isdir(dataset_path):
@@ -144,7 +146,7 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
             possible_col_names.append((col_name, metric_value))
         
         for col_name, metric_value in possible_col_names:
-            if f1_flag and "f1" in col_name:    
+            if f1_flag and "_f1" in col_name:    
                 if col_name not in row:
                     row[col_name] = round(metric_value, 4)
                     all_metric_cols.add(col_name)
@@ -807,11 +809,23 @@ def main():
         default="qwen2.5-3B",
         help="Name of the base model we trained on",
     )
+    parser.add_argument(
+        "--base_result_dir",
+        type=str,
+        default="~/users/Nima/AbductiveReasoning/GRPO/results",
+        help="Directory of the base model we trained on",
+    )
+    parser.add_argument(
+        "--train_data",
+        type=str,
+        default="UniADILR",
+        help="Name of the training data that the model was trained on.",
+    )
 
     args = parser.parse_args()
 
     if args.best_checkpoint is None:
-        BASE_RESULTS_DIR="/home/moein_salimi/users/Nima/AbductiveReasoning/GRPO/results"
+        BASE_RESULTS_DIR = args.base_result_dir
         TRAINING_DIR=f"{BASE_RESULTS_DIR}/Training_{args.run}"
         FINAL_DIR=f"{BASE_RESULTS_DIR}/{args.run}"
         if os.path.isdir(TRAINING_DIR):
@@ -826,11 +840,14 @@ def main():
             return 
 
         best_path, _ = find_best_checkpoint(TRAINING_BASE)
+        best_path, _ = find_best_checkpoint(TRAINING_BASE)
         args.best_checkpoint = os.path.basename(best_path) if best_path else None
+        # args.best_checkpoint = "checkpoint-4096"
 
     rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name)
     # write_csv(rows, columns, args.out_csv)
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=args.run, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
+    sheet_name = args.run.split("e20_")[0] + args.train_data + "_e20_" + args.run.split("e20_")[1]
+    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
 
 
 if __name__ == "__main__":

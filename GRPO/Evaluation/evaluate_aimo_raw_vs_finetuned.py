@@ -19,6 +19,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -275,6 +276,7 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
     total = 0
     failed_extractions = 0
     
+    btime = time.time()
     # Process in batches
     for batch_start in tqdm(range(0, len(dataset), batch_size), desc=f"Evaluating {model_name}"):
         batch_end = min(batch_start + batch_size, len(dataset))
@@ -385,6 +387,8 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
                 'correct': is_correct
             })
     
+    etime = time.time()
+    print(f"Batch processing time: {etime - btime:.2f} seconds")
     accuracy = correct / total if total > 0 else 0.0
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     
@@ -399,6 +403,7 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
         'total': total,
         'failed_extractions': failed_extractions,
         'extraction_rate': extraction_rate,
+        'time': etime - btime,
         'results': results
     }
 

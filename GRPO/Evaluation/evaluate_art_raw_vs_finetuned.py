@@ -19,6 +19,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
 import numpy as np
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -249,7 +250,7 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
     
     # Process in batches
     num_batches = (len(dataset) + batch_size - 1) // batch_size
-    
+    btime = time.time()
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
         # Get batch
         start_idx = batch_idx * batch_size
@@ -358,6 +359,8 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
                 'correct': is_correct
             })
     
+    etime = time.time()
+    print(f"Batch processing time: {etime - btime:.2f} seconds")
     accuracy = correct / total if total > 0 else 0.0
     
     # Calculate comprehensive metrics
@@ -403,6 +406,7 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
         'f1_per_class': f1_per_class.tolist(),
         'support_per_class': support_per_class.tolist(),
         'confusion_matrix': conf_matrix.tolist(),
+        'time': etime - btime,
         'results': results
     }
 

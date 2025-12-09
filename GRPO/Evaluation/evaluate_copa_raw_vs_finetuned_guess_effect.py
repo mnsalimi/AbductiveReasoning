@@ -20,6 +20,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
+import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import warnings
 warnings.filterwarnings('ignore')
@@ -267,7 +268,8 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
     
     # Process in batches
     num_batches = (len(effect_dataset) + batch_size - 1) // batch_size
-    
+    btime = time.time()
+
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
         # Get batch
         start_idx = batch_idx * batch_size
@@ -375,6 +377,8 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
                 'correct': is_correct
             })
     
+    etime = time.time()
+    print(f"Batch processing time: {etime - btime:.2f} seconds")
     # Calculate metrics
     all_true_labels = np.array(all_true_labels)
     all_pred_labels = np.array(all_pred_labels)
@@ -410,6 +414,7 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
         'correct_count': correct_count,
         'total': len(results),
         'failed_extractions': failed_extractions,
+        'time': etime - btime,
         'results': results
     }
 

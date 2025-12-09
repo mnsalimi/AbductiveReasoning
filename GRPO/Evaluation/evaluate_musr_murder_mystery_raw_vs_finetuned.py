@@ -21,6 +21,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -240,7 +241,8 @@ def evaluate_on_musr_murder(model, tokenizer, max_samples=None, model_name="Mode
     
     # Process in batches
     num_batches = (len(dataset) + batch_size - 1) // batch_size
-    
+    btime = time.time()
+
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
         # Get batch
         start_idx = batch_idx * batch_size
@@ -344,6 +346,8 @@ def evaluate_on_musr_murder(model, tokenizer, max_samples=None, model_name="Mode
                 'correct': is_correct
             })
     
+    etime = time.time()
+    print(f"Batch processing time: {etime - btime:.2f} seconds")
     accuracy = correct / total if total > 0 else 0.0
         
     # Calculate comprehensive metrics
@@ -390,6 +394,7 @@ def evaluate_on_musr_murder(model, tokenizer, max_samples=None, model_name="Mode
         'recall_per_class': recall_per_class.tolist(),
         'f1_per_class': f1_per_class.tolist(),
         'support_per_class': support_per_class.tolist(),
+        'time': etime - btime,
         'results': results
     }
 

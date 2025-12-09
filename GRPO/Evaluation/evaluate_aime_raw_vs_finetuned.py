@@ -20,6 +20,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -229,7 +230,8 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
     
     # Process in batches
     num_batches = (len(dataset) + batch_size - 1) // batch_size
-    
+    btime = time.time()
+
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
         # Get batch
         start_idx = batch_idx * batch_size
@@ -331,6 +333,8 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
                 'correct': is_correct
             })
     
+    etime = time.time()
+    print(f"Batch processing time: {etime - btime:.2f} seconds")
     accuracy = correct / total if total > 0 else 0.0
     
     # Calculate additional metrics
@@ -347,6 +351,7 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
         'total': total,
         'failed_extractions': failed_extractions,
         'extraction_rate': extraction_rate,
+        'time': etime - btime,
         'results': results
     }
 

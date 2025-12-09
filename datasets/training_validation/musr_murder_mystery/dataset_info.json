@@ -1,0 +1,1780 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "json",
+  "dataset_size": 23479533,
+  "description": "",
+  "download_checksums": {
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/murder_mystery.json": {
+      "num_bytes": 44386771,
+      "checksum": null
+    }
+  },
+  "download_size": 44386771,
+  "features": {
+    "context": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "questions": [
+      {
+        "answer": {
+          "dtype": "int64",
+          "_type": "Value"
+        },
+        "choices": {
+          "feature": {
+            "dtype": "string",
+            "_type": "Value"
+          },
+          "_type": "Sequence"
+        },
+        "intermediate_data": [
+          {
+            "cf_with_negated_mmo": {
+              "dtype": "bool",
+              "_type": "Value"
+            },
+            "story_hash_id": {
+              "dtype": "int64",
+              "_type": "Value"
+            },
+            "suspect_info": [
+              {
+                "cf_description": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "description": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "innocent_chapter": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "innocent_tree": {
+                  "bf_factor": {
+                    "2": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "chance_of_or": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune_all": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "deduction_type_sample_rate": {
+                    "syllogism": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "depth": {
+                    "dtype": "int64",
+                    "_type": "Value"
+                  },
+                  "nodes": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ],
+                  "root_structure": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ]
+                },
+                "is_murderer": {
+                  "dtype": "bool",
+                  "_type": "Value"
+                },
+                "murderer_chapter": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "murderer_tree": {
+                  "bf_factor": {
+                    "2": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "chance_of_or": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune_all": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "deduction_type_sample_rate": {
+                    "syllogism": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "depth": {
+                    "dtype": "int64",
+                    "_type": "Value"
+                  },
+                  "nodes": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ],
+                  "root_structure": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ]
+                },
+                "suspect_info": {
+                  "alibi": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  },
+                  "description": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  },
+                  "motive": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  },
+                  "red_herrings": {
+                    "feature": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    },
+                    "_type": "Sequence"
+                  },
+                  "role": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  },
+                  "suspect": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  }
+                },
+                "tree": {
+                  "bf_factor": {
+                    "2": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "chance_of_or": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune_all": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "deduction_type_sample_rate": {
+                    "syllogism": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "depth": {
+                    "dtype": "int64",
+                    "_type": "Value"
+                  },
+                  "nodes": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ],
+                  "root_structure": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ]
+                },
+                "used_chapter": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "used_tree": {
+                  "bf_factor": {
+                    "2": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "chance_of_or": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "chance_to_prune_all": {
+                    "dtype": "float64",
+                    "_type": "Value"
+                  },
+                  "deduction_type_sample_rate": {
+                    "syllogism": {
+                      "dtype": "float64",
+                      "_type": "Value"
+                    }
+                  },
+                  "depth": {
+                    "dtype": "int64",
+                    "_type": "Value"
+                  },
+                  "nodes": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ],
+                  "root_structure": [
+                    {
+                      "can_be_leaf": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "children": [
+                        {
+                          "can_be_leaf": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "children": [
+                            {
+                              "can_be_leaf": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "children": [
+                                {
+                                  "can_be_leaf": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "children": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "constraints": {
+                                    "feature": {
+                                      "dtype": "null",
+                                      "_type": "Value"
+                                    },
+                                    "_type": "Sequence"
+                                  },
+                                  "deduction_type": {
+                                    "dtype": "null",
+                                    "_type": "Value"
+                                  },
+                                  "fact_type": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "operator": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  },
+                                  "prunable": {
+                                    "dtype": "bool",
+                                    "_type": "Value"
+                                  },
+                                  "value": {
+                                    "dtype": "string",
+                                    "_type": "Value"
+                                  }
+                                }
+                              ],
+                              "constraints": {
+                                "feature": {
+                                  "dtype": "null",
+                                  "_type": "Value"
+                                },
+                                "_type": "Sequence"
+                              },
+                              "deduction_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "fact_type": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "operator": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              },
+                              "prunable": {
+                                "dtype": "bool",
+                                "_type": "Value"
+                              },
+                              "value": {
+                                "dtype": "string",
+                                "_type": "Value"
+                              }
+                            }
+                          ],
+                          "constraints": {
+                            "feature": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "_type": "Sequence"
+                          },
+                          "deduction_type": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "fact_type": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "operator": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          },
+                          "prunable": {
+                            "dtype": "bool",
+                            "_type": "Value"
+                          },
+                          "value": {
+                            "dtype": "string",
+                            "_type": "Value"
+                          }
+                        }
+                      ],
+                      "constraints": {
+                        "feature": {
+                          "dtype": "null",
+                          "_type": "Value"
+                        },
+                        "_type": "Sequence"
+                      },
+                      "deduction_type": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "fact_type": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "operator": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      },
+                      "prunable": {
+                        "dtype": "bool",
+                        "_type": "Value"
+                      },
+                      "value": {
+                        "dtype": "string",
+                        "_type": "Value"
+                      }
+                    }
+                  ]
+                },
+                "victim_info": {
+                  "crime_scene": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  },
+                  "murder_weapon": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  },
+                  "victim": {
+                    "dtype": "string",
+                    "_type": "Value"
+                  }
+                }
+              }
+            ],
+            "using_counterfactuals": {
+              "dtype": "bool",
+              "_type": "Value"
+            },
+            "victim_info": {
+              "crime_scene": {
+                "dtype": "string",
+                "_type": "Value"
+              },
+              "murder_weapon": {
+                "dtype": "string",
+                "_type": "Value"
+              },
+              "victim": {
+                "dtype": "string",
+                "_type": "Value"
+              }
+            }
+          }
+        ],
+        "intermediate_trees": [
+          {
+            "bf_factor": {
+              "2": {
+                "dtype": "float64",
+                "_type": "Value"
+              }
+            },
+            "chance_of_or": {
+              "dtype": "float64",
+              "_type": "Value"
+            },
+            "chance_to_prune": {
+              "dtype": "float64",
+              "_type": "Value"
+            },
+            "chance_to_prune_all": {
+              "dtype": "float64",
+              "_type": "Value"
+            },
+            "deduction_type_sample_rate": {
+              "syllogism": {
+                "dtype": "float64",
+                "_type": "Value"
+              }
+            },
+            "depth": {
+              "dtype": "int64",
+              "_type": "Value"
+            },
+            "nodes": [
+              {
+                "can_be_leaf": {
+                  "dtype": "bool",
+                  "_type": "Value"
+                },
+                "children": [
+                  {
+                    "can_be_leaf": {
+                      "dtype": "bool",
+                      "_type": "Value"
+                    },
+                    "children": [
+                      {
+                        "can_be_leaf": {
+                          "dtype": "bool",
+                          "_type": "Value"
+                        },
+                        "children": [
+                          {
+                            "can_be_leaf": {
+                              "dtype": "bool",
+                              "_type": "Value"
+                            },
+                            "children": {
+                              "feature": {
+                                "dtype": "null",
+                                "_type": "Value"
+                              },
+                              "_type": "Sequence"
+                            },
+                            "constraints": {
+                              "feature": {
+                                "dtype": "null",
+                                "_type": "Value"
+                              },
+                              "_type": "Sequence"
+                            },
+                            "deduction_type": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "fact_type": {
+                              "dtype": "string",
+                              "_type": "Value"
+                            },
+                            "operator": {
+                              "dtype": "string",
+                              "_type": "Value"
+                            },
+                            "prunable": {
+                              "dtype": "bool",
+                              "_type": "Value"
+                            },
+                            "value": {
+                              "dtype": "string",
+                              "_type": "Value"
+                            }
+                          }
+                        ],
+                        "constraints": {
+                          "feature": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "_type": "Sequence"
+                        },
+                        "deduction_type": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        },
+                        "fact_type": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        },
+                        "operator": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        },
+                        "prunable": {
+                          "dtype": "bool",
+                          "_type": "Value"
+                        },
+                        "value": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        }
+                      }
+                    ],
+                    "constraints": {
+                      "feature": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "_type": "Sequence"
+                    },
+                    "deduction_type": {
+                      "dtype": "null",
+                      "_type": "Value"
+                    },
+                    "fact_type": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    },
+                    "operator": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    },
+                    "prunable": {
+                      "dtype": "bool",
+                      "_type": "Value"
+                    },
+                    "value": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    }
+                  }
+                ],
+                "constraints": {
+                  "feature": {
+                    "dtype": "null",
+                    "_type": "Value"
+                  },
+                  "_type": "Sequence"
+                },
+                "deduction_type": {
+                  "dtype": "null",
+                  "_type": "Value"
+                },
+                "fact_type": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "operator": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "prunable": {
+                  "dtype": "bool",
+                  "_type": "Value"
+                },
+                "value": {
+                  "dtype": "string",
+                  "_type": "Value"
+                }
+              }
+            ],
+            "root_structure": [
+              {
+                "can_be_leaf": {
+                  "dtype": "bool",
+                  "_type": "Value"
+                },
+                "children": [
+                  {
+                    "can_be_leaf": {
+                      "dtype": "bool",
+                      "_type": "Value"
+                    },
+                    "children": [
+                      {
+                        "can_be_leaf": {
+                          "dtype": "bool",
+                          "_type": "Value"
+                        },
+                        "children": [
+                          {
+                            "can_be_leaf": {
+                              "dtype": "bool",
+                              "_type": "Value"
+                            },
+                            "children": {
+                              "feature": {
+                                "dtype": "null",
+                                "_type": "Value"
+                              },
+                              "_type": "Sequence"
+                            },
+                            "constraints": {
+                              "feature": {
+                                "dtype": "null",
+                                "_type": "Value"
+                              },
+                              "_type": "Sequence"
+                            },
+                            "deduction_type": {
+                              "dtype": "null",
+                              "_type": "Value"
+                            },
+                            "fact_type": {
+                              "dtype": "string",
+                              "_type": "Value"
+                            },
+                            "operator": {
+                              "dtype": "string",
+                              "_type": "Value"
+                            },
+                            "prunable": {
+                              "dtype": "bool",
+                              "_type": "Value"
+                            },
+                            "value": {
+                              "dtype": "string",
+                              "_type": "Value"
+                            }
+                          }
+                        ],
+                        "constraints": {
+                          "feature": {
+                            "dtype": "null",
+                            "_type": "Value"
+                          },
+                          "_type": "Sequence"
+                        },
+                        "deduction_type": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        },
+                        "fact_type": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        },
+                        "operator": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        },
+                        "prunable": {
+                          "dtype": "bool",
+                          "_type": "Value"
+                        },
+                        "value": {
+                          "dtype": "string",
+                          "_type": "Value"
+                        }
+                      }
+                    ],
+                    "constraints": {
+                      "feature": {
+                        "dtype": "null",
+                        "_type": "Value"
+                      },
+                      "_type": "Sequence"
+                    },
+                    "deduction_type": {
+                      "dtype": "null",
+                      "_type": "Value"
+                    },
+                    "fact_type": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    },
+                    "operator": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    },
+                    "prunable": {
+                      "dtype": "bool",
+                      "_type": "Value"
+                    },
+                    "value": {
+                      "dtype": "string",
+                      "_type": "Value"
+                    }
+                  }
+                ],
+                "constraints": {
+                  "feature": {
+                    "dtype": "null",
+                    "_type": "Value"
+                  },
+                  "_type": "Sequence"
+                },
+                "deduction_type": {
+                  "dtype": "null",
+                  "_type": "Value"
+                },
+                "fact_type": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "operator": {
+                  "dtype": "string",
+                  "_type": "Value"
+                },
+                "prunable": {
+                  "dtype": "bool",
+                  "_type": "Value"
+                },
+                "value": {
+                  "dtype": "string",
+                  "_type": "Value"
+                }
+              }
+            ]
+          }
+        ],
+        "question": {
+          "dtype": "string",
+          "_type": "Value"
+        }
+      }
+    ]
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 67866304,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 23479533,
+      "num_examples": 250,
+      "dataset_name": "json"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

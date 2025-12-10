@@ -1,0 +1,86 @@
+{
+  "builder_name": "json",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "json",
+  "dataset_size": 349280,
+  "description": "",
+  "download_checksums": {
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/miniarc.jsonl": {
+      "num_bytes": 155435,
+      "checksum": null
+    }
+  },
+  "download_size": 155435,
+  "features": {
+    "idx": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "train": [
+      {
+        "input": {
+          "feature": {
+            "feature": {
+              "dtype": "int64",
+              "_type": "Value"
+            },
+            "_type": "Sequence"
+          },
+          "_type": "Sequence"
+        },
+        "output": {
+          "feature": {
+            "feature": {
+              "dtype": "int64",
+              "_type": "Value"
+            },
+            "_type": "Sequence"
+          },
+          "_type": "Sequence"
+        }
+      }
+    ],
+    "test": [
+      {
+        "input": {
+          "feature": {
+            "feature": {
+              "dtype": "int64",
+              "_type": "Value"
+            },
+            "_type": "Sequence"
+          },
+          "_type": "Sequence"
+        },
+        "output": {
+          "feature": {
+            "feature": {
+              "dtype": "int64",
+              "_type": "Value"
+            },
+            "_type": "Sequence"
+          },
+          "_type": "Sequence"
+        }
+      }
+    ]
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 504715,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 349280,
+      "num_examples": 130,
+      "dataset_name": "json"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

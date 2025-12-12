@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-neulr_abductive Dataset Evaluation: Raw vs Fine-tuned Model
+defeasible_nli Dataset Evaluation: Raw vs Fine-tuned Model
 
-Evaluates models on the neulr_abductive math competition dataset.
-neulr_abductive answers are integers from 0-999.
+Evaluates models on the defeasible_nli math competition dataset.
+defeasible_nli answers are integers from 0-999.
 
 Usage:
-    python evaluate_neulr_abductive_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
+    python evaluate_defeasible_nli_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
 """
 
 import os
@@ -20,10 +20,13 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, cla
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
-import numpy as np
 import time
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
+
+np.random.seed(42)
+
 
 # ============================================================================
 # Configuration
@@ -36,7 +39,7 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/neulr_abductive_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/defeasible_nli_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -149,69 +152,56 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-def create_neulr_abductive_prompt(problem, context):
-    """
-    Create a prompt for an abductive reasoning task.
-    Goal: Given Rules/Facts and a Target Conclusion (at the end of context), 
-    find the 'Missing Fact' (Label) required to prove the conclusion.
-    """
-    
-    # 1. Separate the provided Rules/Facts from the Target Conclusion
-    if "The fact is:" in context:
-        rules_block, target_fact = context.split("The fact is:", 1)
-        rules_block = rules_block.strip()
-        target_fact = target_fact.strip()
-    else:
-        rules_block = context.strip()
-        # Fallback if the target is passed as 'problem' instead of in 'context'
-        target_fact = problem.strip() if problem else ""
+import re
+import time
+import torch
+from tqdm import tqdm
+from datasets import load_dataset
+
+def create_defeasible_nli_prompt(premise, hypothesis, update):
+    """Create a prompt for Defeasible NLI (Thinking Like a Skeptic)."""
 
     system_prompt = """
-    You are an expert Forensic Logic Analyst.
-    
-    Task: Abductive Reasoning (Find the Missing Fact).
-    You are given:
-    1. A list of 'Logical Rules and Known Facts'.
-    2. A 'Target Conclusion' (Observed Fact).
-    
-    The 'Target Conclusion' is currently unprovable with the provided facts alone. 
-    Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion true based on the Rules.
+    You are an expert in defeasible reasoning and skepticism.
+    You will be given a Hypothesis (a tentative conclusion) and an Update (new information).
+    Sometimes, a Premise (context) is also provided.
 
-    Output Format:
+    Your task:
+    1. Consider the Hypothesis in the context of the Premise (if available).
+    2. Analyze how the new Update affects the likelihood of the Hypothesis.
+    3. Determine if the Update STRENGTHENS (makes it more likely) or WEAKENS (makes it less likely) the Hypothesis.
+
+    Your entire output MUST use exactly the following format and nothing else:
+
     <reasoning>
-    [Step-by-step logic: Identify the rule triggered by the Conclusion, trace backwards to find what condition is missing.]
+    [Your step-by-step analysis of how the update affects the hypothesis]
     </reasoning>
     <answer>
-    [The missing fact as a complete sentence. Example: NPsw0v0k is ADP37scy8.]
+    [Output exactly one word: STRENGTHENS or WEAKENS]
     </answer>
     """
 
+    # Handle cases where Premise might be empty (e.g., Social Norms subset)
+    if premise and isinstance(premise, str) and len(premise.strip()) > 0:
+        context_block = f"Premise:\n{premise}\n\nHypothesis:\n{hypothesis}"
+    else:
+        context_block = f"Hypothesis:\n{hypothesis}"
+
     user_prompt = f"""
-    Logical Rules and Known Facts:
-    {rules_block}
+    {context_block}
 
-    Target Conclusion:
-    {target_fact}
+    Update:
+    {update}
 
-    Question: What missing fact is required to conclude the Target Conclusion?
+    Does this Update STRENGTHEN or WEAKEN the Hypothesis?
     """
 
     return system_prompt, user_prompt
 
 
-def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags."""
-    if not response:
-        return None
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return None
-
-
 def extract_answer(response):
     """
-    Extract the full sentence answer from the <answer> block.
+    Extract the label from the <answer>...</answer> block.
     """
     if not response:
         return None
@@ -219,20 +209,33 @@ def extract_answer(response):
     match = re.search(r'<answer>(.*?)</answer>', response, re.IGNORECASE | re.DOTALL)
     
     if match:
-        return match.group(1).strip()
+        clean_answer = match.group(1).strip().upper()
+        # Remove punctuation
+        clean_answer = clean_answer.rstrip('.').rstrip('!')
+        
+        # Normalize to standard output labels
+        if "STRENGTH" in clean_answer:
+            return "STRENGTHENS"
+        if "WEAK" in clean_answer:
+            return "WEAKENS"
+            
+        return clean_answer
         
     return None
 
-def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split='train'):
-    """Evaluate model on neulr_abductive dataset with batch processing support."""
-    print(f"\n🔍 Evaluating {model_name} on neulr_abductive dataset...")
+
+def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split='test'):
+    """Evaluate model on Defeasible NLI dataset."""
+    print(f"\n🔍 Evaluating {model_name} on Defeasible NLI (delta-NLI)...")
     print(f"   Batch size: {batch_size}")
-    print(f"   Split: {split}")
     
-    # Load neulr_abductive dataset
-    print(f"Loading neulr_abductive dataset (split={split})...")
-    # Updated path to match your request implies using the json loader
-    dataset = load_dataset("json", data_files="/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/NeuLR/abductive_neutral.json")["train"]
+    # 1. Load the dataset
+    # We use 'tasksource/defeasible-nli' which aggregates the subsets cleanly
+    print(f"Loading tasksource/defeasible-nli dataset (split=social)...")
+    dataset = load_dataset("tasksource/defeasible-nli", "social")["test"]
+
+    indices = np.random.choice(len(dataset), int(1000), replace=False)
+    dataset = dataset.select(indices)
     
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
@@ -245,40 +248,42 @@ def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="
     total = 0
     failed_extractions = 0
     
-    # Process in batches
     num_batches = (len(dataset) + batch_size - 1) // batch_size
     btime = time.time()
-
+    
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
-        # Get batch
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, len(dataset))
         batch = dataset[start_idx:end_idx]
         
-        # Handle both single sample and batch cases
-        if not isinstance(batch['context'], list):
+        # Handle batch dictionary lists
+        if not isinstance(batch['Hypothesis'], list):
             batch = {k: [v] for k, v in batch.items()}
         
-        batch_size_actual = len(batch["context"])
+        batch_size_actual = len(batch["Hypothesis"])
 
-
-        # Prepare prompts for batch
         formatted_prompts = []
         true_answers = []
         batch_data = []
         
         for i in range(batch_size_actual):
-            # We extract it loosely here for logging, but pass strictly to the prompt function.
-            context = batch["context"][i]
-            if "The fact is:" in context:
-                problem = context.split("The fact is:", 1)[1].strip()
-            else:
-                problem = context 
+            # 2. Extract Fields (Note capitalized keys in this dataset version)
+            premise = batch.get("Premise", [None] * batch_size_actual)[i]
+            hypothesis = batch["Hypothesis"][i]
+            update = batch["Update"][i]
             
-            true_answer = str(batch["label"][i])
+            # 3. Process Label
+            # Dataset uses "strengthener" / "weakener"
+            raw_label = batch["UpdateType"][i].lower()
+            if "strengthen" in raw_label:
+                true_answer = "STRENGTHENS"
+            elif "weaken" in raw_label:
+                true_answer = "WEAKENS"
+            else:
+                true_answer = "UNKNOWN"
 
             # Create prompt
-            system_prompt, user_prompt = create_neulr_abductive_prompt(problem, context)
+            system_prompt, user_prompt = create_defeasible_nli_prompt(premise, hypothesis, update)
             
             try:
                 messages = [
@@ -286,92 +291,69 @@ def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="
                     {"role": "user", "content": user_prompt}
                 ]
                 formatted_prompt = tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True
+                    messages, tokenize=False, add_generation_prompt=True
                 )
             except:
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
             
             formatted_prompts.append(formatted_prompt)
             true_answers.append(true_answer)
+            
             batch_data.append({
-                'question': problem,
-                'id': batch['id'][i] if 'id' in batch else start_idx + i
+                'hypothesis': hypothesis,
+                'update': update,
+                'id': start_idx + i
             })
         
-        # Tokenize batch with padding
+        # Tokenize
         inputs = tokenizer(
-            formatted_prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=2048
-        )
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+            formatted_prompts, return_tensors="pt", padding=True, truncation=True, max_length=4096
+        ).to(model.device)
         
-        # Generate for batch
+        # Generate
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=4096,  # Need more tokens for math reasoning
-                temperature=0.0,  # Low temperature for more accurate answers
+                max_new_tokens=1024, # Shorter generation needed for this task
+                temperature=0.0,
                 do_sample=False,
-                # top_p=0.95,
                 pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
             )
         
-        # Process each output in batch
+        # Process Output
         for i in range(batch_size_actual):
-            # Decode response (skip input tokens)
             input_length = inputs['input_ids'][i].shape[0]
             response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
             
-            # Extract answer
             predicted_answer = extract_answer(response)
-            
-            # Extract reasoning
-            # reasoning = extract_reasoning(response)
-            reasoning = response
             
             if predicted_answer is None:
                 failed_extractions += 1
-                predicted_answer = "-1"  # Mark as failed string
+                predicted_answer = "FAILED"
             
             # Check correctness
-            true_answer = true_answers[i]
-            
-            # This ensures "Fact." == "Fact"
-            norm_predicted = str(predicted_answer).strip().rstrip('.')
-            norm_true = str(true_answer).strip().rstrip('.')
-            
-            is_correct = (norm_predicted == norm_true)
-            
+            is_correct = (predicted_answer == true_answers[i])
             if is_correct:
                 correct += 1
             total += 1
             
-            # Store result
             results.append({
-                'problem_id': batch_data[i]['id'],
-                'question': batch_data[i]['question'],
-                'true_answer': true_answer,
+                'id': batch_data[i]['id'],
+                'hypothesis': batch_data[i]['hypothesis'],
+                'update': batch_data[i]['update'],
+                'true_answer': true_answers[i],
                 'predicted_answer': predicted_answer,
-                'reasoning': reasoning,
+                'full_response': response,
                 'correct': is_correct
             })
     
     etime = time.time()
-    print(f"Batch processing time: {etime - btime:.2f} seconds")
     accuracy = correct / total if total > 0 else 0.0
-    
-    # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     
     print(f"\n📊 {model_name} Results:")
-    print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
-    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%) - {total - failed_extractions}/{total} extracted")
-    print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
+    print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%)")
+    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
     
     return {
         'accuracy': accuracy,
@@ -383,6 +365,7 @@ def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="
         'results': results
     }
 
+
 def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     """Evaluate a model with automatic batch-size backoff to avoid CUDA OOM."""
     results = None
@@ -391,7 +374,7 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     while batch_size >= 1 and results is None:
         try:
             print(f"\n🧪 Evaluating {model_name} with batch_size={batch_size}")
-            results = evaluate_on_neulr_abductive(
+            results = evaluate_on_defeasible_nli(
                 model,
                 tokenizer,
                 args.max_samples,
@@ -421,10 +404,10 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
 
 def ensure_raw_results_cached(args):
     """
-    Ensure raw neulr_abductive results are cached on disk for the current configuration.
+    Ensure raw defeasible_nli results are cached on disk for the current configuration.
     Returns the loaded or newly computed raw_results dict.
     """
-    dataset_name = "neulr_abductive"
+    dataset_name = "defeasible_nli"
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
     
@@ -475,7 +458,7 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Ensure fine-tuned model results are cached on disk for the current configuration.
     Returns the loaded or newly computed fine-tuned results dict.
     """
-    dataset_name = "neulr_abductive"
+    dataset_name = "defeasible_nli"
     ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
@@ -490,7 +473,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     Given a single checkpoint, evaluate it vs cached raw results and save:
       - all_cases.json
       - disagreement_cases.json
-    under: OUTPUT_DIR/<checkpoint_name>/neulr_abductive/
+    under: OUTPUT_DIR/<checkpoint_name>/defeasible_nli/
     """
     print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
     if not os.path.isabs(checkpoint_path):
@@ -532,7 +515,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         return
     
     # Build per-case comparison
-    dataset_name = "neulr_abductive"
+    dataset_name = "defeasible_nli"
     ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
@@ -653,7 +636,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     
     summary = {
         'evaluation_time': timestamp,
-        'dataset': 'yentinglin/neulr_abductive',
+        'dataset': 'yentinglin/defeasible_nli',
         'split': 'train',
         'num_samples': raw_results['total'],
         'raw_model': {
@@ -768,7 +751,7 @@ def evaluate_all_checkpoints(args):
         return
     
     print("="*80)
-    print("🚀 neulr_abductive EVALUATION: ALL CHECKPOINTS")
+    print("🚀 defeasible_nli EVALUATION: ALL CHECKPOINTS")
     print("="*80)
     print(f"Checkpoint Directory: {checkpoint_dir}")
     print(f"CUDA Device: {args.cuda_device}")
@@ -804,7 +787,7 @@ def evaluate_all_checkpoints(args):
         print("🤖 EVALUATING RAW MODEL (once)")
         print("="*80)
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_neulr_abductive(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
+        raw_results = evaluate_on_defeasible_nli(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
         del raw_model
         torch.cuda.empty_cache()
         print(f"\n✅ Raw model evaluation complete")
@@ -842,7 +825,7 @@ def evaluate_all_checkpoints(args):
         try:
             # Load and evaluate checkpoint
             finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
-            finetuned_results = evaluate_on_neulr_abductive(
+            finetuned_results = evaluate_on_defeasible_nli(
                 finetuned_model, finetuned_tokenizer, args.max_samples, 
                 f"{ckpt_name}", args.batch_size
             )
@@ -944,7 +927,7 @@ def evaluate_all_checkpoints(args):
 def print_comparison(summary):
     """Print formatted comparison results."""
     print("\n" + "="*80)
-    print("📊 neulr_abductive EVALUATION: RAW vs FINE-TUNED MODEL")
+    print("📊 defeasible_nli EVALUATION: RAW vs FINE-TUNED MODEL")
     print("="*80)
     
     raw_metrics = summary['raw_model']['metrics']
@@ -974,22 +957,22 @@ def print_comparison(summary):
     print("\n" + "-"*80)
     
     if comp['overall_improved']:
-        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on neulr_abductive!")
+        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on defeasible_nli!")
         print(f"   • Accuracy improved by {acc_rel:.2f}% (relative)")
         print(f"   The model shows better math problem solving ability.")
     elif acc_imp < 0:
-        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on neulr_abductive.")
+        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on defeasible_nli.")
         print(f"   • Accuracy decreased by {acc_rel:.2f}% (relative)")
         print(f"   • This suggests potential overfitting to your training data.")
     else:
-        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on neulr_abductive performance.")
+        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on defeasible_nli performance.")
         print(f"   The model maintained baseline math problem solving ability.")
     
     print("="*80 + "\n")
 
 def main():
     global RAW_MODEL_PATH, OUTPUT_DIR
-    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on neulr_abductive dataset')
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on defeasible_nli dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all 30 problems)')
     parser.add_argument('--cuda_device', type=str, default='0',
@@ -997,7 +980,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=1,
                        help='Batch size for evaluation. Higher values (4-8) are faster but use more GPU memory (default: 1)')
     parser.add_argument('--split', type=str, default='train', choices=['train', 'test', 'validation'],
-                       help='Dataset split to use (default: train). Note: neulr_abductive dataset may only have "train" split.')
+                       help='Dataset split to use (default: train). Note: defeasible_nli dataset may only have "train" split.')
     parser.add_argument('--skip_raw', action='store_true',
                        help='Skip raw model evaluation (evaluate only fine-tuned model)')
     parser.add_argument('--skip_finetuned', action='store_true',
@@ -1022,6 +1005,7 @@ def main():
     args = parser.parse_args()
     
     OUTPUT_DIR = args.output_path
+
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
         print("❌ Error: Cannot use both --checkpoint_path and --checkpoint_dir")
@@ -1047,7 +1031,7 @@ def main():
             return
         
         print("="*80)
-        print("🚀 neulr_abductive PER-CHECKPOINT EVALUATION MODE")
+        print("🚀 defeasible_nli PER-CHECKPOINT EVALUATION MODE")
         print("="*80)
         print(f"Raw Model:     {RAW_MODEL_PATH}")
         print(f"Output Dir:    {OUTPUT_DIR}")
@@ -1069,7 +1053,7 @@ def main():
         return
     
     print("="*70)
-    print("🚀 neulr_abductive EVALUATION: RAW vs FINE-TUNED")
+    print("🚀 defeasible_nli EVALUATION: RAW vs FINE-TUNED")
     print("="*70)
     print(f"Raw Model: {RAW_MODEL_PATH}")
     print(f"Training Dir: {TRAINING_DIR}")
@@ -1126,7 +1110,7 @@ def main():
     # Evaluate raw model
     if not args.skip_raw:
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_neulr_abductive(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
+        raw_results = evaluate_on_defeasible_nli(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
         del raw_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1136,7 +1120,7 @@ def main():
     # Evaluate fine-tuned model
     if not args.skip_finetuned:
         finetuned_model, finetuned_tokenizer = load_finetuned_model(best_checkpoint_info['path'], args.cuda_device)
-        finetuned_results = evaluate_on_neulr_abductive(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size)
+        finetuned_results = evaluate_on_defeasible_nli(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size)
         del finetuned_model  # Free memory
         torch.cuda.empty_cache()
     else:

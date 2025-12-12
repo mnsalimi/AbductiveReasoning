@@ -58,11 +58,11 @@ declare -A BATCH_SIZES=(
     ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=8
     ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=4 # Note that each batch has 4 questions!
     ["evaluate_musr_team_allocation_raw_vs_finetuned.py"]=16
-    ["evaluate_gsm8k_raw_vs_finetuned.py"]=64
+    ["evaluate_gsm8k_raw_vs_finetuned.py"]=32
     ["evaluate_aime_raw_vs_finetuned.py"]=8
     ["evaluate_aimo_raw_vs_finetuned.py"]=8
     ["evaluate_art_raw_vs_finetuned.py"]=64
-    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=128
+    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=64
     ["evaluate_goEmotion_raw_vs_finetuned.py"]=16
 )
 

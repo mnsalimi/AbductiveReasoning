@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-neulr_abductive Dataset Evaluation: Raw vs Fine-tuned Model
+winogrande Dataset Evaluation: Raw vs Fine-tuned Model
 
-Evaluates models on the neulr_abductive math competition dataset.
-neulr_abductive answers are integers from 0-999.
+Evaluates models on the winogrande math competition dataset.
+winogrande answers are integers from 0-999.
 
 Usage:
-    python evaluate_neulr_abductive_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
+    python evaluate_winogrande_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
 """
 
 import os
@@ -20,10 +20,12 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, cla
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
-import numpy as np
 import time
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
+
+np.random.seed(42)
 
 # ============================================================================
 # Configuration
@@ -36,7 +38,7 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/neulr_abductive_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/winogrande_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -149,239 +151,236 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-def create_neulr_abductive_prompt(problem, context):
-    """
-    Create a prompt for an abductive reasoning task.
-    Goal: Given Rules/Facts and a Target Conclusion (at the end of context), 
-    find the 'Missing Fact' (Label) required to prove the conclusion.
-    """
-    
-    # 1. Separate the provided Rules/Facts from the Target Conclusion
-    if "The fact is:" in context:
-        rules_block, target_fact = context.split("The fact is:", 1)
-        rules_block = rules_block.strip()
-        target_fact = target_fact.strip()
-    else:
-        rules_block = context.strip()
-        # Fallback if the target is passed as 'problem' instead of in 'context'
-        target_fact = problem.strip() if problem else ""
+
+def create_winogrande_prompt(sentence, option1, option2):
+    """Create a prompt for WinoGrande-style commonsense pronoun resolution."""
 
     system_prompt = """
-    You are an expert Forensic Logic Analyst.
-    
-    Task: Abductive Reasoning (Find the Missing Fact).
-    You are given:
-    1. A list of 'Logical Rules and Known Facts'.
-    2. A 'Target Conclusion' (Observed Fact).
-    
-    The 'Target Conclusion' is currently unprovable with the provided facts alone. 
-    Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion true based on the Rules.
+You are an expert in commonsense reasoning and pronoun resolution.
 
-    Output Format:
-    <reasoning>
-    [Step-by-step logic: Identify the rule triggered by the Conclusion, trace backwards to find what condition is missing.]
-    </reasoning>
-    <answer>
-    [The missing fact as a complete sentence. Example: NPsw0v0k is ADP37scy8.]
-    </answer>
-    """
+You will be given:
+- A sentence containing a blank represented by an underscore character: _
+- Two candidate options (Option 1 and Option 2)
+
+Your task:
+1. Decide which option best fills the blank to make the sentence coherent and logically correct.
+2. Provide step-by-step reasoning.
+3. Provide the final answer as the option number.
+
+Your entire output MUST use exactly the following format and nothing else:
+
+<reasoning>
+[Your step-by-step analysis of which option best completes the sentence]
+</reasoning>
+<answer>
+[Output exactly one of these two options: 1 or 2]
+</answer>
+""".strip()
 
     user_prompt = f"""
-    Logical Rules and Known Facts:
-    {rules_block}
+Sentence:
+{sentence}
 
-    Target Conclusion:
-    {target_fact}
+Option 1:
+{option1}
 
-    Question: What missing fact is required to conclude the Target Conclusion?
-    """
+Option 2:
+{option2}
+
+Which option correctly fills the blank "_" in the sentence?
+""".strip()
 
     return system_prompt, user_prompt
 
 
-def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags."""
-    if not response:
-        return None
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return None
-
-
 def extract_answer(response):
     """
-    Extract the full sentence answer from the <answer> block.
+    Extract the label from the <answer>...</answer> block.
+    Returns "1" or "2" (strings) or None.
     """
     if not response:
         return None
 
-    match = re.search(r'<answer>(.*?)</answer>', response, re.IGNORECASE | re.DOTALL)
-    
-    if match:
-        return match.group(1).strip()
-        
+    match = re.search(r"<answer>(.*?)</answer>", response, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return None
+
+    clean_answer = match.group(1).strip().upper()
+    clean_answer = clean_answer.rstrip(".")
+
+    # Accept a few common variants but normalize to "1"/"2"
+    if clean_answer in {"1", "OPTION1", "OPTION 1", "A"}:
+        return "1"
+    if clean_answer in {"2", "OPTION2", "OPTION 2", "B"}:
+        return "2"
+
+    # If the model outputs extra text like "1 (Option 1)", grab first 1/2 digit
+    m = re.search(r"([12])", clean_answer)
+    if m:
+        return m.group(1)
+
     return None
 
-def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split='train'):
-    """Evaluate model on neulr_abductive dataset with batch processing support."""
-    print(f"\n🔍 Evaluating {model_name} on neulr_abductive dataset...")
-    print(f"   Batch size: {batch_size}")
+
+def evaluate_on_winogrande(
+    model,
+    tokenizer,
+    max_samples=None,
+    model_name="Model",
+    batch_size=1,
+    split="validation",
+    config="winogrande_xl",
+    max_new_tokens=512,
+    max_length=4096,
+):
+    """Evaluate model on WinoGrande dataset (allenai/winogrande)."""
+    print(f"\n🔍 Evaluating {model_name} on WinoGrande...")
+    print(f"   Config: {config}")
     print(f"   Split: {split}")
-    
-    # Load neulr_abductive dataset
-    print(f"Loading neulr_abductive dataset (split={split})...")
-    # Updated path to match your request implies using the json loader
-    dataset = load_dataset("json", data_files="/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/NeuLR/abductive_neutral.json")["train"]
-    
+    print(f"   Batch size: {batch_size}")
+
+    # 1. Load WinoGrande dataset
+    print(f"Loading allenai/winogrande (config={config}, split={split})...")
+    dataset = load_dataset("allenai/winogrande", config, split=split)
+
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
         print(f"Evaluating on {len(dataset)} samples (limited)")
     else:
-        print(f"Evaluating on {len(dataset)} samples (full dataset)")
-    
+        print(f"Evaluating on {len(dataset)} samples (full split)")
+
     results = []
     correct = 0
     total = 0
     failed_extractions = 0
-    
-    # Process in batches
+
+    # If split is "test", labels are empty => cannot compute accuracy.
+    # We'll still run inference and report extraction rate, but accuracy is computed only on labeled rows.
+    scored = 0
+
     num_batches = (len(dataset) + batch_size - 1) // batch_size
     btime = time.time()
 
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
-        # Get batch
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, len(dataset))
         batch = dataset[start_idx:end_idx]
-        
-        # Handle both single sample and batch cases
-        if not isinstance(batch['context'], list):
+
+        # Handle batch dictionary lists (same style as your code)
+        if not isinstance(batch["sentence"], list):
             batch = {k: [v] for k, v in batch.items()}
-        
-        batch_size_actual = len(batch["context"])
 
+        batch_size_actual = len(batch["sentence"])
 
-        # Prepare prompts for batch
         formatted_prompts = []
         true_answers = []
         batch_data = []
-        
-        for i in range(batch_size_actual):
-            # We extract it loosely here for logging, but pass strictly to the prompt function.
-            context = batch["context"][i]
-            if "The fact is:" in context:
-                problem = context.split("The fact is:", 1)[1].strip()
-            else:
-                problem = context 
-            
-            true_answer = str(batch["label"][i])
 
-            # Create prompt
-            system_prompt, user_prompt = create_neulr_abductive_prompt(problem, context)
-            
+        for i in range(batch_size_actual):
+            sentence = batch["sentence"][i]
+            option1 = batch["option1"][i]
+            option2 = batch["option2"][i]
+            true_answer = batch["answer"][i]  # "1"/"2" on train/validation, "" on test
+
+            system_prompt, user_prompt = create_winogrande_prompt(sentence, option1, option2)
+
             try:
                 messages = [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ]
                 formatted_prompt = tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True
+                    messages, tokenize=False, add_generation_prompt=True
                 )
-            except:
+            except Exception:
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
-            
+
             formatted_prompts.append(formatted_prompt)
             true_answers.append(true_answer)
-            batch_data.append({
-                'question': problem,
-                'id': batch['id'][i] if 'id' in batch else start_idx + i
-            })
-        
-        # Tokenize batch with padding
+            batch_data.append(
+                {
+                    "id": start_idx + i,
+                    "sentence": sentence,
+                    "option1": option1,
+                    "option2": option2,
+                }
+            )
+
         inputs = tokenizer(
             formatted_prompts,
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=2048
-        )
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        
-        # Generate for batch
+            max_length=max_length,
+        ).to(model.device)
+
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=4096,  # Need more tokens for math reasoning
-                temperature=0.0,  # Low temperature for more accurate answers
+                max_new_tokens=max_new_tokens,
+                temperature=0.0,
                 do_sample=False,
-                # top_p=0.95,
-                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
+                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id,
             )
-        
-        # Process each output in batch
+
         for i in range(batch_size_actual):
-            # Decode response (skip input tokens)
-            input_length = inputs['input_ids'][i].shape[0]
+            input_length = inputs["input_ids"][i].shape[0]
             response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
-            
-            # Extract answer
+
             predicted_answer = extract_answer(response)
-            
-            # Extract reasoning
-            # reasoning = extract_reasoning(response)
-            reasoning = response
-            
             if predicted_answer is None:
                 failed_extractions += 1
-                predicted_answer = "-1"  # Mark as failed string
-            
-            # Check correctness
-            true_answer = true_answers[i]
-            
-            # This ensures "Fact." == "Fact"
-            norm_predicted = str(predicted_answer).strip().rstrip('.')
-            norm_true = str(true_answer).strip().rstrip('.')
-            
-            is_correct = (norm_predicted == norm_true)
-            
-            if is_correct:
-                correct += 1
+                predicted_answer = "FAILED"
+
+            gold = true_answers[i]
+            is_scored = gold in ("1", "2")
+
+            is_correct = False
+            if is_scored:
+                scored += 1
+                is_correct = (predicted_answer == gold)
+                if is_correct:
+                    correct += 1
+
             total += 1
-            
-            # Store result
-            results.append({
-                'problem_id': batch_data[i]['id'],
-                'question': batch_data[i]['question'],
-                'true_answer': true_answer,
-                'predicted_answer': predicted_answer,
-                'reasoning': reasoning,
-                'correct': is_correct
-            })
-    
+
+            results.append(
+                {
+                    "id": batch_data[i]["id"],
+                    "sentence": batch_data[i]["sentence"],
+                    "option1": batch_data[i]["option1"],
+                    "option2": batch_data[i]["option2"],
+                    "true_answer": gold if is_scored else None,
+                    "predicted_answer": predicted_answer,
+                    "full_response": response,
+                    "correct": is_correct if is_scored else None,
+                }
+            )
+
     etime = time.time()
-    print(f"Batch processing time: {etime - btime:.2f} seconds")
-    accuracy = correct / total if total > 0 else 0.0
-    
-    # Calculate additional metrics
+    accuracy = (correct / scored) if scored > 0 else None
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
-    
+
     print(f"\n📊 {model_name} Results:")
-    print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
-    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%) - {total - failed_extractions}/{total} extracted")
-    print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
-    
+    if accuracy is None:
+        print("   Accuracy:  N/A (no labels in this split; use split='validation')")
+    else:
+        print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%) on {scored} labeled examples")
+
+    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
+    print(f"   Time: {etime - btime:.1f}s")
+
     return {
-        'accuracy': accuracy,
-        'correct': correct,
-        'total': total,
-        'failed_extractions': failed_extractions,
-        'extraction_rate': extraction_rate,
-        'time': etime - btime,
-        'results': results
+        "accuracy": accuracy,
+        "correct": correct,
+        "scored": scored,           # labeled examples
+        "total": total,             # total processed
+        "failed_extractions": failed_extractions,
+        "extraction_rate": extraction_rate,
+        "time": etime - btime,
+        "results": results,
     }
+
 
 def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     """Evaluate a model with automatic batch-size backoff to avoid CUDA OOM."""
@@ -391,7 +390,7 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     while batch_size >= 1 and results is None:
         try:
             print(f"\n🧪 Evaluating {model_name} with batch_size={batch_size}")
-            results = evaluate_on_neulr_abductive(
+            results = evaluate_on_winogrande(
                 model,
                 tokenizer,
                 args.max_samples,
@@ -421,10 +420,10 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
 
 def ensure_raw_results_cached(args):
     """
-    Ensure raw neulr_abductive results are cached on disk for the current configuration.
+    Ensure raw winogrande results are cached on disk for the current configuration.
     Returns the loaded or newly computed raw_results dict.
     """
-    dataset_name = "neulr_abductive"
+    dataset_name = "winogrande"
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
     
@@ -475,7 +474,7 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Ensure fine-tuned model results are cached on disk for the current configuration.
     Returns the loaded or newly computed fine-tuned results dict.
     """
-    dataset_name = "neulr_abductive"
+    dataset_name = "winogrande"
     ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
@@ -490,7 +489,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     Given a single checkpoint, evaluate it vs cached raw results and save:
       - all_cases.json
       - disagreement_cases.json
-    under: OUTPUT_DIR/<checkpoint_name>/neulr_abductive/
+    under: OUTPUT_DIR/<checkpoint_name>/winogrande/
     """
     print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
     if not os.path.isabs(checkpoint_path):
@@ -532,7 +531,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         return
     
     # Build per-case comparison
-    dataset_name = "neulr_abductive"
+    dataset_name = "winogrande"
     ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
@@ -653,7 +652,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     
     summary = {
         'evaluation_time': timestamp,
-        'dataset': 'yentinglin/neulr_abductive',
+        'dataset': 'yentinglin/winogrande',
         'split': 'train',
         'num_samples': raw_results['total'],
         'raw_model': {
@@ -768,7 +767,7 @@ def evaluate_all_checkpoints(args):
         return
     
     print("="*80)
-    print("🚀 neulr_abductive EVALUATION: ALL CHECKPOINTS")
+    print("🚀 winogrande EVALUATION: ALL CHECKPOINTS")
     print("="*80)
     print(f"Checkpoint Directory: {checkpoint_dir}")
     print(f"CUDA Device: {args.cuda_device}")
@@ -804,7 +803,7 @@ def evaluate_all_checkpoints(args):
         print("🤖 EVALUATING RAW MODEL (once)")
         print("="*80)
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_neulr_abductive(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
+        raw_results = evaluate_on_winogrande(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
         del raw_model
         torch.cuda.empty_cache()
         print(f"\n✅ Raw model evaluation complete")
@@ -842,7 +841,7 @@ def evaluate_all_checkpoints(args):
         try:
             # Load and evaluate checkpoint
             finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
-            finetuned_results = evaluate_on_neulr_abductive(
+            finetuned_results = evaluate_on_winogrande(
                 finetuned_model, finetuned_tokenizer, args.max_samples, 
                 f"{ckpt_name}", args.batch_size
             )
@@ -944,7 +943,7 @@ def evaluate_all_checkpoints(args):
 def print_comparison(summary):
     """Print formatted comparison results."""
     print("\n" + "="*80)
-    print("📊 neulr_abductive EVALUATION: RAW vs FINE-TUNED MODEL")
+    print("📊 winogrande EVALUATION: RAW vs FINE-TUNED MODEL")
     print("="*80)
     
     raw_metrics = summary['raw_model']['metrics']
@@ -974,22 +973,22 @@ def print_comparison(summary):
     print("\n" + "-"*80)
     
     if comp['overall_improved']:
-        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on neulr_abductive!")
+        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on winogrande!")
         print(f"   • Accuracy improved by {acc_rel:.2f}% (relative)")
         print(f"   The model shows better math problem solving ability.")
     elif acc_imp < 0:
-        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on neulr_abductive.")
+        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on winogrande.")
         print(f"   • Accuracy decreased by {acc_rel:.2f}% (relative)")
         print(f"   • This suggests potential overfitting to your training data.")
     else:
-        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on neulr_abductive performance.")
+        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on winogrande performance.")
         print(f"   The model maintained baseline math problem solving ability.")
     
     print("="*80 + "\n")
 
 def main():
     global RAW_MODEL_PATH, OUTPUT_DIR
-    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on neulr_abductive dataset')
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on winogrande dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all 30 problems)')
     parser.add_argument('--cuda_device', type=str, default='0',
@@ -997,7 +996,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=1,
                        help='Batch size for evaluation. Higher values (4-8) are faster but use more GPU memory (default: 1)')
     parser.add_argument('--split', type=str, default='train', choices=['train', 'test', 'validation'],
-                       help='Dataset split to use (default: train). Note: neulr_abductive dataset may only have "train" split.')
+                       help='Dataset split to use (default: train). Note: winogrande dataset may only have "train" split.')
     parser.add_argument('--skip_raw', action='store_true',
                        help='Skip raw model evaluation (evaluate only fine-tuned model)')
     parser.add_argument('--skip_finetuned', action='store_true',
@@ -1022,6 +1021,7 @@ def main():
     args = parser.parse_args()
     
     OUTPUT_DIR = args.output_path
+
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
         print("❌ Error: Cannot use both --checkpoint_path and --checkpoint_dir")
@@ -1047,7 +1047,7 @@ def main():
             return
         
         print("="*80)
-        print("🚀 neulr_abductive PER-CHECKPOINT EVALUATION MODE")
+        print("🚀 winogrande PER-CHECKPOINT EVALUATION MODE")
         print("="*80)
         print(f"Raw Model:     {RAW_MODEL_PATH}")
         print(f"Output Dir:    {OUTPUT_DIR}")
@@ -1069,7 +1069,7 @@ def main():
         return
     
     print("="*70)
-    print("🚀 neulr_abductive EVALUATION: RAW vs FINE-TUNED")
+    print("🚀 winogrande EVALUATION: RAW vs FINE-TUNED")
     print("="*70)
     print(f"Raw Model: {RAW_MODEL_PATH}")
     print(f"Training Dir: {TRAINING_DIR}")
@@ -1126,7 +1126,7 @@ def main():
     # Evaluate raw model
     if not args.skip_raw:
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_neulr_abductive(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
+        raw_results = evaluate_on_winogrande(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
         del raw_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1136,7 +1136,7 @@ def main():
     # Evaluate fine-tuned model
     if not args.skip_finetuned:
         finetuned_model, finetuned_tokenizer = load_finetuned_model(best_checkpoint_info['path'], args.cuda_device)
-        finetuned_results = evaluate_on_neulr_abductive(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size)
+        finetuned_results = evaluate_on_winogrande(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size)
         del finetuned_model  # Free memory
         torch.cuda.empty_cache()
     else:

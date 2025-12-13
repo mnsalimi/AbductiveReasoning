@@ -21,6 +21,9 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+from pathlib import Path
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 warnings.filterwarnings('ignore')
 
 # ============================================================================
@@ -35,6 +38,9 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/aimo_evaluation_results")  # Change default per script
+MODEL_TYPE = "hf"
+CURRENT_LORA_REQUEST = None
+CURRENT_LORA_INT_ID = 0
 
 # ============================================================================
 # Helper Functions
@@ -102,50 +108,104 @@ def find_best_checkpoint(training_dir):
 def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
+    print(f"- Model type: {MODEL_TYPE}")
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
+    if MODEL_TYPE == "hf":
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        model.eval()
+    elif MODEL_TYPE == "vllm":
+        model = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            max_lora_rank=64
+      )
+    else:
+        raise ValueError(f"Invalid model type: {MODEL_TYPE}")
     
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    model.eval()
     print("✅ Raw model loaded successfully")
     
     return model, tokenizer
 
+# Global variable to hold the current LoRA request
+CURRENT_LORA_REQUEST = None
+
+def sanitize_name(name: str) -> str:
+    """Convert a string into a safe identifier-style name."""
+    return re.sub(r'\W|^(?=\d)', '_', name).upper()
+
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
-    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
-    
-    # Load base model
-    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
-    
-    # Load LoRA adapter
-    model = PeftModel.from_pretrained(base_model, checkpoint_path)
-    
-    if base_tokenizer.pad_token is None:
-        base_tokenizer.pad_token = base_tokenizer.eos_token
-    
-    model.eval()
-    print("✅ Fine-tuned model loaded successfully")
-    
-    return model, base_tokenizer
+    """
+    Load the fine-tuned model with LoRA adapter.
+    For vLLM, creates and saves a global LoRARequest with a meaningful name.
+    """
+    global CURRENT_LORA_REQUEST, CURRENT_LORA_INT_ID
+
+    print(f"\nLoading fine-tuned model (MODEL_TYPE={MODEL_TYPE})")
+    print(f"Checkpoint path: {checkpoint_path}")
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Create meaningful lora_name
+    raw_model_name = sanitize_name(Path(RAW_MODEL_PATH).stem)
+    checkpoint_name = sanitize_name(Path(checkpoint_path).stem)
+    meaningful_lora_name = f"LORA_{raw_model_name}_{checkpoint_name}"
+
+    if MODEL_TYPE.lower() == "hf":
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f'cuda:0'},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        model = PeftModel.from_pretrained(base_model, checkpoint_path)
+        model.eval()
+        print("✅ HF LoRA model loaded successfully")
+        return model, tokenizer
+
+    elif MODEL_TYPE.lower() == "vllm":
+        llm = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            enable_lora=True,
+            max_lora_rank=64
+        )
+
+        CURRENT_LORA_INT_ID += 1
+
+        # Save LoRARequest to global variable
+        CURRENT_LORA_REQUEST = LoRARequest(
+            lora_name=meaningful_lora_name,
+            lora_int_id=CURRENT_LORA_INT_ID,
+            lora_path=checkpoint_path,
+        )
+        
+        print(f"✅ vLLM base engine loaded. LoRA request saved as CURRENT_LORA_REQUEST with name {meaningful_lora_name}")
+        return llm, tokenizer
+
+    else:
+        raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
+
 
 def create_aimo_prompt(problem):
     """Create a prompt for AIMO problem - handles LaTeX properly."""
@@ -249,9 +309,9 @@ def normalize_answer(ans):
 
 
 def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="test"):
-    """Evaluate model on AIMO dataset."""
+    """Evaluate model on AIMO dataset with support for HF and vLLM models (LG1)."""
     print(f"\n🔍 Evaluating {model_name} on AIMO dataset...")
-    
+
     # Load dataset
     try:
         dataset = load_dataset("AI-MO/aimo-validation-amc", split="train")
@@ -280,16 +340,15 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
     # Process in batches
     for batch_start in tqdm(range(0, len(dataset), batch_size), desc=f"Evaluating {model_name}"):
         batch_end = min(batch_start + batch_size, len(dataset))
-        
-        # Get individual samples for this batch
-        batch_prompts = []
-        batch_true_answers = []
-        batch_problems = []
-        
+
+        # Prepare batch prompts
+        formatted_prompts = []
+        true_answers = []
+        batch_data = []
+
         for idx in range(batch_start, batch_end):
             sample = dataset[idx]
             system_prompt, user_prompt = create_aimo_prompt(sample['problem'])
-            
             try:
                 messages = [
                     {"role": "system", "content": system_prompt},
@@ -300,93 +359,100 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
                 )
             except:
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
-            
-            batch_prompts.append(formatted_prompt)
-            batch_true_answers.append(str(sample['answer']))
-            batch_problems.append(sample['problem'])
-        
-        # Tokenize batch with padding
-        inputs = tokenizer(
-            batch_prompts, 
-            return_tensors="pt", 
-            truncation=True, 
-            max_length=2048,
-            padding=True
-        )
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        
-        # Generate for batch
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=4096,
-                temperature=0.0,
-                do_sample=False,
-                # top_p=0.95,
-                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+
+            formatted_prompts.append(formatted_prompt)
+            true_answers.append(str(sample['answer']))
+            batch_data.append({'problem': sample['problem'], 'id': idx})
+
+        # --- LG1: Generation ---
+        if MODEL_TYPE.lower() == "hf":
+            inputs = tokenizer(
+                formatted_prompts,
+                return_tensors="pt",
+                truncation=True,
+                padding=True,
+                max_length=2048
             )
-        
-        # Decode each response in batch
-        input_lengths = inputs['input_ids'].shape[1]
-        for i in range(len(batch_prompts)):
-            response = tokenizer.decode(outputs[i][input_lengths:], skip_special_tokens=True)
-            
-            true_answer = batch_true_answers[i]
-            problem = batch_problems[i]
-            idx = batch_start + i
-            
-            # Extract answer
-            predicted_answer = extract_answer(response)
-            
-            # Extract reasoning
-            # reasoning = extract_reasoning(response)
-            reasoning = response
-            
-            if predicted_answer is None:
-                failed_extractions += 1
-                predicted_answer = "FAILED_EXTRACTION"
-            
-            # Normalize and compare
-            norm_true = normalize_answer(true_answer)
-            norm_pred = normalize_answer(predicted_answer)
-            
-            # Compare with tolerance for floating point
-            is_correct = False
-            if norm_true and norm_pred and norm_pred != "failed_extraction":
-                try:
-                    true_val = float(norm_true)
-                    pred_val = float(norm_pred)
-                    # Allow small tolerance for floating point comparison
-                    is_correct = abs(true_val - pred_val) < 0.01
-                except:
-                    is_correct = norm_pred == norm_true
-            
-            if is_correct:
-                correct += 1
-            total += 1
-            
-            # Debug: Print first 3 comparisons
-            # if idx < 3:
-            #     print(f"\n{'='*60}")
-            #     print(f"Sample {idx}:")
-            #     print(f"Problem: {problem[:200]}...")
-            #     print(f"True answer: {true_answer}")
-            #     print(f"Predicted answer: {predicted_answer}")
-            #     print(f"Normalized true: {norm_true}")
-            #     print(f"Normalized pred: {norm_pred}")
-            #     print(f"Correct: {is_correct}")
-            #     print(f"Response excerpt: {response[-200:]}")
-            #     print(f"{'='*60}")
-            
-            results.append({
-                'problem_id': idx,
-                'problem': problem,
-                'true_answer': true_answer,
-                'predicted_answer': predicted_answer,
-                'reasoning': reasoning,
-                'correct': is_correct
-            })
-    
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=4096,
+                    temperature=0.0,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+                )
+
+            for i in range(len(formatted_prompts)):
+                input_len = inputs['input_ids'][i].shape[0]
+                response = tokenizer.decode(outputs[i][input_len:], skip_special_tokens=True)
+                predicted_answer = extract_answer(response) or "FAILED_EXTRACTION"
+                reasoning = response
+                norm_true = normalize_answer(true_answers[i])
+                norm_pred = normalize_answer(predicted_answer)
+                # Compare answers with tolerance
+                is_correct = False
+                if norm_true and norm_pred != "failed_extraction":
+                    try:
+                        is_correct = abs(float(norm_true) - float(norm_pred)) < 0.01
+                    except:
+                        is_correct = norm_pred == norm_true
+                if is_correct:
+                    correct += 1
+                total += 1
+                if predicted_answer == "FAILED_EXTRACTION":
+                    failed_extractions += 1
+
+                results.append({
+                    'problem_id': batch_data[i]['id'],
+                    'problem': batch_data[i]['problem'],
+                    'true_answer': true_answers[i],
+                    'predicted_answer': predicted_answer,
+                    'reasoning': reasoning,
+                    'correct': is_correct
+                })
+
+        elif MODEL_TYPE.lower() == "vllm":
+            from vllm import SamplingParams
+            sampling = SamplingParams(max_tokens=2048, temperature=0.0, top_p=1.0)
+
+            vllm_outputs = model.generate(
+                formatted_prompts,
+                sampling_params=sampling,
+                lora_request=CURRENT_LORA_REQUEST
+            )
+
+            for i, out in enumerate(vllm_outputs):
+                response = out.outputs[0].text
+                predicted_answer = extract_answer(response) or "FAILED_EXTRACTION"
+                reasoning = response
+                norm_true = normalize_answer(true_answers[i])
+                norm_pred = normalize_answer(predicted_answer)
+                is_correct = False
+                if norm_true and norm_pred != "failed_extraction":
+                    try:
+                        is_correct = abs(float(norm_true) - float(norm_pred)) < 0.01
+                    except:
+                        is_correct = norm_pred == norm_true
+                if is_correct:
+                    correct += 1
+                total += 1
+                if predicted_answer == "FAILED_EXTRACTION":
+                    failed_extractions += 1
+
+                results.append({
+                    'problem_id': batch_data[i]['id'],
+                    'problem': batch_data[i]['problem'],
+                    'true_answer': true_answers[i],
+                    'predicted_answer': predicted_answer,
+                    'reasoning': reasoning,
+                    'correct': is_correct
+                })
+
+        else:
+            raise ValueError(f"Unsupported MODEL_TYPE={MODEL_TYPE}")
+
     etime = time.time()
     print(f"Batch processing time: {etime - btime:.2f} seconds")
     accuracy = correct / total if total > 0 else 0.0
@@ -1028,7 +1094,7 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH, OUTPUT_DIR
+    global RAW_MODEL_PATH, OUTPUT_DIR, MODEL_TYPE
     parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIMO dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all samples)')
@@ -1058,10 +1124,15 @@ def main():
                        help='The raw model path')
     parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
                        help='Model output path, defaults to env variable.')
+    parser.add_argument('--model_type', type=str, default=MODEL_TYPE,
+                       help='Use VLLM or HuggingFace Transformers model, defaults to HF.')
         
     args = parser.parse_args()
 
     OUTPUT_DIR = args.output_path
+    MODEL_TYPE = args.model_type.lower()
+    
+    
     
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:

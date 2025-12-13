@@ -23,6 +23,9 @@ import numpy as np
 import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import warnings
+from pathlib import Path
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 warnings.filterwarnings('ignore')
 
 # ============================================================================
@@ -37,6 +40,9 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
      "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/copa_evaluation_results_guess_effect")  # Change default per script
+MODEL_TYPE = "hf"
+CURRENT_LORA_REQUEST = None
+CURRENT_LORA_INT_ID = 0
 
 # ============================================================================
 # Helper Functions
@@ -104,50 +110,100 @@ def find_best_checkpoint(training_dir):
 def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
+    print(f"- Model type: {MODEL_TYPE}")
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
+    if MODEL_TYPE == "hf":
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        model.eval()
+    elif MODEL_TYPE == "vllm":
+        model = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            max_lora_rank=64
+      )
+    else:
+        raise ValueError(f"Invalid model type: {MODEL_TYPE}")
     
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    model.eval()
     print("✅ Raw model loaded successfully")
     
     return model, tokenizer
 
+def sanitize_name(name: str) -> str:
+    """Convert a string into a safe identifier-style name."""
+    return re.sub(r'\W|^(?=\d)', '_', name).upper()
+
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
-    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
-    
-    # Load base model
-    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
-    
-    # Load LoRA adapter
-    model = PeftModel.from_pretrained(base_model, checkpoint_path)
-    
-    if base_tokenizer.pad_token is None:
-        base_tokenizer.pad_token = base_tokenizer.eos_token
-    
-    model.eval()
-    print("✅ Fine-tuned model loaded successfully")
-    
-    return model, base_tokenizer
+    """
+    Load the fine-tuned model with LoRA adapter.
+    For vLLM, creates and saves a global LoRARequest with a meaningful name.
+    """
+    global CURRENT_LORA_REQUEST, CURRENT_LORA_INT_ID
+
+    print(f"\nLoading fine-tuned model (MODEL_TYPE={MODEL_TYPE})")
+    print(f"Checkpoint path: {checkpoint_path}")
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Create meaningful lora_name
+    raw_model_name = sanitize_name(Path(RAW_MODEL_PATH).stem)
+    checkpoint_name = sanitize_name(Path(checkpoint_path).stem)
+    meaningful_lora_name = f"LORA_{raw_model_name}_{checkpoint_name}"
+
+    if MODEL_TYPE.lower() == "hf":
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f'cuda:0'},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        model = PeftModel.from_pretrained(base_model, checkpoint_path)
+        model.eval()
+        print("✅ HF LoRA model loaded successfully")
+        return model, tokenizer
+
+    elif MODEL_TYPE.lower() == "vllm":
+        llm = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            enable_lora=True,
+            max_lora_rank=64
+        )
+
+        CURRENT_LORA_INT_ID += 1
+
+        # Save LoRARequest to global variable
+        CURRENT_LORA_REQUEST = LoRARequest(
+            lora_name=meaningful_lora_name,
+            lora_int_id=CURRENT_LORA_INT_ID,
+            lora_path=checkpoint_path,
+        )
+        
+        print(f"✅ vLLM base engine loaded. LoRA request saved as CURRENT_LORA_REQUEST with name {meaningful_lora_name}")
+        return llm, tokenizer
+
+    else:
+        raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
 
 def create_copa_prompt(premise, choice1, choice2):
     """Create a prompt for COPA causal reasoning task.
@@ -230,173 +286,150 @@ def extract_answer(response):
     return None
 
 def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="validation"):
-    """Evaluate model on COPA dataset (effect questions only)."""
+    """Evaluate model on COPA dataset (effect questions only) with LG1 support."""
     print(f"\n🔍 Evaluating {model_name} on COPA dataset (split: {split})...")
     print(f"   Task: Identify the EFFECT given a CAUSE")
     print(f"   Batch size: {batch_size}")
-    
+
     # Load COPA dataset
-    print("Loading COPA dataset...")
-    
     try:
         dataset = load_dataset("pkavumba/balanced-copa", split="train")
         print(f"Loaded {len(dataset)} samples from COPA dataset")
-        
     except Exception as e:
         print(f"❌ Error loading dataset: {e}")
-        print("\n💡 Make sure you have internet connection and the dataset is accessible.")
         return None
-    
-    # Filter for "effect" questions only (where we're given the cause)
+
+    # Filter for "effect" questions only
     effect_dataset = dataset.filter(lambda x: x['question'] == 'effect')
-    print(f"Filtered to {len(effect_dataset)} 'effect' questions (given cause, find effect)")
-    
-    if len(effect_dataset) == 0:
-        print("❌ No 'effect' questions found in dataset!")
-        return None
-    
     if max_samples:
         effect_dataset = effect_dataset.select(range(min(max_samples, len(effect_dataset))))
-        print(f"Evaluating on {len(effect_dataset)} samples (limited)")
-    else:
-        print(f"Evaluating on {len(effect_dataset)} samples (full filtered {split} set)")
-    
+    print(f"Evaluating on {len(effect_dataset)} 'effect' questions")
+
     results = []
     all_true_labels = []
     all_pred_labels = []
     failed_extractions = 0
-    
-    # Process in batches
+
     num_batches = (len(effect_dataset) + batch_size - 1) // batch_size
     btime = time.time()
 
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
-        # Get batch
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, len(effect_dataset))
         batch = effect_dataset[start_idx:end_idx]
-        
-        # Handle both single sample and batch cases
+
         if not isinstance(batch['premise'], list):
             batch = {k: [v] for k, v in batch.items()}
-        
+
         batch_size_actual = len(batch['premise'])
-        
-        # Prepare prompts for batch
         formatted_prompts = []
         true_labels_batch = []
         batch_data = []
-        
+
         for i in range(batch_size_actual):
             premise = batch['premise'][i]
             choice1 = batch['choice1'][i]
             choice2 = batch['choice2'][i]
             true_label = batch['label'][i]  # 0 or 1
-            
-            # Create prompt
+
             system_prompt, user_prompt = create_copa_prompt(premise, choice1, choice2)
-            
-            # Format with chat template if available
             try:
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
                 formatted_prompt = tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True
+                    messages, tokenize=False, add_generation_prompt=True
                 )
             except:
-                # Fallback if chat template not available
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
-            
+
             formatted_prompts.append(formatted_prompt)
             true_labels_batch.append(true_label)
             batch_data.append({
-                'premise': premise,
-                'choice1': choice1,
-                'choice2': choice2,
-                'true_label': true_label,
-                'id': start_idx + i
+                'premise': premise, 'choice1': choice1, 'choice2': choice2,
+                'true_label': true_label, 'id': start_idx + i
             })
-        
-        # Tokenize batch with padding
-        inputs = tokenizer(
-            formatted_prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=512
-        )
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        
-        # Generate for batch
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=2048,
-                temperature=0.0,
-                do_sample=False,
-                # top_p=0.95,
-                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
+
+        # --- LG1: Generation ---
+        if MODEL_TYPE.lower() == "hf":
+            inputs = tokenizer(
+                formatted_prompts, return_tensors="pt", padding=True, truncation=True, max_length=512
             )
-        
-        # Process each output in batch
-        for i in range(len(formatted_prompts)):
-            # Decode response (skip input tokens)
-            input_length = inputs['input_ids'][i].shape[0]
-            response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
-            
-            # Extract answer from response
-            predicted_label = extract_answer(response)
-            
-            # Extract reasoning
-            # reasoning = extract_reasoning(response)
-            reasoning = response
-            
-            if predicted_label is None:
-                failed_extractions += 1
-                predicted_label = 0  # Default to 0 if extraction fails
-            
-            true_label = true_labels_batch[i]
-            
-            all_true_labels.append(true_label)
-            all_pred_labels.append(predicted_label)
-            
-            # Store result
-            is_correct = (predicted_label == true_label)
-            results.append({
-                'sample_id': batch_data[i]['id'],
-                'premise': batch_data[i]['premise'],
-                'choice1': batch_data[i]['choice1'],
-                'choice2': batch_data[i]['choice2'],
-                'true_label': true_label,
-                'predicted_label': predicted_label,
-                'reasoning': reasoning,
-                'correct': is_correct
-            })
-    
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=2048,
+                    temperature=0.0,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+                )
+
+            for i in range(batch_size_actual):
+                input_len = inputs['input_ids'][i].shape[0]
+                response = tokenizer.decode(outputs[i][input_len:], skip_special_tokens=True)
+                predicted_label = extract_answer(response)
+                if predicted_label is None:
+                    predicted_label = 0
+                    failed_extractions += 1
+                reasoning = response
+                is_correct = (predicted_label == true_labels_batch[i])
+                if is_correct:
+                    all_true_labels.append(true_labels_batch[i])
+                    all_pred_labels.append(predicted_label)
+
+                results.append({
+                    'sample_id': batch_data[i]['id'],
+                    'premise': premise, 'choice1': choice1, 'choice2': choice2,
+                    'true_label': true_labels_batch[i],
+                    'predicted_label': predicted_label,
+                    'reasoning': reasoning,
+                    'correct': is_correct
+                })
+
+        elif MODEL_TYPE.lower() == "vllm":
+            from vllm import SamplingParams
+            sampling = SamplingParams(max_tokens=2048, temperature=0.0, top_p=1.0)
+
+            vllm_outputs = model.generate(
+                formatted_prompts,
+                sampling_params=sampling,
+                lora_request=CURRENT_LORA_REQUEST
+            )
+
+            for i, out in enumerate(vllm_outputs):
+                response = out.outputs[0].text
+                predicted_label = extract_answer(response)
+                if predicted_label is None:
+                    predicted_label = 0
+                    failed_extractions += 1
+                reasoning = response
+                is_correct = (predicted_label == true_labels_batch[i])
+                if is_correct:
+                    all_true_labels.append(true_labels_batch[i])
+                    all_pred_labels.append(predicted_label)
+
+                results.append({
+                    'sample_id': batch_data[i]['id'],
+                    'premise': premise, 'choice1': choice1, 'choice2': choice2,
+                    'true_label': true_labels_batch[i],
+                    'predicted_label': predicted_label,
+                    'reasoning': reasoning,
+                    'correct': is_correct
+                })
+        else:
+            raise ValueError(f"Unsupported MODEL_TYPE={MODEL_TYPE}")
+
     etime = time.time()
-    print(f"Batch processing time: {etime - btime:.2f} seconds")
-    # Calculate metrics
-    all_true_labels = np.array(all_true_labels)
-    all_pred_labels = np.array(all_pred_labels)
-    
-    # Accuracy
-    accuracy = accuracy_score(all_true_labels, all_pred_labels)
-    
-    # F1, Precision, Recall (binary classification)
+    accuracy = accuracy_score(all_true_labels, all_pred_labels) if all_true_labels else 0.0
     f1 = f1_score(all_true_labels, all_pred_labels, average='binary', zero_division=0)
     precision = precision_score(all_true_labels, all_pred_labels, average='binary', zero_division=0)
     recall = recall_score(all_true_labels, all_pred_labels, average='binary', zero_division=0)
-    
-    # Count correct predictions
-    correct_count = sum(1 for r in results if r['correct'])
-    
-    # Extraction rate
     extraction_rate = (len(results) - failed_extractions) / len(results) if results else 0.0
-    
+    correct_count = sum(1 for r in results if r['correct'])
+
     print(f"\n📊 {model_name} Results:")
     print(f"   Accuracy:         {accuracy:.4f} ({accuracy*100:.2f}%) - {correct_count}/{len(results)} correct")
     print(f"   F1 Score:         {f1:.4f}")
@@ -404,7 +437,7 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
     print(f"   Recall:           {recall:.4f}")
     print(f"   Extraction Rate:  {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
     print(f"   Failed extractions: {failed_extractions}/{len(results)} ({failed_extractions/len(results)*100:.1f}%)")
-    
+
     return {
         'accuracy': accuracy,
         'f1': f1,
@@ -1024,24 +1057,26 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH, OUTPUT_DIR
-    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on COPA dataset')
+    global RAW_MODEL_PATH, OUTPUT_DIR, MODEL_TYPE
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIME 2025 dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
-                       help='Maximum number of samples to evaluate (default: all samples)')
+                       help='Maximum number of samples to evaluate (default: all 30 problems)')
     parser.add_argument('--cuda_device', type=str, default='0',
                        help='CUDA device to use (default: 0)')
-    parser.add_argument('--batch_size', type=int, default=4,
-                       help='Batch size for evaluation (default: 4)')
-    parser.add_argument('--split', type=str, default='validation', choices=['train', 'test', 'validation'],
-                       help='Dataset split to use (default: validation)')
+    parser.add_argument('--batch_size', type=int, default=1,
+                       help='Batch size for evaluation. Higher values (4-8) are faster but use more GPU memory (default: 1)')
+    parser.add_argument('--split', type=str, default='train', choices=['train', 'test', 'validation'],
+                       help='Dataset split to use (default: train). Note: AIME 2025 dataset may only have "train" split.')
     parser.add_argument('--skip_raw', action='store_true',
-                       help='Skip raw model evaluation')
+                       help='Skip raw model evaluation (evaluate only fine-tuned model)')
     parser.add_argument('--skip_finetuned', action='store_true',
-                       help='Skip fine-tuned model evaluation')
+                       help='Skip fine-tuned model evaluation (evaluate only raw model)')
     parser.add_argument('--checkpoint_path', type=str, default=None,
-                       help='Path to specific checkpoint to evaluate')
+                       help='Path to specific checkpoint to evaluate (e.g., /path/to/checkpoint-640). '
+                            'If not provided, automatically selects the best checkpoint based on validation metrics.')
     parser.add_argument('--checkpoint_dir', type=str, default=None,
-                       help='Path to directory containing multiple checkpoints')
+                       help='Path to directory containing multiple checkpoints (e.g., /path/to/checkpoint/). '
+                            'Will evaluate ALL checkpoint-* directories found. Cannot be used with --checkpoint_path.')    
     parser.add_argument('--evaluate_checkpoints', type=int, default=0,
                        help='If set to 1, run per-checkpoint mode: '
                             'evaluate the given --checkpoint_path vs cached raw results and '
@@ -1052,10 +1087,15 @@ def main():
                        help='The raw model path')
     parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
                        help='Model output path, defaults to env variable.')
-    
+    parser.add_argument('--model_type', type=str, default=MODEL_TYPE,
+                       help='Use VLLM or HuggingFace Transformers model, defaults to HF.')
+        
     args = parser.parse_args()
-
+    
     OUTPUT_DIR = args.output_path
+    MODEL_TYPE = args.model_type.lower()
+    
+    
     
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:

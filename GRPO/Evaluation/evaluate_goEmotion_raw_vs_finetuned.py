@@ -22,6 +22,9 @@ import numpy as np
 import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, classification_report
 import warnings
+from pathlib import Path
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 warnings.filterwarnings('ignore')
 
 # ============================================================================
@@ -36,6 +39,9 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/goEmotion_evaluation_results")  # Change default per script
+MODEL_TYPE = "hf"
+CURRENT_LORA_REQUEST = None
+CURRENT_LORA_INT_ID = 0
 
 # GoEmotions emotion labels (27 emotions + neutral)
 GOEMOTION_LABELS = [
@@ -112,50 +118,100 @@ def find_best_checkpoint(training_dir):
 def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
+    print(f"- Model type: {MODEL_TYPE}")
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
+    if MODEL_TYPE == "hf":
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        model.eval()
+    elif MODEL_TYPE == "vllm":
+        model = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            max_lora_rank=64
+      )
+    else:
+        raise ValueError(f"Invalid model type: {MODEL_TYPE}")
     
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    model.eval()
     print("✅ Raw model loaded successfully")
     
     return model, tokenizer
 
+def sanitize_name(name: str) -> str:
+    """Convert a string into a safe identifier-style name."""
+    return re.sub(r'\W|^(?=\d)', '_', name).upper()
+
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
-    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
-    
-    # Load base model
-    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
-    
-    # Load LoRA adapter
-    model = PeftModel.from_pretrained(base_model, checkpoint_path)
-    
-    if base_tokenizer.pad_token is None:
-        base_tokenizer.pad_token = base_tokenizer.eos_token
-    
-    model.eval()
-    print("✅ Fine-tuned model loaded successfully")
-    
-    return model, base_tokenizer
+    """
+    Load the fine-tuned model with LoRA adapter.
+    For vLLM, creates and saves a global LoRARequest with a meaningful name.
+    """
+    global CURRENT_LORA_REQUEST, CURRENT_LORA_INT_ID
+
+    print(f"\nLoading fine-tuned model (MODEL_TYPE={MODEL_TYPE})")
+    print(f"Checkpoint path: {checkpoint_path}")
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Create meaningful lora_name
+    raw_model_name = sanitize_name(Path(RAW_MODEL_PATH).stem)
+    checkpoint_name = sanitize_name(Path(checkpoint_path).stem)
+    meaningful_lora_name = f"LORA_{raw_model_name}_{checkpoint_name}"
+
+    if MODEL_TYPE.lower() == "hf":
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f'cuda:0'},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        model = PeftModel.from_pretrained(base_model, checkpoint_path)
+        model.eval()
+        print("✅ HF LoRA model loaded successfully")
+        return model, tokenizer
+
+    elif MODEL_TYPE.lower() == "vllm":
+        llm = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            enable_lora=True,
+            max_lora_rank=64
+        )
+
+        CURRENT_LORA_INT_ID += 1
+
+        # Save LoRARequest to global variable
+        CURRENT_LORA_REQUEST = LoRARequest(
+            lora_name=meaningful_lora_name,
+            lora_int_id=CURRENT_LORA_INT_ID,
+            lora_path=checkpoint_path,
+        )
+        
+        print(f"✅ vLLM base engine loaded. LoRA request saved as CURRENT_LORA_REQUEST with name {meaningful_lora_name}")
+        return llm, tokenizer
+
+    else:
+        raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
 
 def create_goemotion_prompt(text):
     """Create a prompt for GoEmotions emotion classification.
@@ -366,67 +422,71 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
                 'id': start_idx + i
             })
         
-        # Tokenize batch with padding
-        inputs = tokenizer(
-            formatted_prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=512
-        )
-        inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        
-        # Generate for batch
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=2048,
-                temperature=0.0,
-                do_sample=False,
-                # top_p=0.95,
-                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
+        # --- LG1 Generation Logic ---
+        if MODEL_TYPE.lower() == 'hf':
+            # Tokenize batch
+            inputs = tokenizer(
+                formatted_prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=2048
             )
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+            
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=4096,
+                    temperature=0.0,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+                )
+            
+            for i in range(batch_size_actual):
+                input_len = inputs['input_ids'][i].shape[0]
+                response = tokenizer.decode(outputs[i][input_len:], skip_special_tokens=True)
+                predicted_emotions = extract_emotions(response) or []
+                reasoning = response
+                all_pred_labels.append([1 if label in predicted_emotions else 0 for label in [e.lower() for e in GOEMOTION_LABELS]])
+                all_true_labels.append([1 if label in [e.lower() for e in true_labels_batch[i]] else 0 for label in [e.lower() for e in GOEMOTION_LABELS]])
+                exact_match = set([e.lower() for e in predicted_emotions]) == set([e.lower() for e in true_labels_batch[i]])
+                if not predicted_emotions:
+                    failed_extractions += 1
+                results.append({
+                    'sample_id': batch_data[i]['id'],
+                    'text': batch_data[i]['text'],
+                    'true_emotions': true_labels_batch[i],
+                    'predicted_emotions': predicted_emotions,
+                    'reasoning': reasoning,
+                    'exact_match': exact_match
+                })
         
-        # Process each output in batch
-        for i in range(len(formatted_prompts)):
-            # Decode response (skip input tokens)
-            input_length = inputs['input_ids'][i].shape[0]
-            response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
+        elif MODEL_TYPE.lower() == 'vllm':
+            from vllm import SamplingParams
+            sampling = SamplingParams(max_tokens=2048, temperature=0.0, top_p=1.0)
+            vllm_outputs = model.generate(formatted_prompts, sampling_params=sampling, lora_request=CURRENT_LORA_REQUEST)
             
-            # Extract emotions from response
-            predicted_emotions = extract_emotions(response)
-            
-            # Extract reasoning
-            # reasoning = extract_reasoning(response)
-            reasoning = response
-            
-            if predicted_emotions is None:
-                failed_extractions += 1
-                predicted_emotions = []
-            
-            true_emotions = true_labels_batch[i]
-            
-            # Convert to multi-hot vectors for evaluation
-            true_vector = [1 if label in [e.lower() for e in true_emotions] else 0 
-                          for label in [e.lower() for e in GOEMOTION_LABELS]]
-            pred_vector = [1 if label in predicted_emotions else 0 
-                          for label in [e.lower() for e in GOEMOTION_LABELS]]
-            
-            all_true_labels.append(true_vector)
-            all_pred_labels.append(pred_vector)
-            
-            # Calculate exact match for this sample
-            exact_match = set([e.lower() for e in true_emotions]) == set(predicted_emotions)
-            
-            # Store result
-            results.append({
-                'sample_id': batch_data[i]['id'],
-                'text': batch_data[i]['text'],
-                'true_emotions': true_emotions,
-                'predicted_emotions': predicted_emotions,
-                'reasoning': reasoning,
-                'exact_match': exact_match
-            })
+            for i, out in enumerate(vllm_outputs):
+                response = out.outputs[0].text
+                predicted_emotions = extract_emotions(response) or []
+                reasoning = response
+                all_pred_labels.append([1 if label in predicted_emotions else 0 for label in [e.lower() for e in GOEMOTION_LABELS]])
+                all_true_labels.append([1 if label in [e.lower() for e in true_labels_batch[i]] else 0 for label in [e.lower() for e in GOEMOTION_LABELS]])
+                exact_match = set([e.lower() for e in predicted_emotions]) == set([e.lower() for e in true_labels_batch[i]])
+                if not predicted_emotions:
+                    failed_extractions += 1
+                results.append({
+                    'sample_id': batch_data[i]['id'],
+                    'text': batch_data[i]['text'],
+                    'true_emotions': true_labels_batch[i],
+                    'predicted_emotions': predicted_emotions,
+                    'reasoning': reasoning,
+                    'exact_match': exact_match
+                })
+        else:
+            raise ValueError(f"Unsupported MODEL_TYPE={MODEL_TYPE}")
+
     
     etime = time.time()
     print(f"Batch processing time: {etime - btime:.2f} seconds")
@@ -1075,10 +1135,10 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH, OUTPUT_DIR
-    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on GoEmotions dataset')
+    global RAW_MODEL_PATH, OUTPUT_DIR, MODEL_TYPE
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on AIME 2025 dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
-                       help='Maximum number of samples to evaluate (default: all samples)')
+                       help='Maximum number of samples to evaluate (default: all 30 problems)')
     parser.add_argument('--cuda_device', type=str, default='0',
                        help='CUDA device to use (default: 0)')
     parser.add_argument('--batch_size', type=int, default=4,
@@ -1086,13 +1146,15 @@ def main():
     parser.add_argument('--split', type=str, default='test', choices=['train', 'test', 'validation'],
                        help='Dataset split to use (default: test)')
     parser.add_argument('--skip_raw', action='store_true',
-                       help='Skip raw model evaluation')
+                       help='Skip raw model evaluation (evaluate only fine-tuned model)')
     parser.add_argument('--skip_finetuned', action='store_true',
-                       help='Skip fine-tuned model evaluation')
+                       help='Skip fine-tuned model evaluation (evaluate only raw model)')
     parser.add_argument('--checkpoint_path', type=str, default=None,
-                       help='Path to specific checkpoint to evaluate')
+                       help='Path to specific checkpoint to evaluate (e.g., /path/to/checkpoint-640). '
+                            'If not provided, automatically selects the best checkpoint based on validation metrics.')
     parser.add_argument('--checkpoint_dir', type=str, default=None,
-                       help='Path to directory containing multiple checkpoints')
+                       help='Path to directory containing multiple checkpoints (e.g., /path/to/checkpoint/). '
+                            'Will evaluate ALL checkpoint-* directories found. Cannot be used with --checkpoint_path.')    
     parser.add_argument('--evaluate_checkpoints', type=int, default=0,
                        help='If set to 1, run per-checkpoint mode: '
                             'evaluate the given --checkpoint_path vs cached raw results and '
@@ -1103,10 +1165,15 @@ def main():
                        help='The raw model path')
     parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
                        help='Model output path, defaults to env variable.')
-    
+    parser.add_argument('--model_type', type=str, default=MODEL_TYPE,
+                       help='Use VLLM or HuggingFace Transformers model, defaults to HF.')
+        
     args = parser.parse_args()
-
+    
     OUTPUT_DIR = args.output_path
+    MODEL_TYPE = args.model_type.lower()
+    
+    
     
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:

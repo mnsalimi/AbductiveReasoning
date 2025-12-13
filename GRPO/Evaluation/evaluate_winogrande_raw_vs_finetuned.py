@@ -23,6 +23,8 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 warnings.filterwarnings('ignore')
 
 np.random.seed(42)
@@ -106,50 +108,100 @@ def find_best_checkpoint(training_dir):
 def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
+    print(f"- Model type: {MODEL_TYPE}")
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
+    if MODEL_TYPE == "hf":
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        model.eval()
+    elif MODEL_TYPE == "vllm":
+        model = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            max_lora_rank=64
+      )
+    else:
+        raise ValueError(f"Invalid model type: {MODEL_TYPE}")
     
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    model.eval()
     print("✅ Raw model loaded successfully")
     
     return model, tokenizer
 
+def sanitize_name(name: str) -> str:
+    """Convert a string into a safe identifier-style name."""
+    return re.sub(r'\W|^(?=\d)', '_', name).upper()
+
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
-    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
-    
-    # Load base model
-    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
-    
-    # Load LoRA adapter
-    model = PeftModel.from_pretrained(base_model, checkpoint_path)
-    
-    if base_tokenizer.pad_token is None:
-        base_tokenizer.pad_token = base_tokenizer.eos_token
-    
-    model.eval()
-    print("✅ Fine-tuned model loaded successfully")
-    
-    return model, base_tokenizer
+    """
+    Load the fine-tuned model with LoRA adapter.
+    For vLLM, creates and saves a global LoRARequest with a meaningful name.
+    """
+    global CURRENT_LORA_REQUEST, CURRENT_LORA_INT_ID
+
+    print(f"\nLoading fine-tuned model (MODEL_TYPE={MODEL_TYPE})")
+    print(f"Checkpoint path: {checkpoint_path}")
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Create meaningful lora_name
+    raw_model_name = sanitize_name(Path(RAW_MODEL_PATH).stem)
+    checkpoint_name = sanitize_name(Path(checkpoint_path).stem)
+    meaningful_lora_name = f"LORA_{raw_model_name}_{checkpoint_name}"
+
+    if MODEL_TYPE.lower() == "hf":
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f'cuda:0'},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        model = PeftModel.from_pretrained(base_model, checkpoint_path)
+        model.eval()
+        print("✅ HF LoRA model loaded successfully")
+        return model, tokenizer
+
+    elif MODEL_TYPE.lower() == "vllm":
+        llm = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            enable_lora=True,
+            max_lora_rank=64
+        )
+
+        CURRENT_LORA_INT_ID += 1
+
+        # Save LoRARequest to global variable
+        CURRENT_LORA_REQUEST = LoRARequest(
+            lora_name=meaningful_lora_name,
+            lora_int_id=CURRENT_LORA_INT_ID,
+            lora_path=checkpoint_path,
+        )
+        
+        print(f"✅ vLLM base engine loaded. LoRA request saved as CURRENT_LORA_REQUEST with name {meaningful_lora_name}")
+        return llm, tokenizer
+
+    else:
+        raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
 
 
 def create_winogrande_prompt(sentence, option1, option2):

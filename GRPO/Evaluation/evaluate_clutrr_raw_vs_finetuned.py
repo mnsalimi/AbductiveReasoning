@@ -23,6 +23,9 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+from pathlib import Path
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 warnings.filterwarnings('ignore')
 
 np.random.seed(42)
@@ -39,6 +42,9 @@ TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/clutrr_evaluation_results")  # Change default per script
+MODEL_TYPE = "hf"
+CURRENT_LORA_REQUEST = None
+CURRENT_LORA_INT_ID = 0
 
 # ============================================================================
 # Helper Functions
@@ -106,50 +112,100 @@ def find_best_checkpoint(training_dir):
 def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
+    print(f"- Model type: {MODEL_TYPE}")
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
+    if MODEL_TYPE == "hf":
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        model.eval()
+    elif MODEL_TYPE == "vllm":
+        model = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            max_lora_rank=64
+      )
+    else:
+        raise ValueError(f"Invalid model type: {MODEL_TYPE}")
     
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    model.eval()
     print("✅ Raw model loaded successfully")
     
     return model, tokenizer
 
+def sanitize_name(name: str) -> str:
+    """Convert a string into a safe identifier-style name."""
+    return re.sub(r'\W|^(?=\d)', '_', name).upper()
+
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
-    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
-    
-    # Load base model
-    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-    
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        load_in_4bit=True,
-    )
-    
-    # Load LoRA adapter
-    model = PeftModel.from_pretrained(base_model, checkpoint_path)
-    
-    if base_tokenizer.pad_token is None:
-        base_tokenizer.pad_token = base_tokenizer.eos_token
-    
-    model.eval()
-    print("✅ Fine-tuned model loaded successfully")
-    
-    return model, base_tokenizer
+    """
+    Load the fine-tuned model with LoRA adapter.
+    For vLLM, creates and saves a global LoRARequest with a meaningful name.
+    """
+    global CURRENT_LORA_REQUEST, CURRENT_LORA_INT_ID
+
+    print(f"\nLoading fine-tuned model (MODEL_TYPE={MODEL_TYPE})")
+    print(f"Checkpoint path: {checkpoint_path}")
+
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Create meaningful lora_name
+    raw_model_name = sanitize_name(Path(RAW_MODEL_PATH).stem)
+    checkpoint_name = sanitize_name(Path(checkpoint_path).stem)
+    meaningful_lora_name = f"LORA_{raw_model_name}_{checkpoint_name}"
+
+    if MODEL_TYPE.lower() == "hf":
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f'cuda:0'},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+        model = PeftModel.from_pretrained(base_model, checkpoint_path)
+        model.eval()
+        print("✅ HF LoRA model loaded successfully")
+        return model, tokenizer
+
+    elif MODEL_TYPE.lower() == "vllm":
+        llm = LLM(
+            model=RAW_MODEL_PATH,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            quantization="bitsandbytes",
+            enable_lora=True,
+            max_lora_rank=64
+        )
+
+        CURRENT_LORA_INT_ID += 1
+
+        # Save LoRARequest to global variable
+        CURRENT_LORA_REQUEST = LoRARequest(
+            lora_name=meaningful_lora_name,
+            lora_int_id=CURRENT_LORA_INT_ID,
+            lora_path=checkpoint_path,
+        )
+        
+        print(f"✅ vLLM base engine loaded. LoRA request saved as CURRENT_LORA_REQUEST with name {meaningful_lora_name}")
+        return llm, tokenizer
+
+    else:
+        raise ValueError(f"Unknown MODEL_TYPE: {MODEL_TYPE}")
 
 
 def create_clutrr_prompt(story, query):
@@ -219,52 +275,46 @@ def extract_answer(response):
 
 
 def evaluate_on_clutrr(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split='test'):
-    """Evaluate model on CLUTRR dataset."""
+    """Evaluate model on CLUTRR dataset with HF and vLLM support (LG1)."""
     print(f"\n🔍 Evaluating {model_name} on CLUTRR...")
     print(f"   Batch size: {batch_size}")
-    
-    # 1. Load Dataset
-    # We use a common HuggingFace version that contains 'clean_story'.
-    # If you have a local file, change this to: load_dataset("json", data_files="path.json")
+
+    # Load dataset
     print(f"Loading CLUTRR dataset (using 'CLUTRR/v1' as default source)...")
     try:
-        dataset = load_dataset("CLUTRR/v1", "gen_train234_test2to10", split="test")
+        dataset = load_dataset("CLUTRR/v1", "gen_train234_test2to10", split=split)
     except:
-        # Fallback if specific config fails or using local
         print("Warning: Could not load specific config, trying generic load...")
         dataset = load_dataset("clutrr", split=split)
-    
+
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
         print(f"Evaluating on {len(dataset)} samples (limited)")
     else:
         print(f"Evaluating on {len(dataset)} samples (full dataset)")
-    
+
     results = []
     correct = 0
     total = 0
     failed_extractions = 0
-    
+
     num_batches = (len(dataset) + batch_size - 1) // batch_size
     btime = time.time()
-    
+
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, len(dataset))
         batch = dataset[start_idx:end_idx]
-        
-        # Handle batch dictionary lists
+
         if not isinstance(batch['clean_story'], list):
             batch = {k: [v] for k, v in batch.items()}
-        
-        batch_size_actual = len(batch["clean_story"])
 
+        batch_size_actual = len(batch["clean_story"])
         formatted_prompts = []
         true_answers = []
         batch_data = []
-        
+
         for i in range(batch_size_actual):
-            # 2. Extract Fields based on your request
             story = batch['clean_story'][i]
             
             # Use 'query' column. If it's a tuple tuple(name1, name2), the prompt function handles it.
@@ -277,13 +327,9 @@ def evaluate_on_clutrr(model, tokenizer, max_samples=None, model_name="Model", b
                 target = batch['target'][i]
             else:
                 target = "unknown"
-
-            # Normalize True Answer
             true_answer = str(target).strip().lower()
 
-            # Create prompt
             system_prompt, user_prompt = create_clutrr_prompt(story, query)
-            
             try:
                 messages = [
                     {"role": "system", "content": system_prompt},
@@ -294,72 +340,91 @@ def evaluate_on_clutrr(model, tokenizer, max_samples=None, model_name="Model", b
                 )
             except:
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
-            
+
             formatted_prompts.append(formatted_prompt)
             true_answers.append(true_answer)
-            
-            batch_data.append({
-                'id': start_idx + i,
-                'story': story,
-                'query': query
-            })
-        
-        # Tokenize
-        inputs = tokenizer(
-            formatted_prompts, return_tensors="pt", padding=True, truncation=True, max_length=4096
-        ).to(model.device)
-        
-        # Generate
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=512, # Short generation (Relation word + reasoning)
-                temperature=0.0,
-                do_sample=False,
-                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
-            )
-        
-        # Process Output
-        for i in range(batch_size_actual):
-            input_length = inputs['input_ids'][i].shape[0]
-            response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
-            
-            predicted_answer = extract_answer(response)
-            
-            if predicted_answer is None:
-                failed_extractions += 1
-                predicted_answer = "FAILED"
-            
-            # Check correctness
-            # We strictly compare lowercased strings (e.g., "aunt" == "aunt")
-            # Sometimes targets are lists in raw data, handle that:
-            if isinstance(true_answers[i], list):
-                is_correct = predicted_answer in [t.lower() for t in true_answers[i]]
-            else:
-                is_correct = (predicted_answer == true_answers[i])
+            batch_data.append({'id': start_idx + i, 'story': story, 'query': query})
 
-            if is_correct:
-                correct += 1
-            total += 1
-            
-            results.append({
-                'id': batch_data[i]['id'],
-                'story': batch_data[i]['story'],
-                'query': batch_data[i]['query'],
-                'true_answer': true_answers[i],
-                'predicted_answer': predicted_answer,
-                'full_response': response,
-                'correct': is_correct
-            })
-    
+        # --- LG1: Generation ---
+        if MODEL_TYPE.lower() == "hf":
+            inputs = tokenizer(
+                formatted_prompts, return_tensors="pt", padding=True, truncation=True, max_length=4096
+            )
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=512,
+                    temperature=0.0,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id
+                )
+
+            for i in range(batch_size_actual):
+                input_len = inputs['input_ids'][i].shape[0]
+                response = tokenizer.decode(outputs[i][input_len:], skip_special_tokens=True)
+                predicted_answer = extract_answer(response) or "FAILED"
+                reasoning = response
+                is_correct = (predicted_answer == true_answers[i])
+                if is_correct:
+                    correct += 1
+                total += 1
+                if predicted_answer == "FAILED":
+                    failed_extractions += 1
+
+                results.append({
+                    'id': batch_data[i]['id'],
+                    'story': batch_data[i]['story'],
+                    'query': batch_data[i]['query'],
+                    'true_answer': true_answers[i],
+                    'predicted_answer': predicted_answer,
+                    'reasoning': reasoning,
+                    'correct': is_correct
+                })
+
+        elif MODEL_TYPE.lower() == "vllm":
+            from vllm import SamplingParams
+            sampling = SamplingParams(max_tokens=512, temperature=0.0, top_p=1.0)
+
+            vllm_outputs = model.generate(
+                formatted_prompts,
+                sampling_params=sampling,
+                lora_request=CURRENT_LORA_REQUEST
+            )
+
+            for i, out in enumerate(vllm_outputs):
+                response = out.outputs[0].text
+                predicted_answer = extract_answer(response) or "FAILED"
+                reasoning = response
+                is_correct = (predicted_answer == true_answers[i])
+                if is_correct:
+                    correct += 1
+                total += 1
+                if predicted_answer == "FAILED":
+                    failed_extractions += 1
+
+                results.append({
+                    'id': batch_data[i]['id'],
+                    'story': batch_data[i]['story'],
+                    'query': batch_data[i]['query'],
+                    'true_answer': true_answers[i],
+                    'predicted_answer': predicted_answer,
+                    'reasoning': reasoning,
+                    'correct': is_correct
+                })
+
+        else:
+            raise ValueError(f"Unsupported MODEL_TYPE={MODEL_TYPE}")
+
     etime = time.time()
     accuracy = correct / total if total > 0 else 0.0
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
-    
+
     print(f"\n📊 {model_name} Results:")
     print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%)")
     print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
-        
+
     return {
         'accuracy': accuracy,
         'correct': correct,
@@ -976,7 +1041,7 @@ def print_comparison(summary):
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH, OUTPUT_DIR
+    global RAW_MODEL_PATH, OUTPUT_DIR, MODEL_TYPE
     parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on clutrr dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
                        help='Maximum number of samples to evaluate (default: all 30 problems)')
@@ -1006,10 +1071,15 @@ def main():
                        help='The raw model path')
     parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
                        help='Model output path, defaults to env variable.')
-    
+    parser.add_argument('--model_type', type=str, default=MODEL_TYPE,
+                       help='Use VLLM or HuggingFace Transformers model, defaults to HF.')
+        
     args = parser.parse_args()
     
     OUTPUT_DIR = args.output_path
+    MODEL_TYPE = args.model_type.lower()
+    
+    
 
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:

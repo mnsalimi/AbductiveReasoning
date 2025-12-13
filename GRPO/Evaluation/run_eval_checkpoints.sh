@@ -4,19 +4,19 @@ scripts=(
     # "evaluate_neulr_deductive_raw_vs_finetuned.py"
     # "evaluate_neulr_inductive_raw_vs_finetuned.py"
     # "evaluate_neulr_abductive_raw_vs_finetuned.py"
-    "evaluate_musr_object_placements_raw_vs_finetuned.py"
-    "evaluate_musr_murder_mystery_raw_vs_finetuned.py"
-    "evaluate_musr_team_allocation_raw_vs_finetuned.py"
-    "evaluate_medqa_raw_vs_finetuned.py"
-    "evaluate_gsm8k_raw_vs_finetuned.py"
+    # "evaluate_musr_object_placements_raw_vs_finetuned.py"
+    # "evaluate_musr_murder_mystery_raw_vs_finetuned.py"
+    # "evaluate_musr_team_allocation_raw_vs_finetuned.py"
+    # "evaluate_medqa_raw_vs_finetuned.py"
+    # "evaluate_gsm8k_raw_vs_finetuned.py"
     "evaluate_aime_raw_vs_finetuned.py"
-    "evaluate_aimo_raw_vs_finetuned.py"
-    "evaluate_art_raw_vs_finetuned.py"
-    "evaluate_copa_raw_vs_finetuned_guess_effect.py"
-    "evaluate_goEmotion_raw_vs_finetuned.py"
+    # "evaluate_aimo_raw_vs_finetuned.py"
+    # "evaluate_art_raw_vs_finetuned.py"
+    # "evaluate_copa_raw_vs_finetuned_guess_effect.py"
+    # "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 
-OUTPUT_DIR="/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/14B"
+OUTPUT_DIR="/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/14B"
 
 ROOT_DIR="./GRPO/Evaluation/14B"
 
@@ -48,7 +48,7 @@ fi
 echo "Using checkpoint directory: $CHECKPOINT_DIR"
 echo
 
-COMMON_ARGS="--cuda_device 3 --evaluate_checkpoints 1"
+COMMON_ARGS="--cuda_device 1 --evaluate_checkpoints 1 --model_type vllm"
 
 declare -A BATCH_SIZES=(
     ["evaluate_neulr_deductive_raw_vs_finetuned.py"]=8
@@ -69,6 +69,11 @@ declare -A BATCH_SIZES=(
 export TRAINING_BASE
 
 for ckpt_name in $(ls -1 "$CHECKPOINT_DIR" | grep '^checkpoint-' | sort -t- -k2,2n); do
+    if [[ "$ckpt_name" != *"checkpoint-2560"* ]];
+    then
+        echo skipping $ckpt_name
+        continue
+    fi
     ckpt="$CHECKPOINT_DIR/$ckpt_name"
     [ -d "$ckpt" ] || continue
 

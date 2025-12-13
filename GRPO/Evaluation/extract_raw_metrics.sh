@@ -21,7 +21,10 @@ scripts=(
     # "evaluate_clutrr_raw_vs_finetuned.py"
     # "evaluate_winogrande_raw_vs_finetuned.py"
     # "evaluate_hellaswag_raw_vs_finetuned.py"
-    "evaluate_strategyqa_raw_vs_finetuned.py"
+    # "evaluate_strategyqa_raw_vs_finetuned.py"
+    # "evaluate_ecare_raw_vs_finetuned.py"
+    "evaluate_causelogics_raw_vs_finetuned.py"
+    "evaluate_causelogics_raw_vs_finetuned copy.py"
 )
 
 raw_paths=(
@@ -56,6 +59,10 @@ declare -A BATCH_SIZES=(
     ["evaluate_winogrande_raw_vs_finetuned.py"]=32
     ["evaluate_hellaswag_raw_vs_finetuned.py"]=32
     ["evaluate_strategyqa_raw_vs_finetuned.py"]=16
+    ["evaluate_ecare_raw_vs_finetuned.py"]=16
+    ["evaluate_causelogics_raw_vs_finetuned.py"]=16
+    ["evaluate_causelogics_raw_vs_finetuned copy.py"]=32
+    
     
 )
 

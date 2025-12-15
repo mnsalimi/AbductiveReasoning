@@ -33,10 +33,10 @@ warnings.filterwarnings('ignore')
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/climate_fever_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/climate_fever_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -149,40 +149,50 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-def create_climate_fever_prompt(claim, evidence_text):
-    """Create a prompt for Fact Verification."""
 
-    system_prompt = """
-    You are an expert climate scientist and professional fact-checker.
-    You will be given a specific Claim and a list of Evidences.
+SYSTEM_PROMPT_CLIMATE_FEVER = """
+You are an expert climate scientist and professional fact-checker.
+You will be given a specific Claim and a list of Evidences.
 
-    Your task:
-    1. Read the Claim and the provided Evidence carefully.
-    2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO.
-    3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision.
-    4. Provide the final label.
+Your task:
+1. Read the Claim and the provided Evidence carefully.
+2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO.
+3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision.
+4. Provide the final label.
 
-    Your entire output MUST use exactly the following format and nothing else:
+Your entire output MUST use exactly the following format and nothing else:
 
-    <reasoning>
-    [Your step-by-step analysis of how the evidence relates to the claim]
-    </reasoning>
-    <answer>
-    [Output exactly one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO]
-    </answer>
-    """
+<reasoning>
+[Your step-by-step analysis of how the evidence relates to the claim]
+</reasoning>
+<answer>
+[Output exactly one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO]
+</answer>
+""".strip()
 
-    user_prompt = f"""
-    Claim:
-    {claim}
+def create_climate_fever_prompt(example: dict):
+    """Create a prompt for Climate-FEVER fact verification from one example record."""
 
-    Evidence:
-    {evidence_text}
+    system_prompt = SYSTEM_PROMPT_CLIMATE_FEVER
 
-    Based on the evidence provided, determine the veracity of the claim.
-    """
+    claim = example["claim"]
+
+    # evidences is a list of dicts; in your dataset each has an "evidence" string (not evidence_text)
+    evidence_objs = example.get("evidences", [])
+    evidence_list = [e.get("evidence", "") for e in evidence_objs]
+    evidence_text = "\n".join([f"- {txt}" for txt in evidence_list if txt])
+
+    user_prompt = f"""Claim:
+{claim}
+
+Evidence:
+{evidence_text}
+
+Based on the evidence provided, determine the veracity of the claim.
+"""
 
     return system_prompt, user_prompt
+
 
 
 def extract_answer(response):
@@ -245,15 +255,13 @@ def evaluate_on_climate_fever(model, tokenizer, max_samples=None, model_name="Mo
         
         for i in range(batch_size_actual):
             claim = batch["claim"][i]
-            
-            evidence_objs = batch["evidences"][i]
-            evidence_list = [e.get('evidence_text', '') for e in evidence_objs]
-            evidence_text = "\n".join([f"- {txt}" for txt in evidence_list[:]])
 
             label_id = batch["claim_label"][i]
             true_answer = LABEL_MAP.get(label_id, "NOT ENOUGH INFO")
 
-            system_prompt, user_prompt = create_climate_fever_prompt(claim, evidence_text)
+            example = {k: batch[k][i] for k in batch.keys()}
+            system_prompt, user_prompt = create_climate_fever_prompt(example)
+
             
             try:
                 messages = [

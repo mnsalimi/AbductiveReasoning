@@ -35,10 +35,10 @@ np.random.seed(42)
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/causelogics_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/causelogics_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -161,54 +161,99 @@ import torch
 from tqdm import tqdm
 from datasets import load_dataset
 
+SYSTEM_PROMPT_CAUSELOGICS = """
+You are an expert logician and careful reasoning assistant.
+You will be given:
+- a set of Premises (facts),
+- a set of Rules (implications),
+- an observed Phenomenon,
+- and a Possible Cause (a hypothesis).
 
-def create_causelogics_prompt(phenomenon: str, possible_cause: str, premises: str, rules: str):
-    """Create a prompt for CauseLogics (abductive logical decision)."""
+Your task:
+1. Assume the Possible Cause is added as an additional premise.
+2. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward.
+3. Decide whether the Phenomenon can be logically inferred.
+   - If the Phenomenon can be inferred, the Possible Cause is TRUE.
+   - If the Phenomenon cannot be inferred, the Possible Cause is FALSE.
+4. Provide step-by-step reasoning referencing which premises/rules you used.
+5. Output the final label.
 
-    system_prompt = """
-    You are an expert logician and careful reasoning assistant.
-    You will be given:
-    - a set of Premises (facts),
-    - a set of Rules (implications),
-    - an observed Phenomenon,
-    - and a Possible Cause (a hypothesis).
+Your entire output MUST use exactly the following format and nothing else:
 
-    Your task:
-    1. Assume the Possible Cause is added as an additional premise.
-    2. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward.
-    3. Decide whether the Phenomenon can be logically inferred.
-       - If the Phenomenon can be inferred, the Possible Cause is TRUE.
-       - If the Phenomenon cannot be inferred, the Possible Cause is FALSE.
-    4. Provide step-by-step reasoning referencing which premises/rules you used.
-    5. Output the final label.
+<reasoning>
+[Your step-by-step analysis]
+</reasoning>
+<answer>
+[Output exactly one of these two options: TRUE, FALSE]
+</answer>
+""".strip()
 
-    Your entire output MUST use exactly the following format and nothing else:
 
-    <reasoning>
-    [Your step-by-step analysis]
-    </reasoning>
-    <answer>
-    [Output exactly one of these two options: TRUE, FALSE]
-    </answer>
+def create_causelogics_prompt(example: dict):
     """
+    Create a prompt for CauseLogics (abductive logical decision) from a single example record.
+
+    Expected example keys (case-insensitive-ish):
+      - Premises / premises: list[str] or str
+      - Rules / rules: list[str] or str
+      - Phenomenon / phenomenon: str
+      - PossibleCause / possible_cause: str
+      - (optional) causelogics_level, dataset_name, Label/label, id, etc.
+
+    Returns:
+      system_prompt (str), user_prompt (str)
+    """
+
+    def _get_any(d, keys, default=None):
+        for k in keys:
+            if k in d:
+                return d[k]
+        return default
+
+    premises_raw = _get_any(example, ["Premises", "premises"], default=[])
+    rules_raw = _get_any(example, ["Rules", "rules"], default=[])
+    phenomenon = _get_any(example, ["Phenomenon", "phenomenon"], default=None)
+    possible_cause = _get_any(example, ["PossibleCause", "possible_cause"], default=None)
+
+    # Convert premises/rules into printable text
+    if isinstance(premises_raw, list):
+        premises_text = "\n".join([f"- {x}" for x in premises_raw])
+    else:
+        premises_text = f"- {premises_raw}" if premises_raw is not None else ""
+
+    if isinstance(rules_raw, list):
+        rules_text = "\n".join([f"- {x}" for x in rules_raw])
+    else:
+        rules_text = f"- {rules_raw}" if rules_raw is not None else ""
+
+    if phenomenon is None or possible_cause is None:
+        missing = []
+        if phenomenon is None:
+            missing.append("Phenomenon")
+        if possible_cause is None:
+            missing.append("PossibleCause")
+        raise KeyError(f"CauseLogics example missing required field(s): {', '.join(missing)}")
+
+    system_prompt = SYSTEM_PROMPT_CAUSELOGICS
 
     user_prompt = f"""
-    Premises:
-    {premises}
+Premises:
+{premises_text}
 
-    Rules:
-    {rules}
+Rules:
+{rules_text}
 
-    Phenomenon:
-    {phenomenon}
+Phenomenon:
+{str(phenomenon)}
 
-    Possible Cause:
-    {possible_cause}
+Possible Cause:
+{str(possible_cause)}
 
-    Determine whether the Possible Cause is TRUE or FALSE.
-    """
+Determine whether the Possible Cause is TRUE or FALSE.
+""".strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_answer(response: str):
@@ -376,7 +421,7 @@ def evaluate_on_causelogics(
 ):
     level = 3
     """Evaluate model on CauseLogics dataset (CauseJudger repo)."""
-    data_dir = "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/CauseJudger"
+    data_dir = "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/CauseJudger"
     print(f"\n🔍 Evaluating {model_name} on CauseLogics...")
     print(f"   data_dir: {data_dir}")
     print(f"   split: {split} | level: {level}")
@@ -427,52 +472,18 @@ def evaluate_on_causelogics(
         batch_data = []
 
         for i in range(batch_size_actual):
-            # Robust field access: match the paper’s keys first ("Premises", "Rules", ...)
-            premises_raw = (
-                batch.get("Premises", [None])[i]
-                if "Premises" in batch else
-                batch.get("premises", [None])[i]
-            )
-            rules_raw = (
-                batch.get("Rules", [None])[i]
-                if "Rules" in batch else
-                batch.get("rules", [None])[i]
-            )
-            phenomenon = (
-                batch.get("Phenomenon", [None])[i]
-                if "Phenomenon" in batch else
-                batch.get("phenomenon", [None])[i]
-            )
-            possible_cause = (
-                batch.get("PossibleCause", [None])[i]
-                if "PossibleCause" in batch else
-                batch.get("possible_cause", [None])[i]
-            )
+            # Build a single example dict for this row
+            example = {k: batch[k][i] for k in batch.keys()}
+
+            system_prompt, user_prompt = create_causelogics_prompt(example)
+
             label_raw = (
                 batch.get("Label", [None])[i]
                 if "Label" in batch else
                 batch.get("label", [None])[i]
             )
 
-            # Convert premises/rules into printable text
-            if isinstance(premises_raw, list):
-                premises_text = "\n".join([f"- {x}" for x in premises_raw])
-            else:
-                premises_text = f"- {premises_raw}" if premises_raw is not None else ""
-
-            if isinstance(rules_raw, list):
-                rules_text = "\n".join([f"- {x}" for x in rules_raw])
-            else:
-                rules_text = f"- {rules_raw}" if rules_raw is not None else ""
-
             true_answer = _normalize_label(label_raw)
-
-            system_prompt, user_prompt = create_causelogics_prompt(
-                phenomenon=str(phenomenon),
-                possible_cause=str(possible_cause),
-                premises=premises_text,
-                rules=rules_text,
-            )
 
             try:
                 messages = [

@@ -3,35 +3,45 @@
 # ===============================
 #      Evaluation Datasets 
 # ===============================
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 scripts=(
+    "evaluate_all.py"
     # "evaluate_neulr_deductive_raw_vs_finetuned.py"
     # "evaluate_neulr_inductive_raw_vs_finetuned.py"
+    # "evaluate_strategyqa_raw_vs_finetuned.py"
+    # "evaluate_defeasible_nli_raw_vs_finetuned.py"
     # "evaluate_neulr_abductive_raw_vs_finetuned.py"
-    "evaluate_musr_object_placements_raw_vs_finetuned.py"
-    "evaluate_musr_murder_mystery_raw_vs_finetuned.py"
-    "evaluate_musr_team_allocation_raw_vs_finetuned.py"
-    "evaluate_medqa_raw_vs_finetuned.py"
-    "evaluate_gsm8k_raw_vs_finetuned.py"
-    "evaluate_aime_raw_vs_finetuned.py"
-    "evaluate_aimo_raw_vs_finetuned.py"
-    "evaluate_art_raw_vs_finetuned.py"
-    "evaluate_copa_raw_vs_finetuned_guess_effect.py"
-    "evaluate_goEmotion_raw_vs_finetuned.py"
+    # "evaluate_musr_object_placements_raw_vs_finetuned.py"
+    # "evaluate_musr_murder_mystery_raw_vs_finetuned.py"
+    # "evaluate_musr_team_allocation_raw_vs_finetuned.py"
+    # "evaluate_medqa_raw_vs_finetuned.py"
+    # "evaluate_gsm8k_raw_vs_finetuned.py"
+    # "evaluate_aime_raw_vs_finetuned.py"
+    # "evaluate_aimo_raw_vs_finetuned.py"
+    # "evaluate_art_raw_vs_finetuned.py"
+    # "evaluate_copa_raw_vs_finetuned_guess_effect.py"
+    # "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 declare -A BATCH_SIZES=(
-    ["evaluate_neulr_deductive_raw_vs_finetuned.py"]=8
-    ["evaluate_neulr_inductive_raw_vs_finetuned.py"]=8
-    ["evaluate_neulr_abductive_raw_vs_finetuned.py"]=8
-    ["evaluate_medqa_raw_vs_finetuned.py"]=16
-    ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=8
-    ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=4 # Note that each batch has 4 questions!
-    ["evaluate_musr_team_allocation_raw_vs_finetuned.py"]=16
-    ["evaluate_gsm8k_raw_vs_finetuned.py"]=64
-    ["evaluate_aime_raw_vs_finetuned.py"]=8
-    ["evaluate_aimo_raw_vs_finetuned.py"]=8
-    ["evaluate_art_raw_vs_finetuned.py"]=64
-    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=128
-    ["evaluate_goEmotion_raw_vs_finetuned.py"]=16
+    ["evaluate_all.py"]=8
+    # ["evaluate_neulr_deductive_raw_vs_finetuned.py"]=8
+    # ["evaluate_neulr_inductive_raw_vs_finetuned.py"]=8
+    # ["evaluate_defeasible_nli_raw_vs_finetuned.py"]=8
+    # ["evaluate_strategyqa_raw_vs_finetuned.py"]=8
+    # ["evaluate_neulr_abductive_raw_vs_finetuned.py"]=8
+    # ["evaluate_medqa_raw_vs_finetuned.py"]=16
+    # ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=8
+    # ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=4 # Note that each batch has 4 questions!
+    # ["evaluate_musr_team_allocation_raw_vs_finetuned.py"]=16
+    # ["evaluate_gsm8k_raw_vs_finetuned.py"]=64
+    # ["evaluate_aime_raw_vs_finetuned.py"]=8
+    # ["evaluate_aimo_raw_vs_finetuned.py"]=8
+    # ["evaluate_art_raw_vs_finetuned.py"]=64
+    # ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=128
+    # ["evaluate_goEmotion_raw_vs_finetuned.py"]=16
 )
 
 # ============================
@@ -88,7 +98,7 @@ echo "====================================="
 for script in "${scripts[@]}"; do
     batch_size="${BATCH_SIZES[$script]:-256}"
     echo "Running $script with checkpoint $ckpt (batch_size=$batch_size) ..."
-    python3 GRPO/Evaluation/"$script" \
+    python3 "${SCRIPT_DIR}/${script}" \
         $COMMON_ARGS \
         --batch_size "$batch_size" \
         --checkpoint_path "$ckpt" \
@@ -98,11 +108,11 @@ for script in "${scripts[@]}"; do
 
     echo "Finished $script"
     echo "-------------------------------------"
-    python3 GRPO/Evaluation/create_table.py \
+    python3 "${SCRIPT_DIR}/create_table.py" \
         --root "$ROOT_DIR" \
-        --out_csv "./GRPO/Evaluation//metrics_summary.xlsx" \
+        --out_csv "${SCRIPT_DIR}/metrics_summary.xlsx" \
         --run "$RUN_NAME" \
-        --base_model_name $BASE_MODEL_NAME \
+        --base_model_name "$BASE_MODEL_NAME" \
         --base_result_dir "$BASE_RESULTS_DIR" \
-        --train_data $TRAIN_DATA
+        --train_data "$TRAIN_DATA"
 done

@@ -34,7 +34,7 @@ raw_paths=(
 
 # RUN_PREFIX="Dec1"
 
-OUTPUT_PATH="$HOME/users/amirmo/AbductiveReasoning/GRPO/Evaluation/ablation/raw_model"
+OUTPUT_PATH="$HOME/users/Danial/AbductiveReasoning/GRPO/Evaluation/ablation/raw_model"
 
 COMMON_ARGS="--cuda_device 3 --skip_finetuned"
 

@@ -56,13 +56,13 @@ DEFAULT_VAL_SPLIT_PATH = os.environ.get(
 # ============================================================================
 
 SYSTEM_PROMPT_UniADILR = """
-You are an expert in logical reasoning and abductive inference. Your task is to perform abductive reasoning: given a set of sentences (context) and a hypothesis, you must identify which sentences best support or explain the hypothesis.
+You are an expert in logical reasoning and abductive inference. Your task is to identify which sentences from a given context provide the necessary evidence to support or explain a hypothesis.
 
 You will be provided with:
 1. A Context containing multiple numbered sentences (sent1, sent2, sent3, etc.)
 2. A Hypothesis that needs to be supported or explained
 
-Your goal is to identify which sentence(s) from the context, when taken together, provide the strongest logical foundation for the hypothesis through abductive reasoning.
+Your goal is to identify which sentence(s) from the context, when combined, provide the logical foundation for the hypothesis through abductive reasoning.
 
 ## Instructions:
 1. Carefully read all sentences in the context
@@ -81,7 +81,7 @@ You MUST provide your answer in the following format:
 [Sentence numbers only, comma-separated. For example: 5, 13 or 2, 7, 9]
 </answer>
 
-CRITICAL: The answer section must contain ONLY the sentence numbers, separated by commas. Do not include the word "sent" or any other text.
+CRITICAL: The answer section must contain ONLY the sentence numbers separated by commas. Do not include the word "sent" or any other text.
 """.strip()
 
 # ============================================================================

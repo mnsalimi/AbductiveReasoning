@@ -25,6 +25,35 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 import warnings
 warnings.filterwarnings('ignore')
 
+SYSTEM_PROMPT_balanced_copa_cause_only = """
+You are an expert in logical reasoning and abductive inference. Your task is to determine which of two given choices represents the most plausible cause for a given premise.
+
+You will be provided with:
+1. A Premise describing a situation or event
+2. Two Choices (Choice 1 and Choice 2)
+
+Your goal is to select the choice that best explains WHY the premise happened - identifying the root cause that led to the described situation.
+Danial
+## Instructions:
+1. Carefully read the premise
+2. Evaluate both choices as potDanial causes
+3. Consider common sense, real-world knowledge, and typical causal relationships when making your decision
+4. Select the choice that represents the most plausible and direct cause
+
+## Output Format:
+You MUST provide your answer in the following format:
+
+<think>
+[Explain your thought process: why we should select one choice over the other or analyzing the cause or their relationships]
+</think>
+
+<answer>
+[Either "1" or "2" - just the number, nothing else]
+</answer>
+
+CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
+""".strip()
+
 # ============================================================================
 # Configuration
 # ============================================================================
@@ -149,7 +178,7 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-def create_copa_prompt(premise, choice1, choice2):
+def create_copa_prompt(example):
     """Create a prompt for COPA causal reasoning task.
     
     Args:
@@ -160,28 +189,15 @@ def create_copa_prompt(premise, choice1, choice2):
     Returns:
         system_prompt, user_prompt
     """
-    system_prompt = """You are an expert in causal reasoning. Given a cause and two possible effect options, select which option (1 or 2) is the most plausible direct effect.
-
-First, think step by step and explain your causal reasoning in just one paragraph. Then decide which option (1 or 2) is better.
-
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-<reasoning>
-[here you write your chain-of-thought reasoning about which effect is more plausible]
-</reasoning>
-<answer>
-[here you output ONLY the number 1 or 2]
-</answer>"""
+    system_prompt = SYSTEM_PROMPT_balanced_copa_cause_only
 
     
-    user_prompt = f"""Cause: {premise}
+    user_prompt = f"""Premise: {example['premise']}
 
-Which of the following is the most plausible EFFECT of this cause?
+Choice 1: {example['choice1']}
+Choice 2: {example['choice2']}
 
-Option 1: {choice1}
-Option 2: {choice2}
-
-Think step by step about which option is the most likely effect, then provide your answer in <answer></answer> tags."""
+Which choice is the most plausible cause for the premise?"""
     
     return system_prompt, user_prompt
 
@@ -294,7 +310,8 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
             true_label = batch['label'][i]  # 0 or 1
             
             # Create prompt
-            system_prompt, user_prompt = create_copa_prompt(premise, choice1, choice2)
+            example = {"premise": premise, "choice1": choice1, "choice2": choice2}
+            system_prompt, user_prompt = create_copa_prompt(example)
             
             # Format with chat template if available
             try:

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-strategyqa Dataset Evaluation: Raw vs Fine-tuned Model
+List Functions Dataset Evaluation: Raw vs Fine-tuned Model
 
-Evaluates models on the strategyqa math competition dataset.
-strategyqa answers are integers from 0-999.
+Evaluates models on a rule-inference task where the input and output are
+1D lists of integers (e.g., [1, 2, 3]).
+
+The model must infer a transformation rule from a few training examples
+and apply it to a test case.
 
 Usage:
-    python evaluate_strategyqa_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
+    python evaluate_list_functions_raw_vs_finetuned.py [--max_samples N] [--batch_size N] [--checkpoint_dir PATH]
 """
 
 import os
@@ -16,16 +19,12 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
-import time
 import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
-
-np.random.seed(42)
 
 # ============================================================================
 # Configuration
@@ -35,10 +34,14 @@ np.random.seed(42)
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/strategyqa_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/list_functions_evaluation_results")  # Change default per script
+
+# !!! USER MUST FILL THIS PATH !!!
+LIST_FUNCTIONS_DATASET_PATH = "/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/dataset/list_functions.jsonl" 
+
 
 # ============================================================================
 # Helper Functions
@@ -91,8 +94,9 @@ def find_best_checkpoint(training_dir):
     checkpoint_steps = [(int(cp.split('-')[1]), cp) for cp in checkpoints]
     checkpoint_steps.sort()
     
-    max_checkpoint_step = max(checkpoint_steps)[0]
-    estimated_steps_per_epoch = max_checkpoint_step / 20.0
+    # Assuming 20 epochs based on original script's logic, estimate steps/epoch
+    max_checkpoint_step = max(checkpoint_steps)[0] if checkpoint_steps else 0
+    estimated_steps_per_epoch = max_checkpoint_step / 20.0 if max_checkpoint_step > 0 else 1 
     target_step = int(best_epoch * estimated_steps_per_epoch)
     
     best_checkpoint = min(checkpoint_steps, key=lambda x: abs(x[0] - target_step))
@@ -109,10 +113,11 @@ def load_raw_model(device):
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
+    print(device)
     model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
         torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
+        device_map={"": f"cuda:{device}"},
         trust_remote_code=True,
         load_in_4bit=True,
     )
@@ -135,7 +140,7 @@ def load_finetuned_model(checkpoint_path, device):
     base_model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
         torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
+        device_map={"": f"cuda:{device}"},
         trust_remote_code=True,
         load_in_4bit=True,
     )
@@ -151,409 +156,272 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-import re
-import time
-import json
-from tqdm import tqdm
-
-import torch
-from datasets import load_dataset, Dataset
-from huggingface_hub import hf_hub_download
-import json
-from datasets import Dataset, load_dataset
-from huggingface_hub import hf_hub_download
-
-def _normalize_for_arrow(ex: dict) -> dict:
+def string_to_list(s):
     """
-    Make columns Arrow-friendly by forcing inconsistent/nested fields into JSON strings.
-    This avoids 'cannot mix list and non-list' errors.
+    Safely converts a string representation of a 1D list of integers
+    (e.g., "[1, 2, 3]") into a Python list ([1, 2, 3]).
+    Returns None on failure.
     """
-    ex = dict(ex)
-
-    # evidence is the main culprit (can be list/dict/str/etc)
-    if "evidence" in ex:
-        ex["evidence"] = json.dumps(ex["evidence"], ensure_ascii=False)
-
-    # These can also be lists in some variants; stringify to be safe (optional but robust)
-    for k in ["decomposition", "facts"]:
-        if k in ex:
-            ex[k] = json.dumps(ex[k], ensure_ascii=False)
-
-    # Ensure qid/question exist in some form
-    if "qid" not in ex and "id" in ex:
-        ex["qid"] = ex["id"]
-
-    return ex
-
-
-def load_strategyqa_split_safe(split: str):
-    """
-    Robust loader for voidful/StrategyQA on Windows.
-    Avoids datasets.load_dataset() because evidence column has mixed types -> Arrow error.
-    Always loads raw JSON, normalizes columns, then Dataset.from_list.
-    """
-    filename = "strategyqa_train.json" if split.startswith("train") else "strategyqa_test.json"
-    local_path = hf_hub_download(repo_id="voidful/StrategyQA", repo_type="dataset", filename=filename)
-
-    with open(local_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Normalize each row so Arrow sees consistent scalar (string) columns.
-    data = [_normalize_for_arrow(ex) for ex in data]
-
-    return Dataset.from_list(data)
-
-
-
-def _get_evidence_obj(example: dict):
-    """
-    Your dataset now stores evidence as a JSON string (for Arrow safety).
-    Convert it back into python object when needed.
-    """
-    ev = example.get("evidence", None)
-    if ev is None:
+    if not s:
         return None
-    if isinstance(ev, str):
-        try:
-            return json.loads(ev)
-        except Exception:
-            return ev
-    return ev
+    try:
+        # json.loads is safer than eval()
+        parsed_list = json.loads(s)
+        
+        # Basic validation: ensure it's a list of ints
+        if isinstance(parsed_list, list) and all(isinstance(val, int) for val in parsed_list):
+            return parsed_list
+        else:
+            return None
+    except:
+        return None
 
+def list_to_string(lst):
+    """Converts a 1D list of integers into a string representation."""
+    if not lst:
+        return str(lst)
+    return str(lst).replace(" ", "") # Use simple str() output for [1, 2, 3]
 
-
-def create_strategyqa_prompt(question, evidence_text):
-    """Create a prompt for StrategyQA (Yes/No QA with evidence)."""
-
-    system_prompt = """
-You are an expert at answering yes/no questions using provided evidence.
-
-You will be given:
-- A Question
-- A list of Evidence paragraphs
+SYSTEM_PROMPT_LIST_FUNCTION = """
+You are an AI with exceptional abstract reasoning skills.
+You will be given several 'input' and corresponding 'output' list examples (the training set).
+These examples reveal an underlying transformation rule on lists of integers.
 
 Your task:
-1. Read the Question and the provided Evidence carefully.
-2. Decide whether the correct answer is YES or NO.
-3. Provide step-by-step reasoning that uses specific parts of the evidence.
-4. Provide the final label.
+1. Carefully analyze the training examples to infer the rule (e.g., reverse, remove duplicates, shift, filter, etc.).
+2. Apply the inferred rule to the provided 'Test Input' list to generate the 'Test Output' list.
 
-Your entire output MUST use exactly the following format and nothing else:
+Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
 <reasoning>
-[Your step-by-step analysis grounded in the evidence]
+[here you write your chain-of-thought analysis of the rule and intermediate steps]
 </reasoning>
 <answer>
-[Output exactly one of these two options: YES, NO]
+[here you output ONLY the predicted 'Test Output' list as a string representation of a list of integers (e.g., [1, 2, 3]), with no extra words]
 </answer>
 """.strip()
 
+def create_list_functions_prompt(example):
+    """Create a prompt for the list_functions rule-inference task."""
+
+    system_prompt = SYSTEM_PROMPT_LIST_FUNCTION
+
+    train_prompt = "\n".join([
+        f"--- Example {i+1} ---\nInput: {ex['input']}\nOutput: {ex['output']}" 
+        for i, ex in enumerate(example['train'])
+    ])
+
     user_prompt = f"""
-Question:
-{question}
+    Training Examples to Infer the Rule:
+    {train_prompt}
 
-Evidence:
-{evidence_text}
+    Test Input:
+    {example['test'][0]['input']}
 
-Based on the evidence provided, answer the question.
-""".strip()
+    Solve this problem step by step by inferring the rule and applying it to the Test Input, then provide the final Test Output list.
+    """
 
     return system_prompt, user_prompt
 
 
+def extract_reasoning(response):
+    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
+    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
 def extract_answer(response):
-    """
-    Extract the label from the <answer>...</answer> block.
-    Normalizes common variants (TRUE/FALSE -> YES/NO).
-    """
+    """Extract the 1D list answer from the <answer>...</answer> block and parse it into a list of integers."""
     if not response:
         return None
 
-    match = re.search(r'<answer>(.*?)</answer>', response, re.IGNORECASE | re.DOTALL)
-    if not match:
+    tag_match = re.search(
+        r'<answer>\s*(.*?)\s*</answer>',
+        response,
+        re.IGNORECASE | re.DOTALL
+    )
+    if not tag_match:
         return None
 
-    clean_answer = match.group(1).strip().upper()
-    clean_answer = clean_answer.rstrip(".")  # normalize "YES." -> "YES"
+    answer_content = tag_match.group(1).strip()
+    
+    # Remove any stray markdown or latex
+    answer_content = answer_content.replace('```', '').replace('json', '').strip()
+    
+    # Use the safe parsing function
+    return string_to_list(answer_content)
+    
 
-    # Map common variants to YES/NO
-    if clean_answer in {"TRUE", "T"}:
-        clean_answer = "YES"
-    elif clean_answer in {"FALSE", "F"}:
-        clean_answer = "NO"
-    elif clean_answer in {"Y"}:
-        clean_answer = "YES"
-    elif clean_answer in {"N"}:
-        clean_answer = "NO"
-
-    if clean_answer not in {"YES", "NO"}:
-        return None
-
-    return clean_answer
-
-
-# --- Helper functions (small additions to adapt to StrategyQA evidence format) ---
-
-_PARAGRAPH_ID_RE = re.compile(r".+-\d+$")  # e.g., "Genghis Khan-15"
+def lists_match(list1, list2):
+    """Checks for exact match between two 1D lists of integers."""
+    if not (isinstance(list1, list) and isinstance(list2, list)):
+        return False
+    
+    # Simple Python list comparison works for exact match of content and order
+    return list1 == list2
 
 
-def _extract_paragraph_ids(obj):
-    """
-    Recursively extract paragraph ids from StrategyQA 'evidence' field.
-    Keeps order, removes duplicates.
-    """
-    seen = set()
-    ordered = []
-
-    def rec(x):
-        if isinstance(x, str):
-            if x in {"no_evidence", "operation"}:
-                return
-            if _PARAGRAPH_ID_RE.match(x):
-                if x not in seen:
-                    seen.add(x)
-                    ordered.append(x)
-        elif isinstance(x, list) or isinstance(x, tuple):
-            for y in x:
-                rec(y)
-        elif isinstance(x, dict):
-            for y in x.values():
-                rec(y)
-
-    rec(obj)
-    return ordered
-
-
-def _build_evidence_text(example, paragraphs_dict=None, max_paragraphs=8, max_chars_per_paragraph=900):
-    chunks = []
-
-    # IMPORTANT: evidence might be stored as JSON string now
-    evidence_obj = _get_evidence_obj(example)
-
-    if paragraphs_dict is not None and evidence_obj is not None:
-        para_ids = _extract_paragraph_ids(evidence_obj)
-        para_ids = para_ids[:max_paragraphs]
-        for pid in para_ids:
-            p = paragraphs_dict.get(pid)
-            if not p:
-                continue
-            title = p.get("title", "")
-            content = (p.get("content", "") or "").strip().replace("\n", " ")
-            if max_chars_per_paragraph and len(content) > max_chars_per_paragraph:
-                content = content[:max_chars_per_paragraph].rstrip() + "…"
-            if title:
-                chunks.append(f"- ({pid}) {title}: {content}")
-            else:
-                chunks.append(f"- ({pid}) {content}")
-
-    # fallback to facts (now also may be JSON string)
-    if not chunks and "facts" in example and example["facts"]:
-        facts_obj = example["facts"]
-        if isinstance(facts_obj, str):
-            try:
-                facts_obj = json.loads(facts_obj)
-            except Exception:
-                facts_obj = [facts_obj]
-        if isinstance(facts_obj, list):
-            for f in facts_obj[:max_paragraphs]:
-                chunks.append(f"- {str(f).strip()}")
-
-    if not chunks:
-        return "- (No evidence provided.)"
-    return "\n".join(chunks)
-
-
-
-def evaluate_on_strategyqa(
-    model,
-    tokenizer,
-    max_samples=None,
-    model_name="Model",
-    batch_size=1,
-    split="train",
-    use_paragraphs=True,
-    max_evidence_paragraphs=8,
-    max_chars_per_paragraph=900,
-    max_prompt_length=4096,
-    max_new_tokens=512,
-):
-    """Evaluate model on voidful/StrategyQA dataset."""
-    # split="validation"
-    print(f"\n🔍 Evaluating {model_name} on StrategyQA...")
-    print(f"   Split: {split}")
+def evaluate_on_list_functions(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split='train'):
+    """Evaluate model on list_functions dataset with batch processing support."""
+    print(f"\n🔍 Evaluating {model_name} on list_functions dataset...")
     print(f"   Batch size: {batch_size}")
-
-    # Make batching + generation more reliable
-    tokenizer.padding_side = "left"
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    # 1) Load StrategyQA dataset
-    print(f"Loading voidful/StrategyQA (split={split})...")
-
+    print(f"   Split: {split}")
+    
+    # Load list_functions dataset
+    print(f"Loading list_functions dataset from {LIST_FUNCTIONS_DATASET_PATH} (split={split})...")
     try:
-        dataset = load_strategyqa_split_safe(split)
+        # Assuming the local JSON file is loaded into a 'train' split
+        dataset = load_dataset("json", data_files=LIST_FUNCTIONS_DATASET_PATH)["train"]
     except Exception as e:
-        # Fallback: download the JSON file directly
-        print(f"load_dataset failed ({type(e).__name__}: {e}). Falling back to hf_hub_download + Dataset.from_list.")
-        filename = "strategyqa_train.json" if split.startswith("train") else "strategyqa_test.json"
-        local_path = hf_hub_download(repo_id="voidful/StrategyQA", repo_type="dataset", filename=filename)
-        with open(local_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        dataset = Dataset.from_list(data)
-
-    num_samples = min(1000, len(dataset))
-    indices = np.random.choice(len(dataset), num_samples, replace=False)
-    dataset = dataset.select(indices)
-
+        print(f"❌ Error loading dataset from {LIST_FUNCTIONS_DATASET_PATH}: {e}")
+        return {
+            'accuracy': 0.0, 'correct': 0, 'total': 0, 
+            'failed_extractions': 0, 'extraction_rate': 0.0, 'results': []
+        }
+        
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
         print(f"Evaluating on {len(dataset)} samples (limited)")
     else:
-        print(f"Evaluating on {len(dataset)} samples (full split)")
-
-    # 2) Load paragraphs store (for evidence text), if requested
-    paragraphs_dict = None
-    if use_paragraphs:
-        print("Loading strategyqa_train_paragraphs.json (paragraph evidence store)...")
-        para_path = hf_hub_download(
-            repo_id="voidful/StrategyQA",
-            repo_type="dataset",
-            filename="strategyqa_train_paragraphs.json",
-        )
-        with open(para_path, "r", encoding="utf-8") as f:
-            paragraphs_dict = json.load(f)
-
-    # 3) Metrics
+        print(f"Evaluating on {len(dataset)} samples (full dataset)")
+    
     results = []
     correct = 0
     total = 0
     failed_extractions = 0
-
-    # StrategyQA labels are bools in train; test has no labels
-    has_labels = "answer" in dataset.column_names
-
+    
+    # Process in batches
     num_batches = (len(dataset) + batch_size - 1) // batch_size
-    btime = time.time()
-
+    
     for batch_idx in tqdm(range(num_batches), desc=f"Evaluating {model_name}"):
+        # Get batch
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, len(dataset))
         batch = dataset[start_idx:end_idx]
+        
+        # Handle single sample if the slicing doesn't return a list of dictionaries
+        if not isinstance(batch['train'], list) and not isinstance(batch['train'], np.ndarray):
+             batch = {k: [v] for k, v in batch.items()}
+        
+        batch_size_actual = len(batch['train'])
 
-        # Handle batch dictionary lists
-        if not isinstance(batch["question"], list):
-            batch = {k: [v] for k, v in batch.items()}
-
-        batch_size_actual = len(batch["question"])
-
+        # Prepare prompts for batch
         formatted_prompts = []
-        true_answers = []
+        true_answers_list = []
         batch_data = []
-
+        
         for i in range(batch_size_actual):
-            question = batch["question"][i]
-            qid = batch["qid"][i] if "qid" in batch else (start_idx + i)
-
-            # Build evidence text
-            ex = {k: batch[k][i] for k in batch.keys()}
-            evidence_text = _build_evidence_text(
-                ex,
-                paragraphs_dict=paragraphs_dict,
-                max_paragraphs=max_evidence_paragraphs,
-                max_chars_per_paragraph=max_chars_per_paragraph,
-            )
-
-            # True label (if available)
-            if has_labels:
-                true_answer = "YES" if bool(batch["answer"][i]) else "NO"
-            else:
-                true_answer = None
-
-            system_prompt, user_prompt = create_strategyqa_prompt(question, evidence_text)
-
+            # The list_functions task is structured like ACR: multiple train examples, multiple test problems per index.
+            # We focus on the first test problem per index.
+            test_problem = batch['test'][i][0] # Focus on the first test case
+            
+            test_input_str = test_problem['input']
+            true_answer_str = test_problem['output']
+            
+            # True answer needs to be parsed for comparison
+            true_answer_list = string_to_list(true_answer_str)
+            
+            # Create prompt
+            example = {'input': batch['train'][i], 'test': batch['test'][i]}
+            system_prompt, user_prompt = create_list_functions_prompt(example)
+            
+            # Format with chat template if available
             try:
                 messages = [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
+                    {"role": "user", "content": user_prompt}
                 ]
                 formatted_prompt = tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True
                 )
-            except Exception:
+            except:
+                # Fallback if chat template not available
                 formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
-
+            
             formatted_prompts.append(formatted_prompt)
-            true_answers.append(true_answer)
-            batch_data.append({"qid": qid, "question": question})
-
+            true_answers_list.append(true_answer_list)
+            batch_data.append({
+                'id': batch['idx'][i] if 'idx' in batch else start_idx + i,
+                'test_input': test_input_str
+            })
+        
+        # Tokenize batch with padding
         inputs = tokenizer(
             formatted_prompts,
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=max_prompt_length,
-        ).to(model.device)
-
+            max_length=4096 # Allow for larger contexts
+        )
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        
+        # Generate for batch
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,
-                temperature=0.0,
+                max_new_tokens=2048,  # Sufficient tokens for reasoning and output list
+                temperature=0.0,  # Low temperature for deterministic output
                 do_sample=False,
-                pad_token_id=tokenizer.pad_token_id,
+                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id
             )
-
+        
+        # Process each output in batch
         for i in range(batch_size_actual):
-            # IMPORTANT FIX vs the original: use attention_mask to get the true per-sample prompt length
-            prompt_len = int(inputs["attention_mask"][i].sum().item())
-            response = tokenizer.decode(outputs[i][prompt_len:], skip_special_tokens=True)
-
-            predicted_answer = extract_answer(response)
-            if predicted_answer is None:
+            # Decode response (skip input tokens)
+            input_length = inputs['input_ids'][i].shape[0]
+            response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
+            
+            # Extract and parse predicted answer
+            predicted_answer_list = extract_answer(response)
+            
+            # Extract reasoning
+            reasoning = response
+            
+            # True answer (already a list)
+            true_answer_list = true_answers_list[i]
+            
+            if predicted_answer_list is None or true_answer_list is None:
                 failed_extractions += 1
-                predicted_answer = "FAILED"
-
-            is_correct = (true_answers[i] is not None) and (predicted_answer == true_answers[i])
+                is_correct = False
+            else:
+                # Check correctness: exact list match
+                is_correct = lists_match(predicted_answer_list, true_answer_list)
+            
             if is_correct:
                 correct += 1
-
             total += 1
-
+            
+            # Store result
             results.append({
-                "qid": batch_data[i]["qid"],
-                "question": batch_data[i]["question"],
-                "true_answer": true_answers[i],
-                "predicted_answer": predicted_answer,
-                "full_response": response,
-                "correct": is_correct if true_answers[i] is not None else None,
+                'problem_id': batch_data[i]['id'],
+                'test_input': batch_data[i]['test_input'],
+                'true_answer': list_to_string(true_answer_list) if true_answer_list is not None else "PARSING_FAILED_TRUE",
+                'predicted_answer': list_to_string(predicted_answer_list) if predicted_answer_list is not None else "EXTRACTION_FAILED",
+                'reasoning': reasoning,
+                'correct': is_correct
             })
-
-    etime = time.time()
-
-    # If no labels (e.g., test split), accuracy isn't defined
-    if has_labels:
-        accuracy = correct / total if total > 0 else 0.0
-    else:
-        accuracy = None
-
+    
+    accuracy = correct / total if total > 0 else 0.0
+    
+    # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
-
+    
     print(f"\n📊 {model_name} Results:")
-    if accuracy is not None:
-        print(f"   Accuracy:  {accuracy:.4f} ({accuracy*100:.2f}%)")
-    else:
-        print("   Accuracy:  N/A (no labels in this split)")
-    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%)")
-
+    print(f"   Accuracy (Exact Match):  {accuracy:.4f} ({accuracy*100:.2f}%) - {correct}/{total} correct")
+    print(f"   Extraction Rate: {extraction_rate:.4f} ({extraction_rate*100:.2f}%) - {total - failed_extractions}/{total} extracted")
+    print(f"   Failed extractions: {failed_extractions}/{total} ({failed_extractions/total*100:.1f}%)")
+    
     return {
-        "accuracy": accuracy,
-        "correct": correct if has_labels else None,
-        "total": total,
-        "failed_extractions": failed_extractions,
-        "extraction_rate": extraction_rate,
-        "time": etime - btime,
-        "results": results,
+        'accuracy': accuracy,
+        'correct': correct,
+        'total': total,
+        'failed_extractions': failed_extractions,
+        'extraction_rate': extraction_rate,
+        'results': results
     }
 
 
@@ -565,7 +433,7 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
     while batch_size >= 1 and results is None:
         try:
             print(f"\n🧪 Evaluating {model_name} with batch_size={batch_size}")
-            results = evaluate_on_strategyqa(
+            results = evaluate_on_list_functions(
                 model,
                 tokenizer,
                 args.max_samples,
@@ -595,10 +463,10 @@ def evaluate_model_with_dynamic_batch(model, tokenizer, args, model_name):
 
 def ensure_raw_results_cached(args):
     """
-    Ensure raw strategyqa results are cached on disk for the current configuration.
+    Ensure raw list_functions results are cached on disk for the current configuration.
     Returns the loaded or newly computed raw_results dict.
     """
-    dataset_name = "strategyqa"
+    dataset_name = "list_functions"
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
     
@@ -607,7 +475,7 @@ def ensure_raw_results_cached(args):
     
     raw_results_file = os.path.join(
         raw_results_dir,
-        f"raw_results_train_all.json"
+        f"raw_results_{split}_{sample_tag}.json"
     )
     
     if os.path.exists(raw_results_file):
@@ -647,10 +515,13 @@ def ensure_raw_results_cached(args):
 def ensure_finetuned_results_cached(args, ckpt_name):
     """
     Ensure fine-tuned model results are cached on disk for the current configuration.
-    Returns the loaded or newly computed fine-tuned results dict.
+    Returns True if cached results are found, False otherwise.
     """
-    dataset_name = "strategyqa"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    dataset_name = "list_functions"
+    ckpt_output_dir_parts = OUTPUT_DIR.split("/")
+    base_output_dir = "/".join(ckpt_output_dir_parts[:-1]) if len(ckpt_output_dir_parts) > 1 else OUTPUT_DIR
+    ckpt_output_dir = os.path.join(base_output_dir, args.run, ckpt_name, dataset_name)
+
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
@@ -664,7 +535,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     Given a single checkpoint, evaluate it vs cached raw results and save:
       - all_cases.json
       - disagreement_cases.json
-    under: OUTPUT_DIR/<checkpoint_name>/strategyqa/
+    under: OUTPUT_DIR/<run>/<checkpoint_name>/list_functions/
     """
     print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
     if not os.path.isabs(checkpoint_path):
@@ -706,12 +577,15 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         return
     
     # Build per-case comparison
-    dataset_name = "strategyqa"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    dataset_name = "list_functions"
+    ckpt_output_dir_parts = OUTPUT_DIR.split("/")
+    base_output_dir = "/".join(ckpt_output_dir_parts[:-1]) if len(ckpt_output_dir_parts) > 1 else OUTPUT_DIR
+    ckpt_output_dir = os.path.join(base_output_dir, args.run, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
-    raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
-    ft_by_id = {idx + 1: r for idx, r in enumerate(finetuned_results["results"])}
+    # Index results by problem_id (idx from dataset)
+    raw_by_id = {r['problem_id']: r for r in raw_results["results"]}
+    ft_by_id = {r['problem_id']: r for r in finetuned_results["results"]}
     
     disagreement_cases = []
     
@@ -722,7 +596,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         
         case_entry = {
             "problem_id": pid,
-            "problem": raw_r["question"],          
+            "test_input": raw_r["test_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -798,6 +672,10 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         json.dump(raw_output, f, indent=2)
     print(f"\n💾 Raw model results saved to: {raw_file}")
     
+    if not finetuned_results:
+        print("❌ Fine-tuned model evaluation not available")
+        return None
+    
     # Save fine-tuned model results
     finetuned_output = {
         'base_model': RAW_MODEL_PATH,
@@ -827,7 +705,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
     
     summary = {
         'evaluation_time': timestamp,
-        'dataset': 'yentinglin/strategyqa',
+        'dataset': 'List Functions Rule Inference',
         'split': 'train',
         'num_samples': raw_results['total'],
         'raw_model': {
@@ -878,7 +756,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         all_cases.append({
             "problem_id": pid,
-            "problem": raw_r["question"],          
+            "test_input": raw_r["test_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -902,7 +780,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         disagreement_cases.append({
             "problem_id": pid,
-            "problem": raw_r["question"],          
+            "test_input": raw_r["test_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -942,7 +820,7 @@ def evaluate_all_checkpoints(args):
         return
     
     print("="*80)
-    print("🚀 strategyqa EVALUATION: ALL CHECKPOINTS")
+    print("🚀 LIST FUNCTIONS EVALUATION: ALL CHECKPOINTS")
     print("="*80)
     print(f"Checkpoint Directory: {checkpoint_dir}")
     print(f"CUDA Device: {args.cuda_device}")
@@ -977,12 +855,19 @@ def evaluate_all_checkpoints(args):
         print("\n" + "="*80)
         print("🤖 EVALUATING RAW MODEL (once)")
         print("="*80)
+        # Note: Using evaluate_model_with_dynamic_batch to include OOM handling
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_strategyqa(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
+        raw_results = evaluate_model_with_dynamic_batch(raw_model, raw_tokenizer, args, "Raw Model")
         del raw_model
         torch.cuda.empty_cache()
-        print(f"\n✅ Raw model evaluation complete")
-        print(f"   Accuracy: {raw_results['accuracy']:.4f} ({raw_results['accuracy']*100:.2f}%)")
+        
+        if raw_results is None:
+            print("❌ Raw model evaluation failed, cannot compute deltas.")
+        else:
+            print(f"\n✅ Raw model evaluation complete")
+            print(f"   Accuracy: {raw_results['accuracy']:.4f} ({raw_results['accuracy']*100:.2f}%)")
+    else:
+        print("\n⏭️  Skipping raw model evaluation")
     
     # Save detailed results to JSON
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -1016,12 +901,16 @@ def evaluate_all_checkpoints(args):
         try:
             # Load and evaluate checkpoint
             finetuned_model, finetuned_tokenizer = load_finetuned_model(checkpoint_path, args.cuda_device)
-            finetuned_results = evaluate_on_strategyqa(
-                finetuned_model, finetuned_tokenizer, args.max_samples, 
-                f"{ckpt_name}", args.batch_size
+            finetuned_results = evaluate_model_with_dynamic_batch(
+                finetuned_model, finetuned_tokenizer, args, 
+                f"{ckpt_name}"
             )
             del finetuned_model
             torch.cuda.empty_cache()
+
+            if finetuned_results is None:
+                print(f"❌ Checkpoint {ckpt_name} evaluation failed.")
+                continue
             
             # Store results
             checkpoint_info = {
@@ -1029,6 +918,10 @@ def evaluate_all_checkpoints(args):
                 'checkpoint_path': checkpoint_path,
                 'results': finetuned_results
             }
+            
+            # Prepare summary data for live update
+            raw_acc = raw_results['accuracy'] if raw_results else 0.0
+            raw_ext = raw_results['extraction_rate'] if raw_results else 0.0
             
             summary_data["checkpoints"].append({
                 'name': checkpoint_info['checkpoint_name'],
@@ -1038,8 +931,8 @@ def evaluate_all_checkpoints(args):
                     'extraction_rate': checkpoint_info['results']['extraction_rate']
                 },
                 'improvements_vs_raw': {
-                    'accuracy_delta': checkpoint_info['results']['accuracy'] - raw_results['accuracy'] if raw_results else None,
-                    'extraction_delta': checkpoint_info['results']['extraction_rate'] - raw_results['extraction_rate'] if raw_results else None
+                    'accuracy_delta': checkpoint_info['results']['accuracy'] - raw_acc,
+                    'extraction_delta': checkpoint_info['results']['extraction_rate'] - raw_ext
                 } if raw_results else None
             })
             
@@ -1054,18 +947,15 @@ def evaluate_all_checkpoints(args):
             
             # Show improvement vs raw model if available
             if raw_results:
-                acc_improvement = finetuned_results['accuracy'] - raw_results['accuracy']
-                ext_improvement = finetuned_results['extraction_rate'] - raw_results['extraction_rate']
+                acc_improvement = finetuned_results['accuracy'] - raw_acc
+                ext_improvement = finetuned_results['extraction_rate'] - raw_ext
                 print(f"   📈 Improvement vs Raw: Accuracy {acc_improvement:+.4f} ({acc_improvement*100:+.2f}%), Extraction {ext_improvement:+.4f} ({ext_improvement*100:+.2f}%)")
             
         except Exception as e:
             print(f"❌ Error evaluating {ckpt_name}: {e}")
             continue
     
-    # Save all results
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    
-    # Create summary comparison
+    # Final summary printout (same logic as original script)
     print("\n" + "="*80)
     print("📊 SUMMARY: ALL CHECKPOINTS COMPARISON")
     print("="*80)
@@ -1077,13 +967,16 @@ def evaluate_all_checkpoints(args):
     
     print(f"\n🎯 FINE-TUNED CHECKPOINTS:")
     if raw_results:
+        raw_acc = raw_results['accuracy']
+        raw_ext = raw_results['extraction_rate']
+        
         print(f"   {'Checkpoint':<20} {'Accuracy':<15} {'Extraction':<15} {'Acc Δ':<12} {'Ext Δ':<12}")
         print(f"   {'-'*80}")
         
         for checkpoint_info in all_checkpoint_results:
             res = checkpoint_info['results']
-            acc_delta = res['accuracy'] - raw_results['accuracy']
-            ext_delta = res['extraction_rate'] - raw_results['extraction_rate']
+            acc_delta = res['accuracy'] - raw_acc
+            ext_delta = res['extraction_rate'] - raw_ext
             
             print(f"   {checkpoint_info['checkpoint_name']:<20} "
                   f"{res['accuracy']:.4f} ({res['accuracy']*100:5.2f}%) "
@@ -1115,10 +1008,11 @@ def evaluate_all_checkpoints(args):
     print(f"\n💾 All results saved to: {summary_file}")
     print("="*80 + "\n")
 
+
 def print_comparison(summary):
     """Print formatted comparison results."""
     print("\n" + "="*80)
-    print("📊 strategyqa EVALUATION: RAW vs FINE-TUNED MODEL")
+    print("📊 LIST FUNCTIONS EVALUATION: RAW vs FINE-TUNED MODEL")
     print("="*80)
     
     raw_metrics = summary['raw_model']['metrics']
@@ -1148,30 +1042,33 @@ def print_comparison(summary):
     print("\n" + "-"*80)
     
     if comp['overall_improved']:
-        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on strategyqa!")
+        print("✅ RESULT: Fine-tuning on your dataset IMPROVED performance on List Functions!")
         print(f"   • Accuracy improved by {acc_rel:.2f}% (relative)")
-        print(f"   The model shows better math problem solving ability.")
+        print(f"   The model shows better list transformation ability.")
     elif acc_imp < 0:
-        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on strategyqa.")
+        print("⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on List Functions.")
         print(f"   • Accuracy decreased by {acc_rel:.2f}% (relative)")
         print(f"   • This suggests potential overfitting to your training data.")
     else:
-        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on strategyqa performance.")
-        print(f"   The model maintained baseline math problem solving ability.")
+        print("➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on List Functions performance.")
+        print(f"   The model maintained baseline rule inference ability.")
     
     print("="*80 + "\n")
 
 def main():
-    global RAW_MODEL_PATH, OUTPUT_DIR
-    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on strategyqa dataset')
+    global RAW_MODEL_PATH
+    global LIST_FUNCTIONS_DATASET_PATH
+    global OUTPUT_DIR
+    
+    parser = argparse.ArgumentParser(description='Evaluate raw vs fine-tuned model on List Functions dataset')
     parser.add_argument('--max_samples', type=int, default=None, 
-                       help='Maximum number of samples to evaluate (default: all 30 problems)')
+                       help='Maximum number of samples to evaluate (default: all problems)')
     parser.add_argument('--cuda_device', type=str, default='0',
                        help='CUDA device to use (default: 0)')
     parser.add_argument('--batch_size', type=int, default=1,
                        help='Batch size for evaluation. Higher values (4-8) are faster but use more GPU memory (default: 1)')
     parser.add_argument('--split', type=str, default='train', choices=['train', 'test', 'validation'],
-                       help='Dataset split to use (default: train). Note: strategyqa dataset may only have "train" split.')
+                       help='Dataset split to use (default: train). Note: The dataset loading assumes a "train" split.')
     parser.add_argument('--skip_raw', action='store_true',
                        help='Skip raw model evaluation (evaluate only fine-tuned model)')
     parser.add_argument('--skip_finetuned', action='store_true',
@@ -1185,17 +1082,25 @@ def main():
     parser.add_argument('--evaluate_checkpoints', type=int, default=0,
                        help='If set to 1, run per-checkpoint mode: '
                             'evaluate the given --checkpoint_path vs cached raw results and '
-                            'save all_cases/disagreement_cases under OUTPUT_DIR/checkpoint/dataset_name.')
+                            'save all_cases/disagreement_cases under OUTPUT_DIR/run/checkpoint/dataset_name.')
     parser.add_argument('--run', type=str, default="run",
                        help='Which training run to use for the output directory.')
     parser.add_argument('--raw_path', type=str, default=None,
                        help='The raw model path')
+    parser.add_argument('--dataset_path', type=str, default=LIST_FUNCTIONS_DATASET_PATH,
+                       help='The path to the local List Functions JSON dataset file (e.g., /path/to/list_functions_dataset.json)')
     parser.add_argument('--output_path', type=str, default=OUTPUT_DIR,
                        help='Model output path, defaults to env variable.')
     
     args = parser.parse_args()
     
     OUTPUT_DIR = args.output_path
+    # Set the dataset path from args, which might be the default empty string if not provided
+    LIST_FUNCTIONS_DATASET_PATH = args.dataset_path
+    
+    if not LIST_FUNCTIONS_DATASET_PATH:
+        print("❌ Error: The --dataset_path argument is required and cannot be empty.")
+        return
 
     # Validate arguments
     if args.checkpoint_path and args.checkpoint_dir:
@@ -1210,7 +1115,7 @@ def main():
         return
     
     # Set CUDA device
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device
+    # os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device
 
     if args.raw_path:
         RAW_MODEL_PATH = args.raw_path
@@ -1222,10 +1127,11 @@ def main():
             return
         
         print("="*80)
-        print("🚀 strategyqa PER-CHECKPOINT EVALUATION MODE")
+        print("🚀 LIST FUNCTIONS PER-CHECKPOINT EVALUATION MODE")
         print("="*80)
         print(f"Raw Model:     {RAW_MODEL_PATH}")
         print(f"Output Dir:    {OUTPUT_DIR}")
+        print(f"Dataset Path:  {LIST_FUNCTIONS_DATASET_PATH}")
         print(f"CUDA Device:   {args.cuda_device}")
         print(f"Split:         {args.split}")
         if args.max_samples:
@@ -1244,10 +1150,12 @@ def main():
         return
     
     print("="*70)
-    print("🚀 strategyqa EVALUATION: RAW vs FINE-TUNED")
+    print("🚀 LIST FUNCTIONS EVALUATION: RAW vs FINE-TUNED")
     print("="*70)
     print(f"Raw Model: {RAW_MODEL_PATH}")
     print(f"Training Dir: {TRAINING_DIR}")
+    print(f"Dataset Path: {LIST_FUNCTIONS_DATASET_PATH}")
+    print(f"Output Dir:    {OUTPUT_DIR}")
     print(f"CUDA Device: {args.cuda_device}")
     print(f"Batch Size: {args.batch_size}")
     if args.max_samples:
@@ -1301,7 +1209,7 @@ def main():
     # Evaluate raw model
     if not args.skip_raw:
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-        raw_results = evaluate_on_strategyqa(raw_model, raw_tokenizer, args.max_samples, "Raw Model", args.batch_size)
+        raw_results = evaluate_model_with_dynamic_batch(raw_model, raw_tokenizer, args, "Raw Model")
         del raw_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1309,9 +1217,9 @@ def main():
         print("\n⏭️  Skipping raw model evaluation")
     
     # Evaluate fine-tuned model
-    if not args.skip_finetuned:
+    if not args.skip_finetuned and best_checkpoint_info:
         finetuned_model, finetuned_tokenizer = load_finetuned_model(best_checkpoint_info['path'], args.cuda_device)
-        finetuned_results = evaluate_on_strategyqa(finetuned_model, finetuned_tokenizer, args.max_samples, "Fine-tuned Model", args.batch_size)
+        finetuned_results = evaluate_model_with_dynamic_batch(finetuned_model, finetuned_tokenizer, args, "Fine-tuned Model")
         del finetuned_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1319,7 +1227,7 @@ def main():
         print("\n⏭️  Skipping fine-tuned model evaluation")
     
     # Save and display results
-    if raw_results and finetuned_results:
+    if raw_results or finetuned_results:
         summary = save_results(raw_results, finetuned_results, best_checkpoint_info, OUTPUT_DIR)
         print_comparison(summary)
     elif raw_results:
@@ -1331,4 +1239,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

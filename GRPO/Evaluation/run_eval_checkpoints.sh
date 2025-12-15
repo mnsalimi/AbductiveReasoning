@@ -16,7 +16,7 @@ scripts=(
     "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 
-OUTPUT_DIR="/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/14B"
+OUTPUT_DIR="/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/14B"
 
 ROOT_DIR="./GRPO/Evaluation/14B"
 

@@ -36,10 +36,10 @@ np.random.seed(42)
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/inabhyd_evaluation_results")  # Change default per script
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/inabhyd_evaluation_results")  # Change default per script
 
 # ============================================================================
 # Helper Functions
@@ -280,7 +280,7 @@ def evaluate_on_inabhyd(
     model_name="Model",
     batch_size=1,
     split='test',
-    dataset_path="/home/moein_salimi/users/amirmo/1hop_0shot_membership_ontology_property.pkl",
+    dataset_path="/home/moein_salimi/users/Danial/1hop_0shot_membership_ontology_property.pkl",
 ):
     """
     Evaluate a chat model on INABHYD.

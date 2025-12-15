@@ -38,20 +38,63 @@ NUM_EPOCHS = 20  # Default number of training epochs
 # List of evaluation scripts to run
 EVALUATION_SCRIPTS = [
     {
-        'script': str(SCRIPT_DIR / 'evaluate_aimo_raw_vs_finetuned.py'),
-        'name': 'AIMO Dataset Evaluation',
-        'output_subdir': 'aimo_evaluation_results',
+        'script': str(SCRIPT_DIR /'evaluate_strategyqa_raw_vs_finetuned.py'),
+        'name': 'evaluate_strategyqa Dataset Evaluation',
+        'output_subdir': 'strategyqa_evaluation_results',
         'params': {
             'split': 'test',
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
     },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_defeasible_nli_raw_vs_finetuned.py'),
+        'name': 'defeasible_nli (atomic) Dataset Evaluation',
+        'output_subdir': 'defeasible_nli_atomic_evaluation_results',
+        'params': {
+            'split': 'test',
+            'max_samples': 8,
+            'skip_raw': True,
+        },
+        'override_terminal': False
+    },
+    {
+        'script': str(SCRIPT_DIR /'evaluate_neulr_abductive_raw_vs_finetuned.py'),
+        'name': 'evaluate_neulr_abductive Dataset Evaluation',
+        'output_subdir': 'neulr_abductive_evaluation_results',
+        'params': {
+            'split': 'test',
+            'max_samples': 8,
+            'skip_raw': True,
+        },
+        'override_terminal': False
+    },
+
+    #THIS WAS TAKING SO LONG TO RUN. WE COMMENTED IT.
+
+    # {
+    #     'script': str(SCRIPT_DIR / 'evaluate_aimo_raw_vs_finetuned.py'),
+    #     'name': 'AIMO Dataset Evaluation',
+    #     'output_subdir': 'aimo_evaluation_results',
+    #     'params': {
+    #         'split': 'test',
+    #         'max_samples': 8,
+    #         'skip_raw': True,
+    #     },
+    #     'override_terminal': False
+    # },
+
+
+
     {
         'script': str(SCRIPT_DIR / 'evaluate_aime_raw_vs_finetuned.py'),
         'name': 'AIME 2025 Dataset Evaluation',
         'output_subdir': 'aime_evaluation_results',
         'params': {
-            'split': 'train'
+            'split': 'train',
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
     },
@@ -59,8 +102,10 @@ EVALUATION_SCRIPTS = [
         'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_cause.py'),
         'name': 'COPA Dataset Evaluation (Guess Cause)',
         'output_subdir': 'copa_evaluation_guess_cause_results',
-        'params': {
+        'params': { 
             'split': 'train',
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
     },
@@ -70,6 +115,8 @@ EVALUATION_SCRIPTS = [
         'output_subdir': 'copa_evaluation_guess_effect_results',
         'params': {
             'split': 'train',
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
     },
@@ -78,6 +125,8 @@ EVALUATION_SCRIPTS = [
         'name': 'ART Dataset Evaluation',
         'output_subdir': 'art_evaluation_results',
         'params': {
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
     },
@@ -87,6 +136,8 @@ EVALUATION_SCRIPTS = [
         'output_subdir': 'goEmotion_evaluation_results',
         'params': {
             'split': 'test',
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
     },
@@ -96,26 +147,33 @@ EVALUATION_SCRIPTS = [
         'output_subdir': 'gsm8k_evaluation_results',
         'params': {
             'split': 'test',
+            'max_samples': 8,
+            'skip_raw': True,
         },
         'override_terminal': False
-    },
+    },   
 ]
 
 # Default parameters shared across all scripts
 DEFAULT_PARAMS = {
-    'cuda_device': '3',
+    'cuda_device': '0',
     'batch_size': 8,
     'max_samples': None,
     'skip_raw': False,
     'skip_finetuned': False,
     'checkpoint_path': None,
     'checkpoint_dir': None,
+    # New flags propagated to sub-scripts
+    'evaluate_checkpoints': 0,
+    'run': None,
+    'raw_path': None,
+    'output_path': None
 }
 
 # Parallel execution settings
 DEFAULT_PARALLEL_COUNT = 1
 
-# CUDA devices for parallel execution (will cycle through these IN ORDER)
+# Default CUDA devices pool (will be overridden by --cuda_device argument)
 CUDA_DEVICES = ['0']
 
 # Output directory for consolidated orchestrator results
@@ -131,17 +189,20 @@ class EvaluationOrchestrator:
     
     def __init__(self, output_dir: str, parallel_count: int = 1,
         raw_model_path: str = None, training_dir: str = None,
-        base_output_dir: str = None, realtime_logs: bool = True):
+        base_output_dir: str = None, realtime_logs: bool = True,
+        cuda_devices: List[str] = None):
         
         # Convert output_dir to absolute path based on script location
         if not os.path.isabs(output_dir):
             output_dir = os.path.join(SCRIPT_DIR, output_dir)
 
-        
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.parallel_count = parallel_count
         self.realtime_logs = realtime_logs
+        
+        # Set the GPU pool (default to global if not provided)
+        self.cuda_pool = cuda_devices if cuda_devices else CUDA_DEVICES
         
         # Thread-safe printing lock
         self.print_lock = threading.Lock()
@@ -330,9 +391,6 @@ class EvaluationOrchestrator:
             print(f"{'='*70}\n")
             return latest_checkpoint_path, reason
 
-
-
-
     def inject_paths_into_script(self, script_config: Dict) -> Dict[str, str]:
         """Create environment variables to inject paths into evaluation scripts."""
         output_dir = os.path.join(self.base_output_dir, 
@@ -356,7 +414,7 @@ class EvaluationOrchestrator:
         else:
             final_params = {**DEFAULT_PARAMS, **script_params, **terminal_args}
         
-        # Override cuda_device for parallel execution
+        # Override cuda_device for this specific execution
         final_params['cuda_device'] = cuda_device
         
         # Build argument list
@@ -529,7 +587,7 @@ class EvaluationOrchestrator:
         print(f"{'='*70}")
         print(f"Total Scripts: {len(EVALUATION_SCRIPTS)}")
         print(f"Parallel Count: {self.parallel_count}")
-        print(f"CUDA Devices Pool: {CUDA_DEVICES}")
+        print(f"CUDA Devices Pool: {self.cuda_pool}")
         print(f"Real-time Logs: {'Enabled' if self.realtime_logs else 'Disabled'}")
         print(f"Output Directory: {self.run_dir}")
         print(f"\nPATH CONFIGURATION:")
@@ -537,9 +595,9 @@ class EvaluationOrchestrator:
         print(f"  Training Dir: {self.training_dir}")
         print(f"  Base Output: {self.base_output_dir}")
         
-        # --- NEW: Best Checkpoint Finder Logic ---
+        # --- Best Checkpoint Finder Logic ---
         print(f"\nCHECKPOINT SELECTION:")
-        if 'checkpoint_path' in terminal_args:
+        if 'checkpoint_path' in terminal_args and terminal_args['checkpoint_path']:
             print(f"  Mode: Manual (provided via --checkpoint_path)")
             print(f"  Using: {terminal_args['checkpoint_path']}")
         elif find_best:
@@ -561,9 +619,9 @@ class EvaluationOrchestrator:
         overall_start = time.time()
         
         if self.parallel_count == 1:
-            # Sequential execution
+            # Sequential execution using the pool (usually 1 device)
             for idx, script_config in enumerate(EVALUATION_SCRIPTS):
-                cuda_device = CUDA_DEVICES[idx % len(CUDA_DEVICES)]
+                cuda_device = self.cuda_pool[idx % len(self.cuda_pool)]
                 result = self.run_single_evaluation(script_config, terminal_args, 
                                                    cuda_device, idx)
                 results.append(result)
@@ -572,7 +630,7 @@ class EvaluationOrchestrator:
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.parallel_count) as executor:
                 futures = []
                 for idx, script_config in enumerate(EVALUATION_SCRIPTS):
-                    cuda_device = CUDA_DEVICES[idx % len(CUDA_DEVICES)]
+                    cuda_device = self.cuda_pool[idx % len(self.cuda_pool)]
                     future = executor.submit(
                         self.run_single_evaluation,
                         script_config, terminal_args, cuda_device, idx
@@ -614,7 +672,7 @@ class EvaluationOrchestrator:
             f.write(f"  Raw Model: {self.raw_model_path}\n")
             f.write(f"  Training Dir: {self.training_dir}\n")
             f.write(f"  Base Output: {self.base_output_dir}\n")
-            f.write(f"\nCUDA DEVICES POOL: {CUDA_DEVICES}\n")
+            f.write(f"\nCUDA DEVICES POOL: {self.cuda_pool}\n")
             f.write("="*70 + "\n\n")
             
             # Terminal arguments
@@ -747,8 +805,25 @@ Examples:
     parser.add_argument('--no-find-best-checkpoint', action='store_false', dest='find_best_checkpoint',
                        help='Disable the automatic best checkpoint finding logic.')
 
+    # --- New Compatibility Arguments (to match evaluate_art etc.) ---
+    parser.add_argument('--evaluate_checkpoints', type=int, default=0,
+                        help='Supported for sub-script compatibility (default: 0)')
+    parser.add_argument('--run', type=str, default=None,
+                        help='Run name/identifier, passed to sub-scripts.')
+    parser.add_argument('--raw_path', type=str, default=None,
+                        help='Alias for --raw_model_path')
+    parser.add_argument('--output_path', type=str, default=None,
+                        help='Alias for --output_dir')
     
     args = parser.parse_args()
+
+    # Handle alias arguments (compatibility mapping)
+    if args.raw_path and not args.raw_model_path:
+        args.raw_model_path = args.raw_path
+    
+    if args.output_path and not args.output_dir:
+        # Note: Orchesrator usually needs its own dir, but we respect the alias
+        args.output_dir = args.output_path
     
     # Extract terminal arguments
     terminal_args = {
@@ -760,9 +835,21 @@ Examples:
         'skip_finetuned': args.skip_finetuned,
         'checkpoint_path': args.checkpoint_path,
         'checkpoint_dir': args.checkpoint_dir,
+        # Pass the new flags down to sub-scripts
+        'evaluate_checkpoints': args.evaluate_checkpoints,
+        'run': args.run,
+        # Pass the resolved paths too, just in case sub-scripts need them
+        'raw_path': args.raw_model_path,
+        'output_path': args.output_dir,
     }
     # Clean out any arguments that were not provided
     terminal_args = {k: v for k, v in terminal_args.items() if v is not None}
+    
+    # Determine the CUDA devices pool based on arguments
+    selected_devices = None
+    if args.cuda_device:
+        # Allow comma separated string like "0,1" or just "2"
+        selected_devices = [d.strip() for d in args.cuda_device.split(',')]
     
     # Create orchestrator and run
     orchestrator = EvaluationOrchestrator(
@@ -771,7 +858,8 @@ Examples:
         args.raw_model_path,
         args.training_dir,
         args.base_output_dir,
-        realtime_logs=not args.no_realtime
+        realtime_logs=not args.no_realtime,
+        cuda_devices=selected_devices  # Pass the explicit device list
     )
     results = orchestrator.run_all_evaluations(terminal_args, args.find_best_checkpoint)
     

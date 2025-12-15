@@ -854,7 +854,7 @@ def main():
     # write_csv(rows, columns, args.out_csv)
     old_sheet_name = args.run
     sheet_name = args.run.split("e20_")[0] + args.train_data + "_e20_" + args.run.split("e20_")[1]
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/amirmo/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
+    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json="/home/moein_salimi/users/Danial/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json") 
 
 
 if __name__ == "__main__":

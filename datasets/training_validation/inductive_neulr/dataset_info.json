@@ -6,7 +6,7 @@
   "dataset_size": 275000,
   "description": "",
   "download_checksums": {
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/NeuLR/inductive_neutral.json": {
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/datasets/NeuLR/inductive_neutral.json": {
       "num_bytes": 379896,
       "checksum": null
     }

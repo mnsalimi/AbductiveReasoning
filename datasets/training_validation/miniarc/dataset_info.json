@@ -6,7 +6,7 @@
   "dataset_size": 349280,
   "description": "",
   "download_checksums": {
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/miniarc.jsonl": {
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/datasets/miniarc.jsonl": {
       "num_bytes": 155435,
       "checksum": null
     }

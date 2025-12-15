@@ -6,7 +6,7 @@
   "dataset_size": 1211382,
   "description": "",
   "download_checksums": {
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/data_clean/questions/US/test.jsonl": {
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/datasets/data_clean/questions/US/test.jsonl": {
       "num_bytes": 1325785,
       "checksum": null
     }

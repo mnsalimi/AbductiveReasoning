@@ -6,7 +6,7 @@
   "dataset_size": 23479533,
   "description": "",
   "download_checksums": {
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/datasets/murder_mystery.json": {
+    "/home/moein_salimi/users/Danial/AbductiveReasoning/datasets/murder_mystery.json": {
       "num_bytes": 44386771,
       "checksum": null
     }

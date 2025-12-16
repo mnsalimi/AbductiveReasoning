@@ -158,12 +158,6 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-import re
-import time
-import torch
-from tqdm import tqdm
-from datasets import load_dataset
-
 def create_defeasible_nli_prompt(premise, hypothesis, update):
     """Create a prompt for Defeasible NLI (Thinking Like a Skeptic)."""
 

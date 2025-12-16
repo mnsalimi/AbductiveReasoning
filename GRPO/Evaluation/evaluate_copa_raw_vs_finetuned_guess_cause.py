@@ -25,6 +25,9 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import path utilities for project-relative paths
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+
 SYSTEM_PROMPT_balanced_copa_cause_only = """
 You are an expert in logical reasoning and abductive inference. Your task is to determine which of two given choices represents the most plausible cause for a given premise.
 
@@ -58,14 +61,17 @@ CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include
 # Configuration
 # ============================================================================
 
+# Get project root for relative paths
+PROJECT_ROOT = get_project_root()
+
 # Allow path injection from orchestrator
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
+    os.path.join(get_results_dir(), "dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"))
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-     "/home/moein_salimi/users/amirmo/AbductiveReasoning/GRPO/Evaluation/copa_evaluation_results_guess_cause")  # Change default per script
+    os.path.join(get_evaluation_dir(), "copa_evaluation_results_guess_cause"))  # Change default per script
 
 # ============================================================================
 # Helper Functions

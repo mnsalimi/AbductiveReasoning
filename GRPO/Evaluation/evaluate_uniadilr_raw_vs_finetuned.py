@@ -25,9 +25,15 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+# Import path utilities for project-relative paths
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+
 # ============================================================================
 # Configuration
 # ============================================================================
+
+# Get project root for relative paths
+PROJECT_ROOT = get_project_root()
 
 RAW_MODEL_PATH = os.environ.get(
     "EVAL_RAW_MODEL_PATH",

@@ -16,11 +16,15 @@ scripts=(
     "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 
-OUTPUT_DIR="/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/14B"
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+OUTPUT_DIR="$PROJECT_ROOT/GRPO/Evaluation/14B"
 
 ROOT_DIR="./GRPO/Evaluation/14B"
 
-BASE_RESULTS_DIR="/home/moein_salimi/users/sahand/AbductiveReasoning/GRPO/results"
+BASE_RESULTS_DIR="$PROJECT_ROOT/GRPO/results"
 
 # RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
 RAW_MODEL_PATH="/home/moein_salimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit"

@@ -25,20 +25,26 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import path utilities for project-relative paths
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+
 np.random.seed(42)
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
+# Get project root for relative paths
+PROJECT_ROOT = get_project_root()
+
 # Allow path injection from orchestrator
 RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
-    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/results/dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16")
+    os.path.join(get_results_dir(), "dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"))
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
-    "/home/moein_salimi/users/Danial/AbductiveReasoning/GRPO/Evaluation/clutrr_evaluation_results")  # Change default per script
+    os.path.join(get_evaluation_dir(), "clutrr_evaluation_results"))  # Change default per script
 
 # ============================================================================
 # Helper Functions

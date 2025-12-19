@@ -514,6 +514,7 @@ def evaluate_on_strategyqa(
             response = tokenizer.decode(outputs[i][prompt_len:], skip_special_tokens=True)
 
             predicted_answer = extract_answer(response)
+
             if predicted_answer is None:
                 failed_extractions += 1
                 predicted_answer = "FAILED"
@@ -730,12 +731,12 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "reasoning": raw_r["reasoning"],
+                "full_response": raw_r["full_response"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "reasoning": ft_r["reasoning"],
+                "full_response": ft_r["full_response"],
                 "correct": ft_r["correct"]
             }
         }
@@ -886,12 +887,12 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "reasoning": raw_r["reasoning"],
+                "full_response": raw_r["full_response"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "reasoning": ft_r["reasoning"],
+                "full_response": ft_r["full_response"],
                 "correct": ft_r["correct"]
             }
         })
@@ -910,12 +911,12 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "reasoning": raw_r["reasoning"],
+                "full_response": raw_r["full_response"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "reasoning": ft_r["reasoning"],
+                "full_response": ft_r["full_response"],
                 "correct": ft_r["correct"]
             },
             "disagreement_type": disagreement_type
@@ -1335,4 +1336,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

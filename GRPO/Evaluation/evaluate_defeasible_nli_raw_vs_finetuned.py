@@ -691,12 +691,12 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "reasoning": raw_r["reasoning"],
+                "full_response": raw_r["full_response"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "reasoning": ft_r["reasoning"],
+                "full_response": ft_r["full_response"],
                 "correct": ft_r["correct"]
             }
         })
@@ -715,12 +715,12 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "reasoning": raw_r["reasoning"],
+                "full_response": raw_r["full_response"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "reasoning": ft_r["reasoning"],
+                "full_response": ft_r["full_response"],
                 "correct": ft_r["correct"]
             },
             "disagreement_type": disagreement_type
@@ -1140,4 +1140,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

@@ -233,15 +233,14 @@ def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="M
     # We use 'tasksource/defeasible-nli' which aggregates the subsets cleanly
     print(f"Loading tasksource/defeasible-nli dataset (split=social)...")
     dataset = load_dataset("tasksource/defeasible-nli", "atomic")["test"]
-
-    indices = np.random.choice(len(dataset), int(1000), replace=False)
-    dataset = dataset.select(indices)
     
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
         print(f"Evaluating on {len(dataset)} samples (limited)")
     else:
         print(f"Evaluating on {len(dataset)} samples (full dataset)")
+        indices = np.random.choice(len(dataset), int(1000), replace=False)
+        dataset = dataset.select(indices)
     
     results = []
     correct = 0
@@ -531,16 +530,17 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         
         case_entry = {
             "problem_id": pid,
-            "problem": raw_r["question"],          
+            "hypothesis": raw_r["hypothesis"],  
+            "update": raw_r["update"],
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
-                "reasoning": raw_r["reasoning"],
+                "full_response": raw_r["full_response"],
                 "correct": raw_r["correct"]
             },
             "finetuned": {
                 "predicted_answer": ft_r["predicted_answer"],
-                "reasoning": ft_r["reasoning"],
+                "full_response": ft_r["full_response"],
                 "correct": ft_r["correct"]
             }
         }

@@ -109,8 +109,6 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     ckpt_path = os.path.join(root_dir, "raw_model")  
     row: Dict[str, Scalar] = {"checkpoint": f"{model_name}"}
     for dataset_name in sorted(os.listdir(ckpt_path)):
-        if "neu" in dataset_name.lower():
-            continue
         dataset_path = os.path.join(ckpt_path, dataset_name)
         dataset_name = dataset_name.lower()
         if not os.path.isdir(dataset_path):
@@ -857,7 +855,7 @@ def main():
     # Google Drive service account JSON path - should be set via environment variable or config
     gdrive_json = os.environ.get('GDRIVE_SERVICE_ACCOUNT_JSON', 
                                   os.path.expanduser("~/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json"))
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1MvRwwv9P2v3jfbiVF1zBqPK8xmhaDdgU", gdrive_service_account_json=gdrive_json) 
+    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1UVSy7yB2pvj8GSa9ns89JAujxzxkLEC-", gdrive_service_account_json=gdrive_json) 
 
 
 if __name__ == "__main__":

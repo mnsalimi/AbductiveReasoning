@@ -8,12 +8,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 scripts=(
-    "evaluate_all.py"
+    # "evaluate_all.py"
     # "evaluate_neulr_deductive_raw_vs_finetuned.py"
     # "evaluate_neulr_inductive_raw_vs_finetuned.py"
-    # "evaluate_strategyqa_raw_vs_finetuned.py"
-    # "evaluate_defeasible_nli_raw_vs_finetuned.py"
-    # "evaluate_neulr_abductive_raw_vs_finetuned.py"
+    "evaluate_strategyqa_raw_vs_finetuned.py"
+    "evaluate_defeasible_nli_raw_vs_finetuned.py"
+    "evaluate_neulr_abductive_raw_vs_finetuned.py"
     # "evaluate_musr_object_placements_raw_vs_finetuned.py"
     # "evaluate_musr_murder_mystery_raw_vs_finetuned.py"
     # "evaluate_musr_team_allocation_raw_vs_finetuned.py"
@@ -26,12 +26,13 @@ scripts=(
     # "evaluate_goEmotion_raw_vs_finetuned.py"
 )
 declare -A BATCH_SIZES=(
-    ["evaluate_all.py"]=8
+    # ["evaluate_all.py"]=8
     # ["evaluate_neulr_deductive_raw_vs_finetuned.py"]=8
     # ["evaluate_neulr_inductive_raw_vs_finetuned.py"]=8
-    # ["evaluate_defeasible_nli_raw_vs_finetuned.py"]=8
+    ["evaluate_defeasible_nli_raw_vs_finetuned.py"]=8
     # ["evaluate_strategyqa_raw_vs_finetuned.py"]=8
-    # ["evaluate_neulr_abductive_raw_vs_finetuned.py"]=8
+    ["evaluate_neulr_abductive_raw_vs_finetuned.py"]=8
+    ["evaluate_strategyqa_raw_vs_finetuned.py"]=8
     # ["evaluate_medqa_raw_vs_finetuned.py"]=16
     # ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=8
     # ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=4 # Note that each batch has 4 questions!
@@ -64,6 +65,8 @@ COMMON_ARGS="--cuda_device ${CUDA_DEVICE} --evaluate_checkpoints ${EVALUATE_CHEC
 # ============================
 #      Error Handling
 # ============================
+echo "Base Results Dir: $BASE_RESULTS_DIR"
+
 TRAINING_DIR="$BASE_RESULTS_DIR/Training_${RUN_NAME}"
 FINAL_DIR="$BASE_RESULTS_DIR/${RUN_NAME}"
 
@@ -103,16 +106,18 @@ for script in "${scripts[@]}"; do
         --batch_size "$batch_size" \
         --checkpoint_path "$ckpt" \
         --run "$RUN_NAME" \
+        --split "test" \
         --raw_path "$RAW_MODEL_PATH" \
-        --output_path "$OUTPUT_DIR"
+        --output_path "$OUTPUT_DIR" \
+        --max_samples 300
 
     echo "Finished $script"
     echo "-------------------------------------"
-    python3 "${SCRIPT_DIR}/create_table.py" \
-        --root "$ROOT_DIR" \
-        --out_csv "${SCRIPT_DIR}/metrics_summary.xlsx" \
-        --run "$RUN_NAME" \
-        --base_model_name "$BASE_MODEL_NAME" \
-        --base_result_dir "$BASE_RESULTS_DIR" \
-        --train_data "$TRAIN_DATA"
+python3 "${SCRIPT_DIR}/create_table.py" \
+    --root "$ROOT_DIR" \
+    --out_csv "${SCRIPT_DIR}/metrics_summary.xlsx" \
+    --run "$RUN_NAME" \
+    --base_model_name "$BASE_MODEL_NAME" \
+    --base_result_dir "$BASE_RESULTS_DIR" \
+    --train_data "$TRAIN_DATA"
 done

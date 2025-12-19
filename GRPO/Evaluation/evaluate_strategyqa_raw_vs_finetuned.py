@@ -384,6 +384,7 @@ def evaluate_on_strategyqa(
     """Evaluate model on voidful/StrategyQA dataset."""
     # split="validation"
     print(f"\n🔍 Evaluating {model_name} on StrategyQA...")
+    split = "train"
     print(f"   Split: {split}")
     print(f"   Batch size: {batch_size}")
 
@@ -406,15 +407,14 @@ def evaluate_on_strategyqa(
             data = json.load(f)
         dataset = Dataset.from_list(data)
 
-    num_samples = min(1000, len(dataset))
-    indices = np.random.choice(len(dataset), num_samples, replace=False)
-    dataset = dataset.select(indices)
-
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
         print(f"Evaluating on {len(dataset)} samples (limited)")
     else:
         print(f"Evaluating on {len(dataset)} samples (full split)")
+        num_samples = min(1000, len(dataset))
+        indices = np.random.choice(len(dataset), num_samples, replace=False)
+        dataset = dataset.select(indices)
 
     # 2) Load paragraphs store (for evidence text), if requested
     paragraphs_dict = None

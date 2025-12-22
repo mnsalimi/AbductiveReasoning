@@ -156,6 +156,13 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     rows.append(row)
 
     root_dir = os.path.join(root_dir, run)
+    if not os.path.isdir(root_dir):
+        root_dir += "-Evaluation"
+        for dir in os.listdir(root_dir):
+            if dir.startswith("dt"):
+                root_dir = os.path.join(root_dir, dir)
+                break
+            
     training_step = [int(dir.split("-")[-1]) for dir in os.listdir(root_dir)]
     for ckpt_name in [f"checkpoint-{str(dir)}" for dir in sorted(training_step)]:
         ckpt_path = os.path.join(root_dir, ckpt_name)

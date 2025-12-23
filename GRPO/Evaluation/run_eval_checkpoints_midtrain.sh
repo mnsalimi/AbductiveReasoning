@@ -40,9 +40,16 @@ declare -A BATCH_SIZES=(
     ["evaluate_aime_raw_vs_finetuned.py"]=8
     ["evaluate_aimo_raw_vs_finetuned.py"]=8
     ["evaluate_art_raw_vs_finetuned.py"]=32
-    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=64
+    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=32
     ["evaluate_goEmotion_raw_vs_finetuned.py"]=8
 )
+
+# CHECKPOINTS=(
+#     "checkpoint-6970"
+#     "checkpoint-6980"
+#     "checkpoint-6990"
+#     "checkpoint-7000"
+# )
 
 # ============================
 #      Input Parameters
@@ -90,6 +97,7 @@ echo "Using checkpoint directory: $CHECKPOINT_DIR"
 echo
 
 export TRAINING_BASE
+
 
 ckpt="$CHECKPOINT_DIR/$CHKPT_NAME"
 

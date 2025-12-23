@@ -24,6 +24,7 @@ import time
 import numpy as np
 import pickle
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -168,48 +169,48 @@ def create_inabhyd_prompt(claim, evidence_text):
     I keep the name to match your existing code but repurpose the arguments.
     """
 
-    system_prompt = """
-    You are an expert logician specializing in inductive and abductive reasoning
-    over synthetic first-order logic worlds.
+    system_prompt = textwrap.dedent("""\
+        You are an expert logician specializing in inductive and abductive reasoning
+        over synthetic first-order logic worlds.
 
-    You will be given:
-    - Theories: axioms describing an (incomplete) fictional world model.
-    - Observations: facts that must be explained.
+        You will be given:
+        - Theories: axioms describing an (incomplete) fictional world model.
+        - Observations: facts that must be explained.
 
-    Your task:
-    1. Propose one or more hypotheses that, when added to the Theories, make all Observations
-       deductively follow.
-    2. Each hypothesis must be a simple sentence in the form:
-          - "A is B"
-          - "A is not B"
-          - "All A are B"
-          - "All A are not B"
-    3. Make hypotheses as short and general as possible (prefer parsimonious explanations).
-       Do NOT restate the observations as hypotheses unless absolutely necessary.
-    4. First, think step by step.
-    5. Then output ONLY your final hypotheses inside an <answer>...</answer> block,
-       one hypothesis per line, with no commentary.
+        Your task:
+        1. Propose one or more hypotheses that, when added to the Theories, make all Observations
+           deductively follow.
+        2. Each hypothesis must be a simple sentence in the form:
+              - "A is B"
+              - "A is not B"
+              - "All A are B"
+              - "All A are not B"
+        3. Make hypotheses as short and general as possible (prefer parsimonious explanations).
+           Do NOT restate the observations as hypotheses unless absolutely necessary.
+        4. First, think step by step.
+        5. Then output ONLY your final hypotheses inside an <answer>...</answer> block,
+           one hypothesis per line, with no commentary.
 
-    Your entire output MUST use exactly the following format and nothing else:
+        Your entire output MUST use exactly the following format and nothing else:
 
-    <reasoning>
-    [Your step-by-step analysis of how candidate hypotheses explain all observations]
-    </reasoning>
-    <answer>
-    [Your final hypotheses only, one per line, no bullet symbols or numbering]
-    </answer>
-    """.strip()
+        <reasoning>
+        [Your step-by-step analysis of how candidate hypotheses explain all observations]
+        </reasoning>
+        <answer>
+        [Your final hypotheses only, one per line, no bullet symbols or numbering]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""
-    Theories:
-    {claim}
+    user_prompt = textwrap.dedent(f"""\
+        Theories:
+        {claim}
 
-    Observations:
-    {evidence_text}
+        Observations:
+        {evidence_text}
 
-    Based on the theories and observations, propose hypotheses that explain all observations.
-    Remember: output ONLY hypotheses (no explanations) in the <answer> block.
-    """.strip()
+        Based on the theories and observations, propose hypotheses that explain all observations.
+        Remember: output ONLY hypotheses (no explanations) in the <answer> block.
+    """).strip()
 
     return system_prompt, user_prompt
 

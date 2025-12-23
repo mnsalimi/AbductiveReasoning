@@ -23,6 +23,7 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -158,10 +159,10 @@ def load_finetuned_model(checkpoint_path, device):
 def create_neulr_abductive_prompt(problem, context):
     """
     Create a prompt for an abductive reasoning task.
-    Goal: Given Rules/Facts and a Target Conclusion (at the end of context), 
+    Goal: Given Rules/Facts and a Target Conclusion (at the end of context),
     find the 'Missing Fact' (Label) required to prove the conclusion.
     """
-    
+
     # 1. Separate the provided Rules/Facts from the Target Conclusion
     if "The fact is:" in context:
         rules_block, target_fact = context.split("The fact is:", 1)
@@ -172,35 +173,35 @@ def create_neulr_abductive_prompt(problem, context):
         # Fallback if the target is passed as 'problem' instead of in 'context'
         target_fact = problem.strip() if problem else ""
 
-    system_prompt = """
-    You are an expert Forensic Logic Analyst.
-    
-    Task: Abductive Reasoning (Find the Missing Fact).
-    You are given:
-    1. A list of 'Logical Rules and Known Facts'.
-    2. A 'Target Conclusion' (Observed Fact).
-    
-    The 'Target Conclusion' is currently unprovable with the provided facts alone. 
-    Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion true based on the Rules.
+    system_prompt = textwrap.dedent("""\
+        You are an expert Forensic Logic Analyst.
 
-    Output Format:
-    <reasoning>
-    [Step-by-step logic: Identify the rule triggered by the Conclusion, trace backwards to find what condition is missing.]
-    </reasoning>
-    <answer>
-    [The missing fact as a complete sentence. Example: NPsw0v0k is ADP37scy8.]
-    </answer>
-    """
+        Task: Abductive Reasoning (Find the Missing Fact).
+        You are given:
+        1. A list of 'Logical Rules and Known Facts'.
+        2. A 'Target Conclusion' (Observed Fact).
 
-    user_prompt = f"""
-    Logical Rules and Known Facts:
-    {rules_block}
+        The 'Target Conclusion' is currently unprovable with the provided facts alone.
+        Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion true based on the Rules.
 
-    Target Conclusion:
-    {target_fact}
+        Output Format:
+        <reasoning>
+        [Step-by-step logic: Identify the rule triggered by the Conclusion, trace backwards to find what condition is missing.]
+        </reasoning>
+        <answer>
+        [The missing fact as a complete sentence. Example: NPsw0v0k is ADP37scy8.]
+        </answer>
+    """).strip()
 
-    Question: What missing fact is required to conclude the Target Conclusion?
-    """
+    user_prompt = textwrap.dedent(f"""\
+        Logical Rules and Known Facts:
+        {rules_block}
+
+        Target Conclusion:
+        {target_fact}
+
+        Question: What missing fact is required to conclude the Target Conclusion?
+    """).strip()
 
     return system_prompt, user_prompt
 

@@ -21,6 +21,7 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -155,24 +156,26 @@ def load_finetuned_model(checkpoint_path, device):
 
 def create_aimo_prompt(problem):
     """Create a prompt for AIMO problem - handles LaTeX properly."""
-    system_prompt = """You are an expert mathematician specializing in competition mathematics (AMC, AIME, etc.).
+    system_prompt = textwrap.dedent("""\
+        You are an expert mathematician specializing in competition mathematics (AMC, AIME, etc.).
 
-First, read the problem carefully, including all LaTeX mathematical notation, and solve it step by step. Then give the final answer as a single number.
+        First, read the problem carefully, including all LaTeX mathematical notation, and solve it step by step. Then give the final answer as a single number.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought reasoning and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY the final answer as a number, decimal, or fraction a/b, with no extra words]
-</answer>"""
-    
-    user_prompt = f"""Problem:
-{problem}
+        <reasoning>
+        [here you write your chain-of-thought reasoning and intermediate steps]
+        </reasoning>
+        <answer>
+        [here you output ONLY the final answer as a number, decimal, or fraction a/b, with no extra words]
+        </answer>""").strip()
 
-Solve this problem and provide your final numerical answer."""
-    
+    user_prompt = textwrap.dedent(f"""\
+        Problem:
+        {problem}
+
+        Solve this problem and provide your final numerical answer.""").strip()
+
     return system_prompt, user_prompt
 
 def extract_reasoning(response):

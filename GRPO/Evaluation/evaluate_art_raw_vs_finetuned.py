@@ -21,6 +21,7 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, cla
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -163,7 +164,8 @@ def load_finetuned_model(checkpoint_path, device):
 
 def create_art_prompt(obs1, obs2, hyp1, hyp2):
     """Create prompt for ART task."""
-    system_prompt = """You are an expert in abductive reasoning. Given two observations and two hypotheses, select which hypothesis (1 or 2) best explains what happened between the observations.
+    system_prompt = textwrap.dedent("""\
+        You are an expert in abductive reasoning. Given two observations and two hypotheses, select which hypothesis (1 or 2) best explains what happened between the observations.
 
         First, think step by step and explain your abductive reasoning in just one paragraph. Then decide which hypothesis (1 or 2) is better.
 
@@ -174,16 +176,17 @@ def create_art_prompt(obs1, obs2, hyp1, hyp2):
         </reasoning>
         <answer>
         [here you output ONLY the number 1 or 2]
-        </answer>"""
-    
-    user_prompt = f"""Observation 1: {obs1}
-Observation 2: {obs2}
+        </answer>""").strip()
 
-Hypothesis 1: {hyp1}
-Hypothesis 2: {hyp2}
+    user_prompt = textwrap.dedent(f"""\
+        Observation 1: {obs1}
+        Observation 2: {obs2}
 
-Which hypothesis better explains the transition from Observation 1 to Observation 2? Answer with just the number 1 or 2."""
-    
+        Hypothesis 1: {hyp1}
+        Hypothesis 2: {hyp2}
+
+        Which hypothesis better explains the transition from Observation 1 to Observation 2? Answer with just the number 1 or 2.""").strip()
+
     return system_prompt, user_prompt
 
 def extract_reasoning(response):

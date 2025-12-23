@@ -23,6 +23,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -166,24 +167,24 @@ def grid_to_string(grid):
         return str(grid)
     return "[" + ", ".join([str(row) for row in grid]) + "]"
 
-SYSTEM_PROMPT_ACR = """
-You are an AI with exceptional abstract reasoning skills.
-You will be given several 'input' and corresponding 'output' grid examples (the training set).
-These examples reveal an underlying transformation rule.
+SYSTEM_PROMPT_ACR = textwrap.dedent("""\
+    You are an AI with exceptional abstract reasoning skills.
+    You will be given several 'input' and corresponding 'output' grid examples (the training set).
+    These examples reveal an underlying transformation rule.
 
-Your task:
-1. Carefully analyze the training examples to infer the rule.
-2. Apply the inferred rule to the provided 'Test Input' grid to generate the 'Test Output' grid.
+    Your task:
+    1. Carefully analyze the training examples to infer the rule.
+    2. Apply the inferred rule to the provided 'Test Input' grid to generate the 'Test Output' grid.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+    Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought analysis of the rule and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY the predicted 'Test Output' grid as a nested list of integers in string format, with no extra words]
-</answer>
-""".strip()
+    <reasoning>
+    [here you write your chain-of-thought analysis of the rule and intermediate steps]
+    </reasoning>
+    <answer>
+    [here you output ONLY the predicted 'Test Output' grid as a nested list of integers in string format, with no extra words]
+    </answer>
+""").strip()
 
 def create_acr_prompt(example):
     """Create a prompt for the ACR rule-inference task."""
@@ -195,15 +196,15 @@ def create_acr_prompt(example):
         for i, ex in enumerate(example['train'])
     ])
 
-    user_prompt = f"""
-    Training Examples to Infer the Rule:
-    {train_prompt}
+    user_prompt = textwrap.dedent(f"""\
+        Training Examples to Infer the Rule:
+        {train_prompt}
 
-    Test Input:
-    {grid_to_string(example['test'][0]['input'])}
+        Test Input:
+        {grid_to_string(example['test'][0]['input'])}
 
-    Solve this problem step by step by inferring the rule and applying it to the Test Input, then provide the final Test Output grid.
-    """
+        Solve this problem step by step by inferring the rule and applying it to the Test Input, then provide the final Test Output grid.
+    """).strip()
 
     return system_prompt, user_prompt
 

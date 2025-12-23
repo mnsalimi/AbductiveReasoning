@@ -22,6 +22,7 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -156,25 +157,29 @@ def load_finetuned_model(checkpoint_path, device):
 
 def create_aime_prompt(problem):
     """Create a prompt for AIME math problem."""
-    system_prompt = """You are an expert mathematician. Solve the following AIME (American Invitational Mathematics Examination) problem.
+    system_prompt = textwrap.dedent("""
+        You are an expert mathematician. Solve the following AIME (American Invitational Mathematics Examination) problem.
 
-AIME answers are always integers between 0 and 999.
+        AIME answers are always integers between 0 and 999.
 
-First, read the problem carefully and solve it step by step. Then give the final answer as a single integer between 0 and 999.
+        First, read the problem carefully and solve it step by step. Then give the final answer as a single integer between 0 and 999.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought reasoning and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY the final integer answer between 0 and 999, with no extra words]
-</answer>"""
-    
-    user_prompt = f"""Problem: {problem}
+        <reasoning>
+        [here you write your chain-of-thought reasoning and intermediate steps]
+        </reasoning>
+        <answer>
+        [here you output ONLY the final integer answer between 0 and 999, with no extra words]
+        </answer>
+    """).strip()
 
-Solve this problem step by step, then provide your final answer."""
-    
+    user_prompt = textwrap.dedent(f"""
+        Problem: {problem}
+
+        Solve this problem step by step, then provide your final answer.
+    """).strip()
+
     return system_prompt, user_prompt
 
 def extract_reasoning(response):

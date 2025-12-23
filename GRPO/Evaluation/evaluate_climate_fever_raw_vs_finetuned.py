@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -156,25 +157,25 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-SYSTEM_PROMPT_CLIMATE_FEVER = """
-You are an expert climate scientist and professional fact-checker.
-You will be given a specific Claim and a list of Evidences.
+SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
+    You are an expert climate scientist and professional fact-checker.
+    You will be given a specific Claim and a list of Evidences.
 
-Your task:
-1. Read the Claim and the provided Evidence carefully.
-2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO.
-3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision.
-4. Provide the final label.
+    Your task:
+    1. Read the Claim and the provided Evidence carefully.
+    2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO.
+    3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision.
+    4. Provide the final label.
 
-Your entire output MUST use exactly the following format and nothing else:
+    Your entire output MUST use exactly the following format and nothing else:
 
-<reasoning>
-[Your step-by-step analysis of how the evidence relates to the claim]
-</reasoning>
-<answer>
-[Output exactly one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO]
-</answer>
-""".strip()
+    <reasoning>
+    [Your step-by-step analysis of how the evidence relates to the claim]
+    </reasoning>
+    <answer>
+    [Output exactly one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO]
+    </answer>
+""").strip()
 
 def create_climate_fever_prompt(example: dict):
     """Create a prompt for Climate-FEVER fact verification from one example record."""
@@ -183,22 +184,22 @@ def create_climate_fever_prompt(example: dict):
 
     claim = example["claim"]
 
-    # evidences is a list of dicts; in your dataset each has an "evidence" string (not evidence_text)
+    # Extract evidence strings from the dataset
     evidence_objs = example.get("evidences", [])
     evidence_list = [e.get("evidence", "") for e in evidence_objs]
     evidence_text = "\n".join([f"- {txt}" for txt in evidence_list if txt])
 
-    user_prompt = f"""Claim:
-{claim}
+    user_prompt = textwrap.dedent(f"""\
+        Claim:
+        {claim}
 
-Evidence:
-{evidence_text}
+        Evidence:
+        {evidence_text}
 
-Based on the evidence provided, determine the veracity of the claim.
-"""
+        Based on the evidence provided, determine the veracity of the claim.
+    """).strip()
 
     return system_prompt, user_prompt
-
 
 
 def extract_answer(response):

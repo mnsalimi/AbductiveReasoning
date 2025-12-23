@@ -24,6 +24,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -188,24 +189,24 @@ def list_to_string(lst):
         return str(lst)
     return str(lst).replace(" ", "") # Use simple str() output for [1, 2, 3]
 
-SYSTEM_PROMPT_LIST_FUNCTION = """
-You are an AI with exceptional abstract reasoning skills.
-You will be given several 'input' and corresponding 'output' list examples (the training set).
-These examples reveal an underlying transformation rule on lists of integers.
+SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
+    You are an AI with exceptional abstract reasoning skills.
+    You will be given several 'input' and corresponding 'output' list examples (the training set).
+    These examples reveal an underlying transformation rule on lists of integers.
 
-Your task:
-1. Carefully analyze the training examples to infer the rule (e.g., reverse, remove duplicates, shift, filter, etc.).
-2. Apply the inferred rule to the provided 'Test Input' list to generate the 'Test Output' list.
+    Your task:
+    1. Carefully analyze the training examples to infer the rule (e.g., reverse, remove duplicates, shift, filter, etc.).
+    2. Apply the inferred rule to the provided 'Test Input' list to generate the 'Test Output' list.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+    Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought analysis of the rule and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY the predicted 'Test Output' list as a string representation of a list of integers (e.g., [1, 2, 3]), with no extra words]
-</answer>
-""".strip()
+    <reasoning>
+    [here you write your chain-of-thought analysis of the rule and intermediate steps]
+    </reasoning>
+    <answer>
+    [here you output ONLY the predicted 'Test Output' list as a string representation of a list of integers (e.g., [1, 2, 3]), with no extra words]
+    </answer>
+""").strip()
 
 def create_list_functions_prompt(example):
     """Create a prompt for the list_functions rule-inference task."""
@@ -217,15 +218,15 @@ def create_list_functions_prompt(example):
         for i, ex in enumerate(example['train'])
     ])
 
-    user_prompt = f"""
-    Training Examples to Infer the Rule:
-    {train_prompt}
+    user_prompt = textwrap.dedent(f"""\
+        Training Examples to Infer the Rule:
+        {train_prompt}
 
-    Test Input:
-    {example['test'][0]['input']}
+        Test Input:
+        {example['test'][0]['input']}
 
-    Solve this problem step by step by inferring the rule and applying it to the Test Input, then provide the final Test Output list.
-    """
+        Solve this problem step by step by inferring the rule and applying it to the Test Input, then provide the final Test Output list.
+    """).strip()
 
     return system_prompt, user_prompt
 

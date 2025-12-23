@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -175,35 +176,35 @@ def create_clutrr_prompt(story, query):
     else:
         formatted_query = query
 
-    system_prompt = """
-    You are a logic expert specializing in genealogy and family trees.
-    You will be given a short Story describing family relationships and a Query about the relationship between two specific people.
+    system_prompt = textwrap.dedent("""\
+        You are a logic expert specializing in genealogy and family trees.
+        You will be given a short Story describing family relationships and a Query about the relationship between two specific people.
 
-    Your task:
-    1. Read the story carefully to build a mental family tree.
-    2. Trace the path from the first person to the second person in the Query.
-    3. deduce the exact kinship relation (e.g., father, aunt, grandson, son-in-law).
-    4. Output ONLY the relation keyword.
+        Your task:
+        1. Read the story carefully to build a mental family tree.
+        2. Trace the path from the first person to the second person in the Query.
+        3. Deduce the exact kinship relation (e.g., father, aunt, grandson, son-in-law).
+        4. Output ONLY the relation keyword.
 
-    Your entire output MUST use exactly the following format:
+        Your entire output MUST use exactly the following format:
 
-    <reasoning>
-    [Step-by-step deduction of the family tree path]
-    </reasoning>
-    <answer>
-    [The exact kinship relation word, e.g., grandmother]
-    </answer>
-    """
+        <reasoning>
+        [Step-by-step deduction of the family tree path]
+        </reasoning>
+        <answer>
+        [The exact kinship relation word, e.g., grandmother]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""
-    Story:
-    {story}
+    user_prompt = textwrap.dedent(f"""\
+        Story:
+        {story}
 
-    Query:
-    {formatted_query}
+        Query:
+        {formatted_query}
 
-    Relation:
-    """
+        Relation:
+    """).strip()
 
     return system_prompt, user_prompt
 

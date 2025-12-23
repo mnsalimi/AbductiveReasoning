@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -168,39 +169,38 @@ from datasets import load_dataset
 def create_hellaswag_prompt(ctx, endings):
     """Create a prompt for HellaSwag (4-way multiple choice)."""
 
-    system_prompt = """
-    You are an expert at commonsense reasoning.
-    You will be given a short Context and four candidate Endings (A, B, C, D).
+    system_prompt = textwrap.dedent("""\
+        You are an expert at commonsense reasoning.
+        You will be given a short Context and four candidate Endings (A, B, C, D).
 
-    Your task:
-    1. Read the Context and the four Endings carefully.
-    2. Select the single most plausible Ending that best completes the Context.
-    3. Provide brief reasoning.
-    4. Provide the final choice letter.
+        Your task:
+        1. Read the Context and the four Endings carefully.
+        2. Select the single most plausible Ending that best completes the Context.
+        3. Provide brief reasoning.
+        4. Provide the final choice letter.
 
-    Your entire output MUST use exactly the following format and nothing else:
+        Your entire output MUST use exactly the following format and nothing else:
 
-    <reasoning>
-    [Brief explanation of why the chosen ending best fits the context]
-    </reasoning>
-    <answer>
-    [Output exactly one of these four options: A, B, C, D]
-    </answer>
-    """
+        <reasoning>
+        [Brief explanation of why the chosen ending best fits the context]
+        </reasoning>
+        <answer>
+        [Output exactly one of these four options: A, B, C, D]
+        </answer>
+    """).strip()
 
-    # IMPORTANT: In HellaSwag, each ending is intended to be appended to ctx.
-    user_prompt = f"""
-    Context:
-    {ctx}
+    user_prompt = textwrap.dedent(f"""\
+        Context:
+        {ctx}
 
-    Endings (append one ending to the context):
-    A) {endings[0]}
-    B) {endings[1]}
-    C) {endings[2]}
-    D) {endings[3]}
+        Endings (append one ending to the context):
+        A) {endings[0]}
+        B) {endings[1]}
+        C) {endings[2]}
+        D) {endings[3]}
 
-    Which ending best completes the context?
-    """
+        Which ending best completes the context?
+    """).strip()
 
     return system_prompt, user_prompt
 

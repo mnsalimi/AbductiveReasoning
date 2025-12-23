@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -161,40 +162,40 @@ def load_finetuned_model(checkpoint_path, device):
 def create_winogrande_prompt(sentence, option1, option2):
     """Create a prompt for WinoGrande-style commonsense pronoun resolution."""
 
-    system_prompt = """
-You are an expert in commonsense reasoning and pronoun resolution.
+    system_prompt = textwrap.dedent("""\
+        You are an expert in commonsense reasoning and pronoun resolution.
 
-You will be given:
-- A sentence containing a blank represented by an underscore character: _
-- Two candidate options (Option 1 and Option 2)
+        You will be given:
+        - A sentence containing a blank represented by an underscore character: _
+        - Two candidate options (Option 1 and Option 2)
 
-Your task:
-1. Decide which option best fills the blank to make the sentence coherent and logically correct.
-2. Provide step-by-step reasoning.
-3. Provide the final answer as the option number.
+        Your task:
+        1. Decide which option best fills the blank to make the sentence coherent and logically correct.
+        2. Provide step-by-step reasoning.
+        3. Provide the final answer as the option number.
 
-Your entire output MUST use exactly the following format and nothing else:
+        Your entire output MUST use exactly the following format and nothing else:
 
-<reasoning>
-[Your step-by-step analysis of which option best completes the sentence]
-</reasoning>
-<answer>
-[Output exactly one of these two options: 1 or 2]
-</answer>
-""".strip()
+        <reasoning>
+        [Your step-by-step analysis of which option best completes the sentence]
+        </reasoning>
+        <answer>
+        [Output exactly one of these two options: 1 or 2]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""
-Sentence:
-{sentence}
+    user_prompt = textwrap.dedent(f"""\
+        Sentence:
+        {sentence}
 
-Option 1:
-{option1}
+        Option 1:
+        {option1}
 
-Option 2:
-{option2}
+        Option 2:
+        {option2}
 
-Which option correctly fills the blank "_" in the sentence?
-""".strip()
+        Which option correctly fills the blank "_" in the sentence?
+    """).strip()
 
     return system_prompt, user_prompt
 

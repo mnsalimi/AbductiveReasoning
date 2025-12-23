@@ -23,6 +23,7 @@ import numpy as np
 import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -166,29 +167,32 @@ def create_copa_prompt(premise, choice1, choice2):
     Returns:
         system_prompt, user_prompt
     """
-    system_prompt = """You are an expert in causal reasoning. Given a cause and two possible effect options, select which option (1 or 2) is the most plausible direct effect.
+    system_prompt = textwrap.dedent("""\
+        You are an expert in causal reasoning. Given a cause and two possible effect options, select which option (1 or 2) is the most plausible direct effect.
 
-First, think step by step and explain your causal reasoning in just one paragraph. Then decide which option (1 or 2) is better.
+        First, think step by step and explain your causal reasoning in just one paragraph. Then decide which option (1 or 2) is better.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought reasoning about which effect is more plausible]
-</reasoning>
-<answer>
-[here you output ONLY the number 1 or 2]
-</answer>"""
+        <reasoning>
+        [here you write your chain-of-thought reasoning about which effect is more plausible]
+        </reasoning>
+        <answer>
+        [here you output ONLY the number 1 or 2]
+        </answer>
+    """).strip()
 
-    
-    user_prompt = f"""Cause: {premise}
+    user_prompt = textwrap.dedent(f"""\
+        Cause: {premise}
 
-Which of the following is the most plausible EFFECT of this cause?
+        Which of the following is the most plausible EFFECT of this cause?
 
-Option 1: {choice1}
-Option 2: {choice2}
+        Option 1: {choice1}
+        Option 2: {choice2}
 
-Think step by step about which option is the most likely effect, then provide your answer in <answer></answer> tags."""
-    
+        Think step by step about which option is the most likely effect, then provide your answer in <answer></answer> tags.
+    """).strip()
+
     return system_prompt, user_prompt
 
 def extract_reasoning(response):

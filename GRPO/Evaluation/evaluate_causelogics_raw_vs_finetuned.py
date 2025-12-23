@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -167,32 +168,32 @@ import torch
 from tqdm import tqdm
 from datasets import load_dataset
 
-SYSTEM_PROMPT_CAUSELOGICS = """
-You are an expert logician and careful reasoning assistant.
-You will be given:
-- a set of Premises (facts),
-- a set of Rules (implications),
-- an observed Phenomenon,
-- and a Possible Cause (a hypothesis).
+SYSTEM_PROMPT_CAUSELOGICS = textwrap.dedent("""\
+    You are an expert logician and careful reasoning assistant.
+    You will be given:
+    - a set of Premises (facts),
+    - a set of Rules (implications),
+    - an observed Phenomenon,
+    - and a Possible Cause (a hypothesis).
 
-Your task:
-1. Assume the Possible Cause is added as an additional premise.
-2. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward.
-3. Decide whether the Phenomenon can be logically inferred.
-   - If the Phenomenon can be inferred, the Possible Cause is TRUE.
-   - If the Phenomenon cannot be inferred, the Possible Cause is FALSE.
-4. Provide step-by-step reasoning referencing which premises/rules you used.
-5. Output the final label.
+    Your task:
+    1. Assume the Possible Cause is added as an additional premise.
+    2. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward.
+    3. Decide whether the Phenomenon can be logically inferred.
+       - If the Phenomenon can be inferred, the Possible Cause is TRUE.
+       - If the Phenomenon cannot be inferred, the Possible Cause is FALSE.
+    4. Provide step-by-step reasoning referencing which premises/rules you used.
+    5. Output the final label.
 
-Your entire output MUST use exactly the following format and nothing else:
+    Your entire output MUST use exactly the following format and nothing else:
 
-<reasoning>
-[Your step-by-step analysis]
-</reasoning>
-<answer>
-[Output exactly one of these two options: TRUE, FALSE]
-</answer>
-""".strip()
+    <reasoning>
+    [Your step-by-step analysis]
+    </reasoning>
+    <answer>
+    [Output exactly one of these two options: TRUE, FALSE]
+    </answer>
+""").strip()
 
 
 def create_causelogics_prompt(example: dict):
@@ -242,21 +243,21 @@ def create_causelogics_prompt(example: dict):
 
     system_prompt = SYSTEM_PROMPT_CAUSELOGICS
 
-    user_prompt = f"""
-Premises:
-{premises_text}
+    user_prompt = textwrap.dedent(f"""\
+        Premises:
+        {premises_text}
 
-Rules:
-{rules_text}
+        Rules:
+        {rules_text}
 
-Phenomenon:
-{str(phenomenon)}
+        Phenomenon:
+        {str(phenomenon)}
 
-Possible Cause:
-{str(possible_cause)}
+        Possible Cause:
+        {str(possible_cause)}
 
-Determine whether the Possible Cause is TRUE or FALSE.
-""".strip()
+        Determine whether the Possible Cause is TRUE or FALSE.
+    """).strip()
 
     return system_prompt, user_prompt
 

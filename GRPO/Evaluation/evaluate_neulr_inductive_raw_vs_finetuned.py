@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -157,37 +158,37 @@ def load_finetuned_model(checkpoint_path, device):
 
 
 def create_neulr_inductive_prompt(problem, context):
-    """Create a prompt for a detective-style reasoning question involved shared properties."""
+    """Create a prompt for a detective-style reasoning question involving shared properties."""
 
-    system_prompt = """
-    You are a brilliant detective specializing in symbolic logic and pattern recognition.
-    You will be given a context containing facts about entities, their group memberships, and their specific properties.
+    system_prompt = textwrap.dedent("""\
+        You are a brilliant detective specializing in symbolic logic and pattern recognition.
+        You will be given a context containing facts about entities, their group memberships, and their specific properties.
 
-    Your task:
-    1. Carefully parse the context to identify which group the target entity belongs to.
-    2. Look for other entities in that same group to see what properties they possess.
-    3. Perform step-by-step reasoning to deduce the property of the target entity based on these shared group characteristics.
-    4. Give the correct answer as the EXACT alphanumeric code from the text.
+        Your task:
+        1. Carefully parse the context to identify which group the target entity belongs to.
+        2. Look for other entities in that same group to see what properties they possess.
+        3. Perform step-by-step reasoning to deduce the property of the target entity based on these shared group characteristics.
+        4. Give the correct answer as the EXACT alphanumeric code from the text.
 
-    Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-    <reasoning>
-    [here you write your chain-of-thought reasoning, explicitly linking the target entity to a group, finding a sibling entity in that group, and transferring the property]
-    </reasoning>
-    <answer>
-    [here you output ONLY the exact alphanumeric code answer]
-    </answer>
-    """
+        <reasoning>
+        [here you write your chain-of-thought reasoning, explicitly linking the target entity to a group, finding a sibling entity in that group, and transferring the property]
+        </reasoning>
+        <answer>
+        [here you output ONLY the exact alphanumeric code answer]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""
-    Context:
-    {context}
+    user_prompt = textwrap.dedent(f"""\
+        Context:
+        {context}
 
-    Problem:
-    {problem}
+        Problem:
+        {problem}
 
-    Solve this problem step by step using detective reasoning to find the shared property, then provide your final answer in one word ONLY.
-    """
+        Solve this problem step by step using detective reasoning to find the shared property, then provide your final answer in one word ONLY.
+    """).strip()
 
     return system_prompt, user_prompt
 

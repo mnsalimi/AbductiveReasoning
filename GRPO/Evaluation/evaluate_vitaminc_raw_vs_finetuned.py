@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -160,38 +161,38 @@ def load_finetuned_model(checkpoint_path, device):
 def create_vitaminc_prompt(claim, evidence_text):
     """Create a prompt for VitaminC Fact Verification."""
 
-    system_prompt = """
-    You are an expert fact-checker.
-    You will be given a Claim and a specific piece of Evidence.
-    
-    The VitaminC dataset focuses on "contrastive evidence"—small changes in evidence can flip the label. 
-    Pay close attention to negations, numbers, and specific entities.
+    system_prompt = textwrap.dedent("""\
+        You are an expert fact-checker.
+        You will be given a Claim and a specific piece of Evidence.
 
-    Your task:
-    1. Read the Claim and the Evidence carefully.
-    2. Determine if the Evidence SUPPORTS, REFUTES, or provides NOT ENOUGH INFO for the Claim.
-    3. Provide step-by-step reasoning.
-    4. Provide the final label.
+        The VitaminC dataset focuses on "contrastive evidence"—small changes in evidence can flip the label.
+        Pay close attention to negations, numbers, and specific entities.
 
-    Your entire output MUST use exactly the following format and nothing else:
+        Your task:
+        1. Read the Claim and the Evidence carefully.
+        2. Determine if the Evidence SUPPORTS, REFUTES, or provides NOT ENOUGH INFO for the Claim.
+        3. Provide step-by-step reasoning.
+        4. Provide the final label.
 
-    <reasoning>
-    [Your step-by-step analysis]
-    </reasoning>
-    <answer>
-    [Output exactly one: SUPPORTS, REFUTES, NOT ENOUGH INFO]
-    </answer>
-    """
+        Your entire output MUST use exactly the following format and nothing else:
 
-    user_prompt = f"""
-    Claim:
-    {claim}
+        <reasoning>
+        [Your step-by-step analysis]
+        </reasoning>
+        <answer>
+        [Output exactly one: SUPPORTS, REFUTES, NOT ENOUGH INFO]
+        </answer>
+    """).strip()
 
-    Evidence:
-    {evidence_text}
+    user_prompt = textwrap.dedent(f"""\
+        Claim:
+        {claim}
 
-    Based on the evidence provided, determine the veracity of the claim.
-    """
+        Evidence:
+        {evidence_text}
+
+        Based on the evidence provided, determine the veracity of the claim.
+    """).strip()
 
     return system_prompt, user_prompt
 

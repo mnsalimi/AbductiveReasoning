@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -174,38 +175,36 @@ def create_ecare_prompt(claim, evidence_text):
       - `evidence_text` == a formatted block containing question + choices
     """
 
-    # CHANGED: system prompt is now about causal reasoning + multiple-choice selection
-    system_prompt = """
-You are an expert causal reasoner and careful multiple-choice evaluator.
-You will be given a Premise, a Question Type (cause/effect), and two candidate Choices.
+    system_prompt = textwrap.dedent("""\
+        You are an expert causal reasoner and careful multiple-choice evaluator.
+        You will be given a Premise, a Question Type (cause/effect), and two candidate Choices.
 
-Your task:
-1. Read the Premise and Question Type carefully.
-2. Decide which choice (CHOICE1 or CHOICE2) is the more plausible answer to the question:
-   - If Question Type is "cause": pick the choice that best causes the Premise.
-   - If Question Type is "effect": pick the choice that is the most likely result of the Premise.
-3. Provide step-by-step reasoning that compares both choices.
-4. Provide the final label.
+        Your task:
+        1. Read the Premise and Question Type carefully.
+        2. Decide which choice (CHOICE1 or CHOICE2) is the more plausible answer to the question:
+           - If Question Type is "cause": pick the choice that best causes the Premise.
+           - If Question Type is "effect": pick the choice that is the most likely result of the Premise.
+        3. Provide step-by-step reasoning that compares both choices.
+        4. Provide the final label.
 
-Your entire output MUST use exactly the following format and nothing else:
+        Your entire output MUST use exactly the following format and nothing else:
 
-<reasoning>
-[Your step-by-step causal analysis comparing CHOICE1 vs CHOICE2]
-</reasoning>
-<answer>
-[Output exactly one of these two options: CHOICE1, CHOICE2]
-</answer>
-""".strip()
+        <reasoning>
+        [Your step-by-step causal analysis comparing CHOICE1 vs CHOICE2]
+        </reasoning>
+        <answer>
+        [Output exactly one of these two options: CHOICE1, CHOICE2]
+        </answer>
+    """).strip()
 
-    # CHANGED: user prompt now uses Premise + (question + choices) block
-    user_prompt = f"""
-Premise:
-{claim}
+    user_prompt = textwrap.dedent(f"""\
+        Premise:
+        {claim}
 
-{evidence_text}
+        {evidence_text}
 
-Choose the correct answer based on causal reasoning.
-""".strip()
+        Choose the correct answer based on causal reasoning.
+    """).strip()
 
     return system_prompt, user_prompt
 

@@ -22,6 +22,7 @@ import numpy as np
 import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, classification_report
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -163,6 +164,7 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+
 def create_goemotion_prompt(text):
     """Create a prompt for GoEmotions emotion classification.
     
@@ -173,27 +175,32 @@ def create_goemotion_prompt(text):
         system_prompt, user_prompt
     """
     emotions_list = ", ".join(GOEMOTION_LABELS)
-    
-    system_prompt = f"""You are an expert emotion classifier. Given a text and a list of possible emotions, identify all emotions expressed in the text.
 
-Available emotions: {emotions_list}
+    system_prompt = textwrap.dedent(f"""\
+        You are an expert emotion classifier. Given a text and a list of possible emotions, identify all emotions expressed in the text.
 
-First, think step by step and explain your reasoning about which emotions are present, considering context and nuance, in just one paragraph. Then list all and only the emotions that apply.
+        Available emotions: {emotions_list}
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        First, think step by step and explain your reasoning about which emotions are present, considering context and nuance, in just one paragraph. Then list all and only the emotions that apply.
 
-<reasoning>
-[here you write your chain-of-thought reasoning about which emotions are present and why]
-</reasoning>
-<answer>
-[here you output ONLY the emotion names from the available list, separated by commas if there are multiple; e.g. "joy, surprise" or "anger"]
-</answer>"""
-    
-    user_prompt = f"""Text: "{text}"
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-What emotion(s) are expressed in this text?"""
-    
+        <reasoning>
+        [here you write your chain-of-thought reasoning about which emotions are present and why]
+        </reasoning>
+        <answer>
+        [here you output ONLY the emotion names from the available list, separated by commas if there are multiple; e.g. "joy, surprise" or "anger"]
+        </answer>
+    """).strip()
+
+    user_prompt = textwrap.dedent(f"""\
+        Text: "{text}"
+
+        What emotion(s) are expressed in this text?
+    """).strip()
+
     return system_prompt, user_prompt
+
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
@@ -201,6 +208,7 @@ def extract_reasoning(response):
     if match:
         return match.group(1).strip()
     return None
+
 
 def extract_emotions(response, valid_emotions=GOEMOTION_LABELS):
     """Extract emotion labels from model response.

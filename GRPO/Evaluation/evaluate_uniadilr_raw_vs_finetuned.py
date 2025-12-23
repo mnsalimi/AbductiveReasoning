@@ -22,7 +22,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import numpy as np
 import warnings
-
+import textwrap
 warnings.filterwarnings("ignore")
 
 # Import path utilities for project-relative paths
@@ -56,39 +56,6 @@ DEFAULT_VAL_SPLIT_PATH = os.environ.get(
     "UNIADILR_VAL_SPLIT",
     "./dataset/train_split.json",
 )
-
-# ============================================================================
-# System Prompt (copied from training notebook)
-# ============================================================================
-
-SYSTEM_PROMPT_UniADILR = """
-You are an expert in logical reasoning and abductive inference. Your task is to identify which sentences from a given context provide the necessary evidence to support or explain a hypothesis.
-
-You will be provided with:
-1. A Context containing multiple numbered sentences (sent1, sent2, sent3, etc.)
-2. A Hypothesis that needs to be supported or explained
-
-Your goal is to identify which sentence(s) from the context, when combined, provide the logical foundation for the hypothesis through abductive reasoning.
-
-## Instructions:
-1. Carefully read all sentences in the context
-2. Analyze the hypothesis
-3. Identify which sentences, when combined, best explain or support the hypothesis
-4. Consider both direct evidence and logical connections
-
-## Output Format:
-You MUST provide your answer in the following format:
-
-<think>
-[Explain your thought process: why you selected these particular sentences and how they support the hypothesis]
-</think>
-
-<answer>
-[Sentence numbers only, comma-separated. For example: 5, 13 or 2, 7, 9]
-</answer>
-
-CRITICAL: The answer section must contain ONLY the sentence numbers separated by commas. Do not include the word "sent" or any other text.
-""".strip()
 
 # ============================================================================
 # Helper functions: model loading
@@ -219,7 +186,34 @@ def load_finetuned_model(checkpoint_path: str, device: str):
 # ============================================================================
 # Helper functions: prompting, parsing, metrics
 # ============================================================================
+SYSTEM_PROMPT_UniADILR = textwrap.dedent("""\
+    You are an expert in logical reasoning and abductive inference. Your task is to identify which sentences from a given context provide the necessary evidence to support or explain a hypothesis.
 
+    You will be provided with:
+    1. A Context containing multiple numbered sentences (sent1, sent2, sent3, etc.)
+    2. A Hypothesis that needs to be supported or explained
+
+    Your goal is to identify which sentence(s) from the context, when combined, provide the logical foundation for the hypothesis through abductive reasoning.
+
+    ## Instructions:
+    1. Carefully read all sentences in the context
+    2. Analyze the hypothesis
+    3. Identify which sentences, when combined, best explain or support the hypothesis
+    4. Consider both direct evidence and logical connections
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Explain your thought process: why you selected these particular sentences and how they support the hypothesis]
+    </think>
+
+    <answer>
+    [Sentence numbers only, comma-separated. For example: 5, 13 or 2, 7, 9]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the sentence numbers separated by commas. Do not include the word "sent" or any other text.
+""").strip()
 
 def create_uniadilr_prompt(example):
     """
@@ -240,13 +234,15 @@ def create_uniadilr_prompt(example):
     context_lines = [f"{k}: {v}" for k, v in context.items()]
     context_str = "\n".join(context_lines)
 
-    user_prompt = f"""Context:
-{context_str}
+    user_prompt = textwrap.dedent(f"""\
+        Context:
+        {context_str}
 
-Hypothesis:
-{hypothesis}
+        Hypothesis:
+        {hypothesis}
 
-Based on the context and hypothesis above, identify which sentence(s) provide the necessary evidence for the hypothesis."""
+        Based on the context and hypothesis above, identify which sentence(s) provide the necessary evidence for the hypothesis.
+    """).strip()
 
     system_prompt = SYSTEM_PROMPT_UniADILR
     return system_prompt, user_prompt

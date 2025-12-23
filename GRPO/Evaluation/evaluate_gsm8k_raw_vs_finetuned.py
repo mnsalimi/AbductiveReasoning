@@ -21,6 +21,7 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -175,24 +176,29 @@ def extract_gsm8k_answer(answer_string):
 
 def create_gsm8k_prompt(problem):
     """Create a prompt for GSM8K math problem."""
-    system_prompt = """You are an expert mathematician.
+    system_prompt = textwrap.dedent("""\
+        You are an expert mathematician.
 
-First, think step by step and explain your mathematical reasoning in just one paragraph. Then compute the final numerical answer.
+        First, think step by step and explain your mathematical reasoning in just one paragraph. Then compute the final numerical answer.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought reasoning and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY the final numeric answer, e.g. 42 or 3.14]
-</answer>"""
-    
-    user_prompt = f"""Problem: {problem}
+        <reasoning>
+        [here you write your chain-of-thought reasoning and intermediate steps]
+        </reasoning>
+        <answer>
+        [here you output ONLY the final numeric answer, e.g. 42 or 3.14]
+        </answer>
+    """).strip()
 
-Solve this problem step by step, then provide your final numerical answer."""
-    
+    user_prompt = textwrap.dedent(f"""\
+        Problem: {problem}
+
+        Solve this problem step by step, then provide your final numerical answer.
+    """).strip()
+
     return system_prompt, user_prompt
+
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""

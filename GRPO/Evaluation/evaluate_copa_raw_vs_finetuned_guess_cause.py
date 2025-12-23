@@ -23,39 +23,40 @@ import numpy as np
 import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
 
-SYSTEM_PROMPT_balanced_copa_cause_only = """
-You are an expert in logical reasoning and abductive inference. Your task is to determine which of two given choices represents the most plausible cause for a given premise.
+SYSTEM_PROMPT_balanced_copa_cause_only = textwrap.dedent("""\
+    You are an expert in logical reasoning and abductive inference. Your task is to determine which of two given choices represents the most plausible cause for a given premise.
 
-You will be provided with:
-1. A Premise describing a situation or event
-2. Two Choices (Choice 1 and Choice 2)
+    You will be provided with:
+    1. A Premise describing a situation or event
+    2. Two Choices (Choice 1 and Choice 2)
 
-Your goal is to select the choice that best explains WHY the premise happened - identifying the root cause that led to the described situation.
-Danial
-## Instructions:
-1. Carefully read the premise
-2. Evaluate both choices as potDanial causes
-3. Consider common sense, real-world knowledge, and typical causal relationships when making your decision
-4. Select the choice that represents the most plausible and direct cause
+    Your goal is to select the choice that best explains WHY the premise happened - identifying the root cause that led to the described situation.
 
-## Output Format:
-You MUST provide your answer in the following format:
+    ## Instructions:
+    1. Carefully read the premise
+    2. Evaluate both choices as potential causes
+    3. Consider common sense, real-world knowledge, and typical causal relationships when making your decision
+    4. Select the choice that represents the most plausible and direct cause
 
-<think>
-[Explain your thought process: why we should select one choice over the other or analyzing the cause or their relationships]
-</think>
+    ## Output Format:
+    You MUST provide your answer in the following format:
 
-<answer>
-[Either "1" or "2" - just the number, nothing else]
-</answer>
+    <think>
+    [Explain your thought process: why we should select one choice over the other or analyzing the cause or their relationships]
+    </think>
 
-CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
-""".strip()
+    <answer>
+    [Either "1" or "2" - just the number, nothing else]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
+""").strip()
 
 # ============================================================================
 # Configuration
@@ -188,23 +189,22 @@ def create_copa_prompt(example):
     """Create a prompt for COPA causal reasoning task.
     
     Args:
-        premise: The effect that occurred
-        choice1: First possible cause
-        choice2: Second possible cause
+        example (dict): A dictionary containing the premise, choice1, and choice2.
     
     Returns:
-        system_prompt, user_prompt
+        tuple: system_prompt and user_prompt strings.
     """
     system_prompt = SYSTEM_PROMPT_balanced_copa_cause_only
 
-    
-    user_prompt = f"""Premise: {example['premise']}
+    user_prompt = textwrap.dedent(f"""\
+        Premise: {example['premise']}
 
-Choice 1: {example['choice1']}
-Choice 2: {example['choice2']}
+        Choice 1: {example['choice1']}
+        Choice 2: {example['choice2']}
 
-Which choice is the most plausible cause for the premise?"""
-    
+        Which choice is the most plausible cause for the premise?
+    """).strip()
+
     return system_prompt, user_prompt
 
 def extract_reasoning(response):

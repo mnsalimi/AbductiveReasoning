@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -229,38 +230,38 @@ def _get_evidence_obj(example: dict):
 def create_strategyqa_prompt(question, evidence_text):
     """Create a prompt for StrategyQA (Yes/No QA with evidence)."""
 
-    system_prompt = """
-You are an expert at answering yes/no questions using provided evidence.
+    system_prompt = textwrap.dedent("""\
+        You are an expert at answering yes/no questions using provided evidence.
 
-You will be given:
-- A Question
-- A list of Evidence paragraphs
+        You will be given:
+        - A Question
+        - A list of Evidence paragraphs
 
-Your task:
-1. Read the Question and the provided Evidence carefully.
-2. Decide whether the correct answer is YES or NO.
-3. Provide step-by-step reasoning that uses specific parts of the evidence.
-4. Provide the final label.
+        Your task:
+        1. Read the Question and the provided Evidence carefully.
+        2. Decide whether the correct answer is YES or NO.
+        3. Provide step-by-step reasoning that uses specific parts of the evidence.
+        4. Provide the final label.
 
-Your entire output MUST use exactly the following format and nothing else:
+        Your entire output MUST use exactly the following format and nothing else:
 
-<reasoning>
-[Your step-by-step analysis grounded in the evidence]
-</reasoning>
-<answer>
-[Output exactly one of these two options: YES, NO]
-</answer>
-""".strip()
+        <reasoning>
+        [Your step-by-step analysis grounded in the evidence]
+        </reasoning>
+        <answer>
+        [Output exactly one of these two options: YES, NO]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""
-Question:
-{question}
+    user_prompt = textwrap.dedent(f"""\
+        Question:
+        {question}
 
-Evidence:
-{evidence_text}
+        Evidence:
+        {evidence_text}
 
-Based on the evidence provided, answer the question.
-""".strip()
+        Based on the evidence provided, answer the question.
+    """).strip()
 
     return system_prompt, user_prompt
 

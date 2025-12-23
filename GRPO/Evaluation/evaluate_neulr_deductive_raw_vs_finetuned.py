@@ -23,6 +23,7 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -159,34 +160,34 @@ def load_finetuned_model(checkpoint_path, device):
 def create_neulr_deductive_prompt(problem, context):
     """Create a prompt for a detective-style multiple-choice reasoning question."""
 
-    system_prompt = """
-    You are a brilliant detective specializing in symbolic logic and pattern recognition.
-    You will be given a context containing logical rules regarding specific alphanumeric codes and a resulting question.
+    system_prompt = textwrap.dedent("""\
+        You are a brilliant detective specializing in symbolic logic and pattern recognition.
+        You will be given a context containing logical rules regarding specific alphanumeric codes and a resulting question.
 
-    Your task:
-    1. Carefully parse the context to identify facts (who is what) and rules (who is afraid of whom).
-    2. Perform step-by-step deductive reasoning to trace the relationship from the subject in the question to the final answer.
-    3. Give the correct answer as the EXACT alphanumeric code from the text.
+        Your task:
+        1. Carefully parse the context to identify facts (who is what) and rules (who is afraid of whom).
+        2. Perform step-by-step deductive reasoning to trace the relationship from the subject in the question to the final answer.
+        3. Give the correct answer as the EXACT alphanumeric code from the text.
 
-    Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-    <reasoning>
-    [here you write your chain-of-thought reasoning, explicitly linking the individual to their group and the group to the object of their fear]
-    </reasoning>
-    <answer>
-    [here you output ONLY the exact alphanumeric code answer]
-    </answer>
-    """
+        <reasoning>
+        [here you write your chain-of-thought reasoning, explicitly linking the individual to their group and the group to the object of their fear]
+        </reasoning>
+        <answer>
+        [here you output ONLY the exact alphanumeric code answer]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""
-    Context:
-    {context}
+    user_prompt = textwrap.dedent(f"""\
+        Context:
+        {context}
 
-    Problem:
-    {problem}
+        Problem:
+        {problem}
 
-    Solve this problem step by step using detective reasoning to find the logical connection, then provide your final answer in one word ONLY.
-    """
+        Solve this problem step by step using detective reasoning to find the logical connection, then provide your final answer in one word ONLY.
+    """).strip()
 
     return system_prompt, user_prompt
 

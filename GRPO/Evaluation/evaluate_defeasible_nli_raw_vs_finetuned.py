@@ -23,6 +23,7 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -161,40 +162,49 @@ def load_finetuned_model(checkpoint_path, device):
 def create_defeasible_nli_prompt(premise, hypothesis, update):
     """Create a prompt for Defeasible NLI (Thinking Like a Skeptic)."""
 
-    system_prompt = """
-    You are an expert in defeasible reasoning and skepticism.
-    You will be given a Hypothesis (a tentative conclusion) and an Update (new information).
-    Sometimes, a Premise (context) is also provided.
+    system_prompt = textwrap.dedent("""\
+        You are an expert in defeasible reasoning and skepticism.
+        You will be given a Hypothesis (a tentative conclusion) and an Update (new information).
+        Sometimes, a Premise (context) is also provided.
 
-    Your task:
-    1. Consider the Hypothesis in the context of the Premise (if available).
-    2. Analyze how the new Update affects the likelihood of the Hypothesis.
-    3. Determine if the Update STRENGTHENS (makes it more likely) or WEAKENS (makes it less likely) the Hypothesis.
+        Your task:
+        1. Consider the Hypothesis in the context of the Premise (if available).
+        2. Analyze how the new Update affects the likelihood of the Hypothesis.
+        3. Determine if the Update STRENGTHENS (makes it more likely) or WEAKENS (makes it less likely) the Hypothesis.
 
-    Your entire output MUST use exactly the following format and nothing else:
+        Your entire output MUST use exactly the following format and nothing else:
 
-    <reasoning>
-    [Your step-by-step analysis of how the update affects the hypothesis]
-    </reasoning>
-    <answer>
-    [Output exactly one word: STRENGTHENS or WEAKENS]
-    </answer>
-    """
+        <reasoning>
+        [Your step-by-step analysis of how the update affects the hypothesis]
+        </reasoning>
+        <answer>
+        [Output exactly one word: STRENGTHENS or WEAKENS]
+        </answer>
+    """).strip()
 
     # Handle cases where Premise might be empty (e.g., Social Norms subset)
     if premise and isinstance(premise, str) and len(premise.strip()) > 0:
-        context_block = f"Premise:\n{premise}\n\nHypothesis:\n{hypothesis}"
+        context_block = textwrap.dedent(f"""\
+            Premise:
+            {premise}
+
+            Hypothesis:
+            {hypothesis}
+        """).strip()
     else:
-        context_block = f"Hypothesis:\n{hypothesis}"
+        context_block = textwrap.dedent(f"""\
+            Hypothesis:
+            {hypothesis}
+        """).strip()
 
-    user_prompt = f"""
-    {context_block}
+    user_prompt = textwrap.dedent(f"""\
+        {context_block}
 
-    Update:
-    {update}
+        Update:
+        {update}
 
-    Does this Update STRENGTHEN or WEAKEN the Hypothesis?
-    """
+        Does this Update STRENGTHEN or WEAKEN the Hypothesis?
+    """).strip()
 
     return system_prompt, user_prompt
 

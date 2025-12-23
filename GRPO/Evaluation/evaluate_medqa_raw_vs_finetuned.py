@@ -23,6 +23,7 @@ from peft import PeftModel
 import numpy as np
 import time
 import warnings
+import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
@@ -157,25 +158,29 @@ def load_finetuned_model(checkpoint_path, device):
 
 def create_MedQA_prompt(problem):
     """Create a prompt for a MedQA multiple-choice medical question."""
-    system_prompt = """You are an expert medical clinician. Solve the following MedQA multiple-choice problem.
+    system_prompt = textwrap.dedent("""\
+        You are an expert medical clinician. Solve the following MedQA multiple-choice problem.
 
-The final answer must be exactly one of the following letters: A, B, C, or D.
+        The final answer must be exactly one of the following letters: A, B, C, or D.
 
-First, read the question carefully and analyze it step by step using clinical reasoning. Then select the correct option among A, B, C, or D.
+        First, read the question carefully and analyze it step by step using clinical reasoning. Then select the correct option among A, B, C, or D.
 
-Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
+        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-<reasoning>
-[here you write your chain-of-thought reasoning and intermediate steps]
-</reasoning>
-<answer>
-[here you output ONLY one letter: A, B, C, or D, with no extra words]
-</answer>"""
+        <reasoning>
+        [here you write your chain-of-thought reasoning and intermediate steps]
+        </reasoning>
+        <answer>
+        [here you output ONLY one letter: A, B, C, or D, with no extra words]
+        </answer>
+    """).strip()
 
-    user_prompt = f"""Problem: {problem}
+    user_prompt = textwrap.dedent(f"""\
+        Problem: {problem}
 
-Solve this problem step by step, then provide your final answer."""
-    
+        Solve this problem step by step, then provide your final answer.
+    """).strip()
+
     return system_prompt, user_prompt
 
 

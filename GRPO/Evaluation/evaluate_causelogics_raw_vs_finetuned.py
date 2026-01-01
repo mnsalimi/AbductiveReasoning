@@ -24,10 +24,17 @@ import time
 import numpy as np
 import warnings
 import textwrap
+import sys
+import os
 warnings.filterwarnings('ignore')
 
+# Add current directory to sys.path to ensure path_utils can be imported
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 # Import path utilities for project-relative paths
-from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
 
 np.random.seed(42)
 
@@ -613,7 +620,7 @@ def ensure_raw_results_cached(args):
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
     
-    raw_results_dir = os.path.join(OUTPUT_DIR, "raw_model", dataset_name)
+    raw_results_dir = os.path.join(get_grpo_dir(), args.output_path, "raw_model", dataset_name)
     os.makedirs(raw_results_dir, exist_ok=True)
     
     raw_results_file = os.path.join(
@@ -661,7 +668,7 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Returns the loaded or newly computed fine-tuned results dict.
     """
     dataset_name = "causelogics"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
@@ -690,10 +697,18 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     ckpt_name = os.path.basename(checkpoint_path.rstrip("/"))
     print(f"✅ Using checkpoint for per-case evaluation: {ckpt_name}")
 
-    # Get cached (or newly computed) raw results
-    raw_results = ensure_raw_results_cached(args)
-    if raw_results is None:
-        print("❌ Cannot evaluate checkpoint without raw model results.")
+    # Get cached (or newly computed) fine-tuned results
+    if ensure_finetuned_results_cached(args, ckpt_name):
+        print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
+        ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, "causelogics")
+        with open(os.path.join(ckpt_output_dir, "all_cases.json"), "r") as f:
+            finetuned_results = json.load(f)
+        return {
+            "raw_results": raw_results,
+            "finetuned_results": finetuned_results,
+            "all_cases_file": os.path.join(ckpt_output_dir, "all_cases.json"),
+            "disagreement_file": os.path.join(ckpt_output_dir, "disagreement_cases.json")
+        }
         return
     
     # Get cached (or newly computed) fine-tuned results
@@ -718,7 +733,10 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     # Build per-case comparison
     dataset_name = "causelogics"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
+    
+    # print(output_dir)
+    print(ckpt_output_dir)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -1205,7 +1223,7 @@ def main():
                        help='Model output path, defaults to env variable.')
     
     args = parser.parse_args()
-    
+
     OUTPUT_DIR = args.output_path
 
     # Validate arguments
@@ -1313,6 +1331,9 @@ def main():
     if not args.skip_raw:
         raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
         raw_results = evaluate_on_causelogics(raw_model, raw_tokenizer, "./CauseJudger", args.max_samples, "Raw Model", args.batch_size)
+        if raw_results is None:
+            print("❌ Failed to evaluate raw model")
+            return
         del raw_model  # Free memory
         torch.cuda.empty_cache()
     else:
@@ -1323,6 +1344,9 @@ def main():
     if not args.skip_finetuned:
         finetuned_model, finetuned_tokenizer = load_finetuned_model(best_checkpoint_info['path'], args.cuda_device)
         finetuned_results = evaluate_on_causelogics(finetuned_model, finetuned_tokenizer, "./CauseJudger", args.max_samples, "Fine-tuned Model", args.batch_size)
+        if finetuned_results is None:
+            print("❌ Failed to evaluate fine-tuned model")
+            return
         del finetuned_model  # Free memory
         torch.cuda.empty_cache()
     else:

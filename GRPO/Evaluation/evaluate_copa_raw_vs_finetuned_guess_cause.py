@@ -24,10 +24,17 @@ import time
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import warnings
 import textwrap
+import sys
+import os
 warnings.filterwarnings('ignore')
 
+# Add current directory to sys.path to ensure path_utils can be imported
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 # Import path utilities for project-relative paths
-from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
 
 SYSTEM_PROMPT_balanced_copa_cause_only = textwrap.dedent("""\
     You are an expert in logical reasoning and abductive inference. Your task is to determine which of two given choices represents the most plausible cause for a given premise.
@@ -486,8 +493,8 @@ def ensure_raw_results_cached(args):
     dataset_name = "copa_guess_cause"
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
-    
-    raw_results_dir = os.path.join(OUTPUT_DIR, "raw_model", dataset_name)
+
+    raw_results_dir = os.path.join(get_grpo_dir(), args.output_path, "raw_model", dataset_name)
     os.makedirs(raw_results_dir, exist_ok=True)
     
     raw_results_file = os.path.join(
@@ -535,7 +542,8 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Returns the loaded or newly computed fine-tuned results dict.
     """
     dataset_name = "copa_guess_cause"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    # Save in Evaluation directory instead of possibly duplicating root
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
@@ -573,6 +581,15 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):
         print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
+        ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, "copa_guess_cause")
+        with open(os.path.join(ckpt_output_dir, "all_cases.json"), "r") as f:
+            finetuned_results = json.load(f)
+        return {
+            "raw_results": raw_results,
+            "finetuned_results": finetuned_results,
+            "all_cases_file": os.path.join(ckpt_output_dir, "all_cases.json"),
+            "disagreement_file": os.path.join(ckpt_output_dir, "disagreement_cases.json")
+        }
         return
     
     # Evaluate fine-tuned checkpoint
@@ -592,7 +609,11 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     # Build per-case comparison
     dataset_name = "copa_guess_cause"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    # Save in Evaluation directory instead of possibly duplicating root
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
+
+    # print(output_dir)
+    print(ckpt_output_dir)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -684,7 +705,6 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         'failed_extractions': raw_results['failed_extractions'],
         'detailed_results': raw_results['results'][:100]  # Save first 100 for space
     }
-    
     raw_file = os.path.join(output_dir, f"raw_model_copa_results_{timestamp}.json")
     with open(raw_file, 'w') as f:
         json.dump(raw_output, f, indent=2)
@@ -1143,12 +1163,18 @@ def main():
     # Determine which checkpoint to use
     if not args.skip_finetuned:
         if args.checkpoint_path:
+            # Use user-provided checkpoint
             checkpoint_path = args.checkpoint_path
+            # Debug: show what we received
+            print(f"\n📁 Checkpoint path argument received: {checkpoint_path}")
+            
+            # Handle relative vs absolute paths
             if not os.path.isabs(checkpoint_path):
                 checkpoint_path = os.path.abspath(checkpoint_path)
             
             if not os.path.exists(checkpoint_path):
                 print(f"❌ Error: Checkpoint path does not exist: {checkpoint_path}")
+                print(f"   Please check the path and try again.")
                 return
             
             print(f"✅ Using user-specified checkpoint: {os.path.basename(checkpoint_path)}")
@@ -1157,6 +1183,7 @@ def main():
                 'score': 'N/A (manually specified)'
             }
         else:
+            # Auto-select best checkpoint
             best_checkpoint_path, best_score = find_best_checkpoint(TRAINING_DIR)
             if best_checkpoint_path is None:
                 print("❌ No valid checkpoint found!")
@@ -1175,7 +1202,7 @@ def main():
         if raw_results is None:
             print("❌ Failed to evaluate raw model")
             return
-        del raw_model
+        del raw_model # Free memory
         torch.cuda.empty_cache()
     else:
         raw_results = None
@@ -1198,6 +1225,10 @@ def main():
     if raw_results and finetuned_results:
         summary = save_results(raw_results, finetuned_results, best_checkpoint_info, OUTPUT_DIR)
         print_comparison(summary)
+    elif raw_results:
+        print("\n✅ Raw model evaluation completed")
+    elif finetuned_results:
+        print("\n✅ Fine-tuned model evaluation completed")
     
     print(f"\n✅ All results saved to: {OUTPUT_DIR}")
 

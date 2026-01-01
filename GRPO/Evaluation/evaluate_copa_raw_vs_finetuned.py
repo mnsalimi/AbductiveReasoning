@@ -27,7 +27,7 @@ import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
-from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
 
 # ============================================================================
 # Configuration
@@ -475,7 +475,7 @@ def ensure_raw_results_cached(args):
     split = args.split
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
     
-    raw_results_dir = os.path.join(OUTPUT_DIR, "raw_model", dataset_name)
+    raw_results_dir = os.path.join(get_grpo_dir(), args.output_path, "raw_model", dataset_name)
     os.makedirs(raw_results_dir, exist_ok=True)
     
     raw_results_file = os.path.join(
@@ -523,7 +523,7 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     Returns the loaded or newly computed fine-tuned results dict.
     """
     dataset_name = "copa"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
     if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
@@ -561,6 +561,15 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):
         print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
+        ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, "copa")
+        with open(os.path.join(ckpt_output_dir, "all_cases.json"), "r") as f:
+            finetuned_results = json.load(f)
+        return {
+            "raw_results": raw_results,
+            "finetuned_results": finetuned_results,
+            "all_cases_file": os.path.join(ckpt_output_dir, "all_cases.json"),
+            "disagreement_file": os.path.join(ckpt_output_dir, "disagreement_cases.json")
+        }
         return
     
     # Evaluate fine-tuned checkpoint
@@ -580,7 +589,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     # Build per-case comparison
     dataset_name = "copa"
-    ckpt_output_dir = os.path.join("/".join(OUTPUT_DIR.split("/")[:]), args.run, ckpt_name, dataset_name)
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
     os.makedirs(ckpt_output_dir, exist_ok=True)
     
     raw_by_id = {idx + 1: r for idx, r in enumerate(raw_results["results"])}
@@ -1185,6 +1194,10 @@ def main():
     if raw_results and finetuned_results:
         summary = save_results(raw_results, finetuned_results, best_checkpoint_info, OUTPUT_DIR)
         print_comparison(summary)
+    elif raw_results:
+        print("\n✅ Raw model evaluation completed")
+    elif finetuned_results:
+        print("\n✅ Fine-tuned model evaluation completed")
     
     print(f"\n✅ All results saved to: {OUTPUT_DIR}")
 

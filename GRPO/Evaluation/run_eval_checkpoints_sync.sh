@@ -21,12 +21,12 @@ RUN_NAME="dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-
 TRAINING_DIR="$BASE_RESULTS_DIR/Training_${RUN_NAME}"
 FINAL_DIR="$BASE_RESULTS_DIR/${RUN_NAME}"
 
-if [ -d "$TRAINING_DIR/checkpoint" ]; then
-    CHECKPOINT_DIR="$TRAINING_DIR/checkpoint"
-    TRAINING_BASE="$TRAINING_DIR"
-elif [ -d "$FINAL_DIR/checkpoint" ]; then
+if [ -d "$FINAL_DIR/checkpoint" ]; then
     CHECKPOINT_DIR="$FINAL_DIR/checkpoint"
     TRAINING_BASE="$FINAL_DIR"
+elif [ -d "$TRAINING_DIR/checkpoint" ]; then
+    CHECKPOINT_DIR="$TRAINING_DIR/checkpoint"
+    TRAINING_BASE="$TRAINING_DIR"
 else
     echo "ERROR: Could not find checkpoint directory."
     echo "Tried:"
@@ -112,7 +112,8 @@ for ckpt_name in $(ls -1 "$CHECKPOINT_DIR" | grep '^checkpoint-' | sort -t- -k2,
             --root "./GRPO/Evaluation/" \
             --out_csv "$EXCEL_PATH" \
             --run "$RUN_NAME" \
-            --base_model_name "$BASE_MODEL_NAME"
+            --base_model_name "$BASE_MODEL_NAME" \
+            --raw_model_path "$RAW_MODEL_PATH"
 
         # 3. UPLOAD/SYNC: Uploads the updated local Excel file back to the specified Google Sheet
         echo "--- Syncing updated Excel to Google Sheets ---"

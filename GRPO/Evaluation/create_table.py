@@ -45,25 +45,46 @@ import os
 import json
 import argparse
 import csv
+import re
 import numpy as np
 from typing import Dict, Any, List, Tuple, Set, Union
 import pandas as pd
 from openpyxl.styles import PatternFill, Font, Alignment
+import glob
 
 from evaluate_aime_raw_vs_finetuned import find_best_checkpoint  
 
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload  
-from google.oauth2.service_account import Credentials
-from google.oauth2.credentials import Credentials as UserCredentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+# from googleapiclient.discovery import build
+# from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload  
+# from google.oauth2.service_account import Credentials
+# from google.oauth2.credentials import Credentials as UserCredentials
+# from google_auth_oauthlib.flow import InstalledAppFlow
+# from google.auth.transport.requests import Request
 from openpyxl import load_workbook
 import io 
 
-os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+# os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+
+# Define the metrics we want to extract from each dataset's JSON
+# You can add more here easily.
+METRIC_KEYS = ["accuracy", "f1", "precision", "recall", "exact_match"]
 
 Scalar = Union[int, float, str]
+
+def find_json_file(dataset_path: str, patterns: List[str]) -> str:
+    """Find the first file matching any of the patterns in the dataset path."""
+    for pattern in patterns:
+        full_pattern = os.path.join(dataset_path, pattern)
+        matches = glob.glob(full_pattern)
+        if matches:
+            # Sort by modification time, newest first, or just pick one?
+            # If timestamp is in name, sorting by name might work if format is YYYYMMDD...
+            # But glob order is arbitrary.
+            # Let's sort by name to be deterministic.
+            matches.sort(reverse=True) 
+            return matches[0]
+    return None
+
 
 
 def is_scalar(x: Any) -> bool:
@@ -93,7 +114,7 @@ def load_metrics_from_json(json_path: str) -> Dict[str, Scalar]:
     return out
 
 
-def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model_name: str = "qwen2.5-3B") -> Tuple[List[Dict[str, Scalar]], List[str]]:
+def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model_name: str = "qwen2.5-3B", raw_model_path: str = None) -> Tuple[List[Dict[str, Scalar]], List[str]]:
     """Walk the checkpoints directory and collect rows + column names.
 
     Returns:
@@ -106,124 +127,109 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     if not os.path.isdir(root_dir):
         raise FileNotFoundError(f"Root directory not found: {root_dir}")
     
-    ckpt_path = os.path.join(root_dir, "raw_model")  
-    row: Dict[str, Scalar] = {"checkpoint": f"{model_name}"}
-    for dataset_name in sorted(os.listdir(ckpt_path)):
-        dataset_path = os.path.join(ckpt_path, dataset_name)
-        dataset_name = dataset_name.lower()
-        if not os.path.isdir(dataset_path):
-            continue
-
-        json_path = os.path.join(dataset_path, "raw_results_train_all.json")
-        if not os.path.isfile(json_path):
-            continue
-
-        try:
-            metrics = load_metrics_from_json(json_path)
-        except Exception as e:
-            print(f"[WARN] Failed to read {json_path}: {e}")
-            continue
-
-        f1_flag = False
-        possible_col_names = []
-        for metric_name, metric_value in metrics.items():
-            if "accuracy" in metric_name or "hamming_accuracy" in metric_name:
-                col_name = f"{dataset_name}_acc"
-            elif "macro_f1" in metric_name or "f1_macro" in metric_name or "f1" in metric_name:
-                col_name = f"{dataset_name}_f1"
-                f1_flag = True
-            elif "precision" in metric_name:
-                col_name = f"{dataset_name}_precision"
-            elif "recall" in metric_name:
-                col_name = f"{dataset_name}_recall"
-            elif "exact_match_accuracy" in metric_name:
-                col_name = f"{dataset_name}_EM"
-            else:
-                continue
-            
-            possible_col_names.append((col_name, metric_value))
-        
-        for col_name, metric_value in possible_col_names:
-            if f1_flag and "_f1" in col_name:    
-                if col_name not in row:
-                    row[col_name] = round(metric_value, 4)
-                    all_metric_cols.add(col_name)
-            elif not f1_flag:
-                if col_name not in row:
-                    row[col_name] = round(metric_value, 4)
-                    all_metric_cols.add(col_name)
-
-    rows.append(row)
-
-    root_dir = os.path.join(root_dir, run)
-    if not os.path.isdir(root_dir):
-        root_dir += "-Evaluation"
-        for dir in os.listdir(root_dir):
+    # Resolve run directory first
+    candidate_run_dir = os.path.join(root_dir, run)
+    
+    # If root_dir/run exists, go inside. 
+    # Otherwise, assume root_dir IS the folder containing checkpoints.
+    if os.path.isdir(candidate_run_dir):
+        root_dir = candidate_run_dir
+    elif os.path.isdir(candidate_run_dir + "-Evaluation"):
+        run_dir = candidate_run_dir + "-Evaluation"
+        for dir in os.listdir(run_dir):
             if dir.startswith("dt"):
-                root_dir = os.path.join(root_dir, dir)
+                root_dir = os.path.join(run_dir, dir)
                 break
+    else:
+        # If neither exists, assume the checkpoints are directly in root_dir
+        pass 
+    
+    # Helper to process a directory (raw model or checkpoint)
+    def process_directory(path, label):
+        row = {"checkpoint": label}
+        for dataset_name in sorted(os.listdir(path)):
+            dataset_path = os.path.join(path, dataset_name)
+            dataset_name_clean = dataset_name.lower()
             
-    training_step = [int(dir.split("-")[-1]) for dir in os.listdir(root_dir)]
-    for ckpt_name in [f"checkpoint-{str(dir)}" for dir in sorted(training_step)]:
-        ckpt_path = os.path.join(root_dir, ckpt_name)
-        if not os.path.isdir(ckpt_path) or "checkpoint" not in ckpt_name:
-            continue
-        
-        if best_checkpoint and ckpt_name == best_checkpoint:
-            row: Dict[str, Scalar] = {"checkpoint": ckpt_name+"(best)"}
-        else:
-            row: Dict[str, Scalar] = {"checkpoint": ckpt_name}
-
-        for dataset_name in sorted(os.listdir(ckpt_path)):
-            dataset_path = os.path.join(ckpt_path, dataset_name)
-            dataset_name = dataset_name.lower()
             if not os.path.isdir(dataset_path):
                 continue
-            
-            json_path = os.path.join(dataset_path, "all_cases.json")
-            if not os.path.isfile(json_path):
-                json_path = os.path.join(dataset_path, "all_casses.json")
-                if not os.path.isfile(json_path):
-                    continue
-            
+
+            json_path = find_json_file(dataset_path, ["raw_results_train_all.json", "all_cases.json", "all_casses.json"])
+            if not json_path:
+                continue
+
             try:
                 metrics = load_metrics_from_json(json_path)
             except Exception as e:
                 print(f"[WARN] Failed to read {json_path}: {e}")
                 continue
-            
-            f1_flag = False
-            possible_col_names = []
-            for metric_name, metric_value in metrics.items():
-                if "accuracy" in metric_name or "hamming_accuracy" in metric_name:
-                    col_name = f"{dataset_name}_acc"
-                elif "macro_f1" in metric_name or "f1_macro" in metric_name or "f1" in metric_name:
-                    col_name = f"{dataset_name}_f1"
-                    f1_flag = True
-                elif "precision" in metric_name:
-                    col_name = f"{dataset_name}_precision"
-                elif "recall" in metric_name:
-                    col_name = f"{dataset_name}_recall"
-                elif "exact_match_accuracy" in metric_name:
-                    col_name = f"{dataset_name}_EM"
-                else:
-                    continue
+
+            # Iterate over the configured METRIC_KEYS
+            for key in METRIC_KEYS:
+                found_val = None
                 
-                possible_col_names.append((col_name, metric_value))
+                # Check metrics in the JSON for matches
+                for m_name, m_val in metrics.items():
+                    m_name_lower = m_name.lower()
+                    
+                    # Logic to match standard keys to JSON keys
+                    match = False
+                    if key == "accuracy" and ("accuracy" in m_name_lower and "exact_match" not in m_name_lower):
+                        match = True
+                    elif key == "f1" and ("f1" in m_name_lower):
+                        match = True
+                    elif key == "precision" and ("precision" in m_name_lower):
+                        match = True
+                    elif key == "recall" and ("recall" in m_name_lower):
+                        match = True
+                    elif key == "exact_match" and ("exact_match" in m_name_lower or "em" == m_name_lower):
+                        match = True
+                    
+                    if match:
+                        found_val = m_val
+                        break
+                
+                if found_val is not None:
+                    col_name = f"{dataset_name_clean}_{key}"
+                    if col_name not in row:
+                        row[col_name] = round(found_val, 4)
+                        all_metric_cols.add(col_name)
+        return row
+
+    # 1. Process Raw Model
+    if raw_model_path and os.path.isdir(raw_model_path):
+        ckpt_path = raw_model_path
+    else:
+        ckpt_path = os.path.join(root_dir, "raw_model")
+    
+    if os.path.isdir(ckpt_path):
+        rows.append(process_directory(ckpt_path, f"{model_name}"))
+    else:
+        print(f"[WARN] raw_model directory not found. Skipping raw model metrics.")
+
+    # 2. Process Checkpoints
+    training_step = []
+    for dir in os.listdir(root_dir):
+        if dir.startswith("checkpoint-"):
+            try:
+                step = int(dir.split("-")[-1])
+                training_step.append(step)
+            except ValueError:
+                pass
+    training_step.sort()
+
+    for ckpt_name in [f"checkpoint-{str(dir)}" for dir in sorted(training_step)]:
+        ckpt_path = os.path.join(root_dir, ckpt_name)
+        if not os.path.isdir(ckpt_path):
+            continue
+        
+        label = ckpt_name
+        if best_checkpoint and ckpt_name == best_checkpoint:
+            label += "(best)"
             
-            for col_name, metric_value in possible_col_names:
-                if f1_flag and "f1" in col_name:    
-                    if col_name not in row:
-                        row[col_name] = round(metric_value, 4)
-                        all_metric_cols.add(col_name)
-                elif not f1_flag:
-                    if col_name not in row:
-                        row[col_name] = round(metric_value, 4)
-                        all_metric_cols.add(col_name)
+        rows.append(process_directory(ckpt_path, label))
 
-        rows.append(row)
-
-    ordered_cols = ["checkpoint"] + sorted(all_metric_cols)
+    ordered_cols = ["checkpoint"] + sorted(list(all_metric_cols))
     return rows, ordered_cols
 
 
@@ -249,8 +255,8 @@ def clean_sheet_name(name):
     invalid = ['\\', '/', '*', '?', ':', '[', ']']
     for c in invalid:
         name = name.replace(c, '_')
-    # return name[:31]  # Excel also limits sheet names to 31 chars
-    return "Sheet1"
+    return name[:31]  # Excel also limits sheet names to 31 chars
+    # return "Sheet1"
 
 def _checkpoint_key(name: str) -> str:
     """Normalize checkpoint name by stripping '(best)' etc."""
@@ -323,7 +329,11 @@ def append_rows_in_place(
     first_data_row = 2
 
     existing_row_map: Dict[str, int] = {}
-    mx_row = 0
+    
+    # Fix: Start checking for existing rows, but default mx_row to the end of sheet
+    # to avoid overwriting headers if the sheet is populated.
+    mx_row = ws.max_row
+    
     chk_col = col_index["checkpoint"]
     for r_idx in range(first_data_row, ws.max_row + 1):
         val = ws.cell(row=r_idx, column=chk_col).value
@@ -331,7 +341,7 @@ def append_rows_in_place(
             ck = _checkpoint_key(str(val))
             if ck not in existing_row_map:
                 existing_row_map[ck] = r_idx
-                mx_row = max(mx_row, r_idx)
+                # mx_row = max(mx_row, r_idx) # No longer needed if we init with max_row
 
     green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
     no_fill = PatternFill() 
@@ -443,6 +453,7 @@ def write_excel(
                     sheet_name=sheet_name,
                     best_checkpoint=best_checkpoint,
                     model_name=model_name,
+                    old_sheet_name=old_sheet_name
                 )
                 print(
                     f"Excel updated by appending rows to existing sheet "
@@ -549,240 +560,240 @@ def write_excel(
 
     print(f"Excel written to: {out_path} (sheet: {sheet_name})")
 
-GDRIVE_TOKEN_PATH = os.path.expanduser("~/.config/nima_drive_token.json")
-GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+# GDRIVE_TOKEN_PATH = os.path.expanduser("~/.config/nima_drive_token.json")
+# GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
-def get_oauth_credentials(oauth_client_json: str) -> UserCredentials:
-    """
-    Get (or create) OAuth user credentials for Google Drive.
+# def get_oauth_credentials(oauth_client_json: str) -> UserCredentials:
+#     """
+#     Get (or create) OAuth user credentials for Google Drive.
 
-    - Reuses a saved token if it exists.
-    - Otherwise:
-        * Builds an auth URL with a proper redirect_uri
-        * Asks you to open it and grant access
-        * You paste the FULL redirect URL from the browser
-        * Exchanges that for tokens and saves them
-    """
-    creds = None
+#     - Reuses a saved token if it exists.
+#     - Otherwise:
+#         * Builds an auth URL with a proper redirect_uri
+#         * Asks you to open it and grant access
+#         * You paste the FULL redirect URL from the browser
+#         * Exchanges that for tokens and saves them
+#     """
+#     creds = None
 
-    if os.path.exists(GDRIVE_TOKEN_PATH):
-        creds = UserCredentials.from_authorized_user_file(
-            GDRIVE_TOKEN_PATH, GDRIVE_SCOPES
-        )
+#     if os.path.exists(GDRIVE_TOKEN_PATH):
+#         creds = UserCredentials.from_authorized_user_file(
+#             GDRIVE_TOKEN_PATH, GDRIVE_SCOPES
+#         )
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            with open(oauth_client_json, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+#     if not creds or not creds.valid:
+#         if creds and creds.expired and creds.refresh_token:
+#             creds.refresh(Request())
+#         else:
+#             with open(oauth_client_json, "r", encoding="utf-8") as f:
+#                 cfg = json.load(f)
 
-            flow = InstalledAppFlow.from_client_secrets_file(
-                oauth_client_json,
-                scopes=GDRIVE_SCOPES,
-            )
+#             flow = InstalledAppFlow.from_client_secrets_file(
+#                 oauth_client_json,
+#                 scopes=GDRIVE_SCOPES,
+#             )
 
-            redirect_uri = None
-            if "installed" in cfg and "redirect_uris" in cfg["installed"]:
-                redirect_uri = cfg["installed"]["redirect_uris"][0]
-            elif "web" in cfg and "redirect_uris" in cfg["web"]:
-                redirect_uri = cfg["web"]["redirect_uris"][0]
+#             redirect_uri = None
+#             if "installed" in cfg and "redirect_uris" in cfg["installed"]:
+#                 redirect_uri = cfg["installed"]["redirect_uris"][0]
+#             elif "web" in cfg and "redirect_uris" in cfg["web"]:
+#                 redirect_uri = cfg["web"]["redirect_uris"][0]
 
-            if redirect_uri is None:
-                redirect_uri = "http://localhost"
+#             if redirect_uri is None:
+#                 redirect_uri = "http://localhost"
 
-            flow.redirect_uri = redirect_uri
+#             flow.redirect_uri = redirect_uri
 
-            auth_url, _ = flow.authorization_url(
-                access_type="offline",
-                include_granted_scopes="true",
-                prompt="consent",
-            )
+#             auth_url, _ = flow.authorization_url(
+#                 access_type="offline",
+#                 include_granted_scopes="true",
+#                 prompt="consent",
+#             )
 
-            print("\n🔐 Google Drive authorization required.")
-            print("1) Open this URL in your browser:\n")
-            print(auth_url)
-            print(
-                "\n2) Approve access. Google will then redirect you to something "
-                "like:\n"
-                "   http://localhost/?code=...&scope=...\n"
-                "   (The page may show a connection error; that's fine.)"
-            )
-            print(
-                "\n3) Copy the FULL redirect URL from your browser's address bar "
-                "and paste it here."
-            )
-            redirect_response = input("\nRedirect URL: ").strip()
+#             print("\n🔐 Google Drive authorization required.")
+#             print("1) Open this URL in your browser:\n")
+#             print(auth_url)
+#             print(
+#                 "\n2) Approve access. Google will then redirect you to something "
+#                 "like:\n"
+#                 "   http://localhost/?code=...&scope=...\n"
+#                 "   (The page may show a connection error; that's fine.)"
+#             )
+#             print(
+#                 "\n3) Copy the FULL redirect URL from your browser's address bar "
+#                 "and paste it here."
+#             )
+#             redirect_response = input("\nRedirect URL: ").strip()
 
-            flow.fetch_token(authorization_response=redirect_response)
-            creds = flow.credentials
+#             flow.fetch_token(authorization_response=redirect_response)
+#             creds = flow.credentials
 
-        os.makedirs(os.path.dirname(GDRIVE_TOKEN_PATH), exist_ok=True)
-        with open(GDRIVE_TOKEN_PATH, "w", encoding="utf-8") as token_file:
-            token_file.write(creds.to_json())
+#         os.makedirs(os.path.dirname(GDRIVE_TOKEN_PATH), exist_ok=True)
+#         with open(GDRIVE_TOKEN_PATH, "w", encoding="utf-8") as token_file:
+#             token_file.write(creds.to_json())
 
-    return creds
+#     return creds
 
-def download_from_gdrive_if_exists(
-    local_path: str,
-    folder_id: str,
-    oauth_client_json: str,
-    sheet_name: str
-) -> bool:
-    """
-    If a file with the given name exists in the Drive folder, download it
-    to local_path and return True. Otherwise, do nothing and return False.
-    """
-    creds = get_oauth_credentials(oauth_client_json)
-    service = build("drive", "v3", credentials=creds)
+# def download_from_gdrive_if_exists(
+#     local_path: str,
+#     folder_id: str,
+#     oauth_client_json: str,
+#     sheet_name: str
+# ) -> bool:
+#     """
+#     If a file with the given name exists in the Drive folder, download it
+#     to local_path and return True. Otherwise, do nothing and return False.
+#     """
+#     creds = get_oauth_credentials(oauth_client_json)
+#     service = build("drive", "v3", credentials=creds)
 
-    # file_name = os.path.basename(local_path)
-    file_name = sheet_name
-    query = (
-        f"name = '{file_name}' and "
-        f"'{folder_id}' in parents and "
-        f"trashed = false"
-    )
+#     # file_name = os.path.basename(local_path)
+#     file_name = sheet_name
+#     query = (
+#         f"name = '{file_name}' and "
+#         f"'{folder_id}' in parents and "
+#         f"trashed = false"
+#     )
 
-    existing = (
-        service.files()
-        .list(q=query, spaces="drive", fields="files(id, name)", pageSize=1)
-        .execute()
-    )
-    files = existing.get("files", [])
-    if not files:
-        return False 
+#     existing = (
+#         service.files()
+#         .list(q=query, spaces="drive", fields="files(id, name)", pageSize=1)
+#         .execute()
+#     )
+#     files = existing.get("files", [])
+#     if not files:
+#         return False 
 
-    file_id = files[0]["id"]
-    request = service.files().get_media(fileId=file_id)
+#     file_id = files[0]["id"]
+#     request = service.files().get_media(fileId=file_id)
 
-    fh = io.FileIO(local_path, "wb")
-    downloader = MediaIoBaseDownload(fh, request)
+#     fh = io.FileIO(local_path, "wb")
+#     downloader = MediaIoBaseDownload(fh, request)
 
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
+#     done = False
+#     while not done:
+#         status, done = downloader.next_chunk()
 
-    return True
-
-
-def upload_to_gdrive(
-    local_path: str,
-    folder_id: str,
-    oauth_client_json: str,
-    mime_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    sheet_name: str = "Sheet1",
-) -> str:
-    """
-    Upload a local file to a Google Drive folder using OAuth user credentials.
-
-    If a file with the same name already exists in that folder:
-      -> update its contents (overwrite) instead of creating a new file.
-    """
-    if not os.path.isfile(local_path):
-        raise FileNotFoundError(f"File not found for upload: {local_path}")
-
-    creds = get_oauth_credentials(oauth_client_json)
-    service = build("drive", "v3", credentials=creds)
-
-    # file_name = os.path.basename(local_path)
-    file_name = sheet_name
-
-    query = (
-        f"name = '{file_name}' and "
-        f"'{folder_id}' in parents and "
-        f"trashed = false"
-    )
-
-    existing = (
-        service.files()
-        .list(q=query, spaces="drive", fields="files(id, name)", pageSize=1)
-        .execute()
-    )
-    files = existing.get("files", [])
-
-    media = MediaFileUpload(local_path, mimetype=mime_type, resumable=True)
-
-    if files:
-        file_id = files[0]["id"]
-        print(f"Updating existing file on Drive: {file_name} (id={file_id})")
-        uploaded = (
-            service.files()
-            .update(fileId=file_id, media_body=media, fields="id")
-            .execute()
-        )
-    else:
-        file_metadata = {
-            "name": file_name,
-            "parents": [folder_id],
-        }
-        print(f"Creating new file on Drive: {file_name}")
-        uploaded = (
-            service.files()
-            .create(body=file_metadata, media_body=media, fields="id")
-            .execute()
-        )
-
-    file_id = uploaded.get("id")
-    print(f"Uploaded to Google Drive. File ID: {file_id}")
-    return file_id
+#     return True
 
 
-def write_excel_to_gdrive(
-    rows: List[Dict[str, Scalar]],
-    columns: List[str],
-    out_path: str,
-    sheet_name: str,
-    old_sheet_name: str,
-    best_checkpoint: str,
-    model_name: str,
-    gdrive_folder_id: str,
-    gdrive_service_account_json: str,
-) -> None:
-    """
-    - If the file does not exist on Drive:
-        * create a new Excel file locally with all rows (write_excel)
-        * upload it
-    - If it exists:
-        * download latest version (including manual Google formatting)
-        * append only new rows to the existing sheet
-        * upload updated file back to Drive
-    """
-    exists_remote = download_from_gdrive_if_exists(
-        local_path=out_path,
-        folder_id=gdrive_folder_id,
-        oauth_client_json=gdrive_service_account_json,
-        sheet_name=sheet_name
-    )
+# def upload_to_gdrive(
+#     local_path: str,
+#     folder_id: str,
+#     oauth_client_json: str,
+#     mime_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#     sheet_name: str = "Sheet1",
+# ) -> str:
+#     """
+#     Upload a local file to a Google Drive folder using OAuth user credentials.
 
-    if not exists_remote and not os.path.exists(out_path):
-        write_excel(
-            rows=rows,
-            columns=columns,
-            out_path=out_path,
-            sheet_name=sheet_name,
-            old_sheet_name=old_sheet_name,
-            best_checkpoint=best_checkpoint,
-            model_name=model_name,
-        )
-    else:
-        append_rows_in_place(
-            rows=rows,
-            columns=columns,
-            out_path=out_path,
-            sheet_name=sheet_name,
-            old_sheet_name=old_sheet_name,
-            best_checkpoint=best_checkpoint,
-            model_name=model_name,
-        )
+#     If a file with the same name already exists in that folder:
+#       -> update its contents (overwrite) instead of creating a new file.
+#     """
+#     if not os.path.isfile(local_path):
+#         raise FileNotFoundError(f"File not found for upload: {local_path}")
 
-    upload_to_gdrive(
-        local_path=out_path,
-        folder_id=gdrive_folder_id,
-        oauth_client_json=gdrive_service_account_json,
-        sheet_name=sheet_name,
-    )
+#     creds = get_oauth_credentials(oauth_client_json)
+#     service = build("drive", "v3", credentials=creds)
+
+#     # file_name = os.path.basename(local_path)
+#     file_name = sheet_name
+
+#     query = (
+#         f"name = '{file_name}' and "
+#         f"'{folder_id}' in parents and "
+#         f"trashed = false"
+#     )
+
+#     existing = (
+#         service.files()
+#         .list(q=query, spaces="drive", fields="files(id, name)", pageSize=1)
+#         .execute()
+#     )
+#     files = existing.get("files", [])
+
+#     media = MediaFileUpload(local_path, mimetype=mime_type, resumable=True)
+
+#     if files:
+#         file_id = files[0]["id"]
+#         print(f"Updating existing file on Drive: {file_name} (id={file_id})")
+#         uploaded = (
+#             service.files()
+#             .update(fileId=file_id, media_body=media, fields="id")
+#             .execute()
+#         )
+#     else:
+#         file_metadata = {
+#             "name": file_name,
+#             "parents": [folder_id],
+#         }
+#         print(f"Creating new file on Drive: {file_name}")
+#         uploaded = (
+#             service.files()
+#             .create(body=file_metadata, media_body=media, fields="id")
+#             .execute()
+#         )
+
+#     file_id = uploaded.get("id")
+#     print(f"Uploaded to Google Drive. File ID: {file_id}")
+#     return file_id
+
+
+# def write_excel_to_gdrive(
+#     rows: List[Dict[str, Scalar]],
+#     columns: List[str],
+#     out_path: str,
+#     sheet_name: str,
+#     old_sheet_name: str,
+#     best_checkpoint: str,
+#     model_name: str,
+#     gdrive_folder_id: str,
+#     gdrive_service_account_json: str,
+# ) -> None:
+#     """
+#     - If the file does not exist on Drive:
+#         * create a new Excel file locally with all rows (write_excel)
+#         * upload it
+#     - If it exists:
+#         * download latest version (including manual Google formatting)
+#         * append only new rows to the existing sheet
+#         * upload updated file back to Drive
+#     """
+#     exists_remote = download_from_gdrive_if_exists(
+#         local_path=out_path,
+#         folder_id=gdrive_folder_id,
+#         oauth_client_json=gdrive_service_account_json,
+#         sheet_name=sheet_name
+#     )
+
+#     if not exists_remote and not os.path.exists(out_path):
+#         write_excel(
+#             rows=rows,
+#             columns=columns,
+#             out_path=out_path,
+#             sheet_name=sheet_name,
+#             old_sheet_name=old_sheet_name,
+#             best_checkpoint=best_checkpoint,
+#             model_name=model_name,
+#         )
+#     else:
+#         append_rows_in_place(
+#             rows=rows,
+#             columns=columns,
+#             out_path=out_path,
+#             sheet_name=sheet_name,
+#             old_sheet_name=old_sheet_name,
+#             best_checkpoint=best_checkpoint,
+#             model_name=model_name,
+#         )
+
+#     upload_to_gdrive(
+#         local_path=out_path,
+#         folder_id=gdrive_folder_id,
+#         oauth_client_json=gdrive_service_account_json,
+#         sheet_name=sheet_name,
+#     )
 
 
 
@@ -832,6 +843,12 @@ def main():
         default="UniADILR",
         help="Name of the training data that the model was trained on.",
     )
+    parser.add_argument(
+        "--raw_model_path",
+        type=str,
+        default=None,
+        help="Path to the raw model directory containing raw_results_train_all.json",
+    )
 
     args = parser.parse_args()
 
@@ -844,25 +861,30 @@ def main():
         elif os.path.isdir(FINAL_DIR):
             TRAINING_BASE = FINAL_DIR
         else:
-            print(f"ERROR: Could not find checkpoint directory.")
-            print(f"Tried:")
-            print(f"  {TRAINING_DIR}")
-            print(f"  {FINAL_DIR}")
-            return 
+            # Fallback handling if neither dir is found directly
+            TRAINING_BASE = None
+            
+        if TRAINING_BASE:
+            best_path, _ = find_best_checkpoint(TRAINING_BASE)
+            args.best_checkpoint = os.path.basename(best_path) if best_path else None
 
-        best_path, _ = find_best_checkpoint(TRAINING_BASE)
-        best_path, _ = find_best_checkpoint(TRAINING_BASE)
-        args.best_checkpoint = os.path.basename(best_path) if best_path else None
-        # args.best_checkpoint = "checkpoint-4096"
-
-    rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name)
+    rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name, args.raw_model_path)
     # write_csv(rows, columns, args.out_csv)
     old_sheet_name = args.run
-    sheet_name = args.run.split("e20_")[0] + args.train_data + "_e20_" + args.run.split("e20_")[1]
+    # Robustly construct sheet name handling variable epoch numbers (e.g. _e1_, _e20_)
+    match = re.search(r"(_e\d+_)", args.run)
+    if match:
+        start, end = match.span()
+        # Insert train_data before the epoch part
+        sheet_name = args.run[:start] + "_" + args.train_data + args.run[start:]
+    else:
+        # Fallback if pattern not found
+        sheet_name = args.run + "_" + args.train_data
     # Google Drive service account JSON path - should be set via environment variable or config
-    gdrive_json = os.environ.get('GDRIVE_SERVICE_ACCOUNT_JSON', 
-                                  os.path.expanduser("~/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json"))
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1UVSy7yB2pvj8GSa9ns89JAujxzxkLEC-", gdrive_service_account_json=gdrive_json) 
+    # gdrive_json = os.environ.get('GDRIVE_SERVICE_ACCOUNT_JSON', 
+    #                               os.path.expanduser("~/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json"))
+    # write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1UVSy7yB2pvj8GSa9ns89JAujxzxkLEC-", gdrive_service_account_json=gdrive_json) 
+    write_excel(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name) 
 
 
 if __name__ == "__main__":

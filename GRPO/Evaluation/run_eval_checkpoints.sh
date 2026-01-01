@@ -35,12 +35,12 @@ RUN_NAME="dt12.03.23:22_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-
 TRAINING_DIR="$BASE_RESULTS_DIR/Training_${RUN_NAME}"
 FINAL_DIR="$BASE_RESULTS_DIR/${RUN_NAME}"
 
-if [ -d "$TRAINING_DIR/checkpoint" ]; then
-    CHECKPOINT_DIR="$TRAINING_DIR/checkpoint"
-    TRAINING_BASE="$TRAINING_DIR"
-elif [ -d "$FINAL_DIR/checkpoint" ]; then
+if [ -d "$FINAL_DIR/checkpoint" ]; then
     CHECKPOINT_DIR="$FINAL_DIR/checkpoint"
     TRAINING_BASE="$FINAL_DIR"
+elif [ -d "$TRAINING_DIR/checkpoint" ]; then
+    CHECKPOINT_DIR="$TRAINING_DIR/checkpoint"
+    TRAINING_BASE="$TRAINING_DIR"
 else
     echo "ERROR: Could not find checkpoint directory."
     echo "Tried:"
@@ -101,5 +101,6 @@ for ckpt_name in $(ls -1 "$CHECKPOINT_DIR" | grep '^checkpoint-' | sort -t- -k2,
         --run "$RUN_NAME" \
         --base_model_name "qwen2.5-14B" \
         --base_result_dir "$BASE_RESULTS_DIR" \
-        --train_data "UniADILR" 
+        --train_data "UniADILR" \
+        --raw_model_path "$RAW_MODEL_PATH"
 done

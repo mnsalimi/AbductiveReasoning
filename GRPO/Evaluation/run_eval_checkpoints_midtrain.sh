@@ -24,7 +24,10 @@ scripts=(
     "evaluate_art_raw_vs_finetuned.py"
     "evaluate_copa_raw_vs_finetuned_guess_effect.py"
     "evaluate_goEmotion_raw_vs_finetuned.py"
+    "evaluate_list_function_raw_vs_finetuned.py"
+    "evaluate_miniarc_raw_vs_finetuned.py"
 )
+
 declare -A BATCH_SIZES=(
     # ["evaluate_all.py"]=8
     ["evaluate_neulr_deductive_raw_vs_finetuned.py"]=8
@@ -41,7 +44,11 @@ declare -A BATCH_SIZES=(
     ["evaluate_aimo_raw_vs_finetuned.py"]=8
     ["evaluate_art_raw_vs_finetuned.py"]=32
     ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=32
+    ["evaluate_copa_raw_vs_finetuned_guess_cause.py"]=32
     ["evaluate_goEmotion_raw_vs_finetuned.py"]=8
+    ["evaluate_list_function_raw_vs_finetuned.py"]=4
+    ["evaluate_miniarc_raw_vs_finetuned.py"]=2
+    ["evaluate_uniadilr_raw_vs_finetuned"]=4
 )
 
 # CHECKPOINTS=(
@@ -71,17 +78,20 @@ COMMON_ARGS="--cuda_device ${CUDA_DEVICE} --evaluate_checkpoints ${EVALUATE_CHEC
 # ============================
 #      Error Handling
 # ============================
+# ============================
+#      Error Handling
+# ============================
 echo "Base Results Dir: $BASE_RESULTS_DIR"
 
-TRAINING_DIR="$BASE_RESULTS_DIR/Training_${RUN_NAME}"
+TRAINING_DIR="$BASE_RESULTS_DIR/${RUN_NAME}"
 FINAL_DIR="$BASE_RESULTS_DIR/${RUN_NAME}"
 
-if [ -d "$TRAINING_DIR/checkpoint" ]; then
-    CHECKPOINT_DIR="$TRAINING_DIR/checkpoint"
-    TRAINING_BASE="$TRAINING_DIR"
-elif [ -d "$FINAL_DIR/checkpoint" ]; then
+if [ -d "$FINAL_DIR/checkpoint" ]; then
     CHECKPOINT_DIR="$FINAL_DIR/checkpoint"
     TRAINING_BASE="$FINAL_DIR"
+elif [ -d "$TRAINING_DIR/checkpoint" ]; then
+    CHECKPOINT_DIR="$TRAINING_DIR/checkpoint"
+    TRAINING_BASE="$TRAINING_DIR"
 else
     echo "ERROR: Could not find checkpoint directory."
     echo "Tried:"
@@ -116,7 +126,7 @@ for script in "${scripts[@]}"; do
         --split "test" \
         --raw_path "$RAW_MODEL_PATH" \
         --output_path "$OUTPUT_DIR" \
-        --max_samples 300
+        --max_samples 5
 
     echo "Finished $script"
     echo "-------------------------------------"
@@ -126,5 +136,6 @@ python3 "${SCRIPT_DIR}/create_table.py" \
     --run "$RUN_NAME" \
     --base_model_name "$BASE_MODEL_NAME" \
     --base_result_dir "$BASE_RESULTS_DIR" \
-    --train_data "$TRAIN_DATA"
+    --train_data "$TRAIN_DATA" \
+    --raw_model_path "$RAW_MODEL_PATH"
 done

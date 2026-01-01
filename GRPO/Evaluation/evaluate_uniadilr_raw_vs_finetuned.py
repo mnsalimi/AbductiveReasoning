@@ -23,10 +23,17 @@ from peft import PeftModel
 import numpy as np
 import warnings
 import textwrap
+import sys
+import os
 warnings.filterwarnings("ignore")
 
+# Add current directory to sys.path to ensure path_utils can be imported
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 # Import path utilities for project-relative paths
-from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
 
 # ============================================================================
 # Configuration
@@ -35,27 +42,15 @@ from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, g
 # Get project root for relative paths
 PROJECT_ROOT = get_project_root()
 
-RAW_MODEL_PATH = os.environ.get(
-    "EVAL_RAW_MODEL_PATH",
-    "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit",
-)
-
-TRAINING_DIR = os.environ.get(
-    "EVAL_TRAINING_DIR",
-    "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4",
-)
-
+# Allow path injection from orchestrator
+RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
+    "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
+TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
+    os.path.join(get_results_dir(), "dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"))
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
-
-OUTPUT_DIR = os.environ.get(
-    "EVAL_OUTPUT_DIR",
-    "/home/msalimi/users/sahand/AbductiveReasoning/GRPO/Evaluation/res/uniadilr_evaluation_results",
-)
-
-DEFAULT_VAL_SPLIT_PATH = os.environ.get(
-    "UNIADILR_VAL_SPLIT",
-    "./dataset/train_split.json",
-)
+OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
+    os.path.join(get_evaluation_dir(), "copa_evaluation_results_guess_cause"))  # Change default per script
+DEFAULT_VAL_SPLIT_PATH = os.environ.get("UNIADILR_VAL_SPLIT", "./dataset/UniADILR.jsonl",)
 
 # ============================================================================
 # Helper functions: model loading
@@ -353,8 +348,19 @@ def load_uniadilr_split(split_path: str, max_samples: int | None = None):
     """Load UniADILR examples from a pre-split JSON file."""
     print(f"\n📂 Loading UniADILR split from: {split_path}")
 
+    secondary_path = "/home/moein_salimi/users/Parsa/AbductiveReasoning/GRPO/dataset/UniADILR.jsonl"
+
     if not os.path.exists(split_path):
-        raise FileNotFoundError(f"Split file not found: {split_path}")
+        if os.path.exists(secondary_path):
+            # Use secondary path and inform user
+            print(f"⚠️ Warning: Primary split path not found. Using hardcoded secondary path: {secondary_path}")
+            split_path = secondary_path
+        else:
+            # Both failed
+            raise FileNotFoundError(
+                f"❌ Error: Neither the primary split path ({split_path}) "
+                f"nor the secondary hardcoded path ({secondary_path}) could be found."
+            )
 
     with open(split_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -560,7 +566,7 @@ def ensure_raw_results_cached(args):
     dataset_name = "uniadilr_abduction"
     sample_tag = f"max{args.max_samples}" if args.max_samples else "all"
 
-    raw_results_dir = os.path.join(OUTPUT_DIR, "raw_model", dataset_name)
+    raw_results_dir = os.path.join(get_grpo_dir(), args.output_path, "raw_model", dataset_name)
     os.makedirs(raw_results_dir, exist_ok=True)
 
     raw_results_file = os.path.join(
@@ -609,13 +615,8 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     We consider them cached if both all_cases.json and disagreement_cases.json exist.
     """
     dataset_name = "uniadilr_abduction"
-    ckpt_output_dir = os.path.join(
-        "/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name
-    )
-    all_cases_path = os.path.join(ckpt_output_dir, "all_cases.json")
-    disagreement_path = os.path.join(ckpt_output_dir, "disagreement_cases.json")
-
-    if os.path.exists(all_cases_path) and os.path.exists(disagreement_path):
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
+    if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
 
@@ -648,11 +649,18 @@ def evaluate_checkpoint_cases(args, checkpoint_path: str):
         print("❌ Cannot evaluate checkpoint without raw model results.")
         return
 
-    # Check if already cached
+    # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):
-        print(
-            f"✅ Using cached fine-tuned UniADILR results for per-case evaluation: {ckpt_name}"
-        )
+        print(f"✅ Using cached fine-tuned model results for per-case evaluation: {ckpt_name}")
+        ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, "uniadilr_abduction")
+        with open(os.path.join(ckpt_output_dir, "all_cases.json"), "r") as f:
+            finetuned_results = json.load(f)
+        return {
+            "raw_results": raw_results,
+            "finetuned_results": finetuned_results,
+            "all_cases_file": os.path.join(ckpt_output_dir, "all_cases.json"),
+            "disagreement_file": os.path.join(ckpt_output_dir, "disagreement_cases.json")
+        }
         return
 
     # Evaluate fine-tuned checkpoint
@@ -671,11 +679,14 @@ def evaluate_checkpoint_cases(args, checkpoint_path: str):
     if finetuned_results is None:
         print("❌ Fine-tuned model evaluation failed; aborting.")
         return
-
+    
+    # Build per-case comparison
     dataset_name = "uniadilr_abduction"
-    ckpt_output_dir = os.path.join(
-        "/".join(OUTPUT_DIR.split("/")[:-1]), args.run, ckpt_name, dataset_name
-    )
+    # Save in Evaluation directory instead of possibly duplicating root
+    ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
+    
+    # print(output_dir)
+    print(ckpt_output_dir)
     os.makedirs(ckpt_output_dir, exist_ok=True)
 
     raw_by_id = {r["record_id"]: r for r in raw_results["results"]}
@@ -755,6 +766,408 @@ def evaluate_checkpoint_cases(args, checkpoint_path: str):
 # ============================================================================
 # Main CLI
 # ============================================================================
+
+
+def save_results(raw_results, finetuned_results, best_checkpoint_info, output_dir):
+    """Save evaluation results to JSON files."""
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Save raw model results
+    if raw_results:
+        raw_output = {
+            "model": RAW_MODEL_PATH,
+            "evaluation_time": timestamp,
+            "metrics": raw_results["metrics"],
+            "correct_count": raw_results["correct_count"],
+            "total": raw_results["total"],
+            "detailed_results": raw_results["results"],
+        }
+
+        raw_file = os.path.join(output_dir, f"raw_model_results_{timestamp}.json")
+        with open(raw_file, "w") as f:
+            json.dump(raw_output, f, indent=2)
+        print(f"\\n💾 Raw model results saved to: {raw_file}")
+
+    # Save fine-tuned model results
+    if finetuned_results and best_checkpoint_info:
+        finetuned_output = {
+            "base_model": RAW_MODEL_PATH,
+            "checkpoint": best_checkpoint_info["path"],
+            "validation_score": best_checkpoint_info["score"],
+            "evaluation_time": timestamp,
+            "metrics": finetuned_results["metrics"],
+            "correct_count": finetuned_results["correct_count"],
+            "total": finetuned_results["total"],
+            "detailed_results": finetuned_results["results"],
+        }
+
+        finetuned_file = os.path.join(
+            output_dir, f"finetuned_model_results_{timestamp}.json"
+        )
+        with open(finetuned_file, "w") as f:
+            json.dump(finetuned_output, f, indent=2)
+        print(f"💾 Fine-tuned model results saved to: {finetuned_file}")
+
+    # Save comparison summary
+    summary = {
+        "evaluation_time": timestamp,
+        "dataset": "UniADILR",
+        "split_path": best_checkpoint_info.get("split_path", "unknown") if best_checkpoint_info else "unknown",
+        "num_samples": raw_results["total"] if raw_results else (finetuned_results["total"] if finetuned_results else 0),
+        "raw_model": None,
+        "finetuned_model": None,
+        "comparison": None
+    }
+
+    if raw_results:
+        summary["raw_model"] = {
+            "path": RAW_MODEL_PATH,
+            "metrics": raw_results["metrics"],
+            "correct_count": raw_results["correct_count"],
+            "total": raw_results["total"],
+        }
+
+    if finetuned_results and best_checkpoint_info:
+        summary["finetuned_model"] = {
+            "base_model": RAW_MODEL_PATH,
+            "checkpoint": best_checkpoint_info["path"],
+            "validation_score": best_checkpoint_info["score"],
+            "metrics": finetuned_results["metrics"],
+            "correct_count": finetuned_results["correct_count"],
+            "total": finetuned_results["total"],
+        }
+
+    if raw_results and finetuned_results:
+        acc_raw = raw_results["metrics"]["exact_match_accuracy"]
+        acc_ft = finetuned_results["metrics"]["exact_match_accuracy"]
+        improvement = acc_ft - acc_raw
+        relative_improvement = (improvement / acc_raw * 100) if acc_raw > 0 else 0
+        
+        summary["comparison"] = {
+            "exact_match_improvement": improvement,
+            "exact_match_relative_improvement_percent": relative_improvement,
+            "overall_improved": improvement > 0,
+        }
+
+    summary_file = os.path.join(output_dir, f"comparison_summary_{timestamp}.json")
+    with open(summary_file, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"💾 Comparison summary saved to: {summary_file}")
+
+    # Save disagreement and all cases summary
+    if raw_results and finetuned_results:
+        raw_by_id = {r["record_id"]: r for r in raw_results["results"]}
+        ft_by_id = {r["record_id"]: r for r in finetuned_results["results"]}
+
+        disagreement_cases = []
+        all_cases = []
+
+        for pid, raw_r in raw_by_id.items():
+            if pid not in ft_by_id:
+                continue
+            ft_r = ft_by_id[pid]
+
+            case_entry = {
+                "record_id": pid,
+                "context": raw_r["context"],
+                "hypothesis": raw_r["hypothesis"],
+                "ground_truth": raw_r["ground_truth"],
+                "raw": {
+                    "predicted": raw_r["predicted"],
+                    "completion": raw_r["completion"],
+                    "correct": raw_r["correct"],
+                },
+                "finetuned": {
+                    "predicted": ft_r["predicted"],
+                    "completion": ft_r["completion"],
+                    "correct": ft_r["correct"],
+                },
+            }
+
+            all_cases.append(case_entry)
+
+            if raw_r["correct"] == ft_r["correct"]:
+                continue
+
+            disagreement_type = (
+                "raw_correct_finetuned_wrong"
+                if raw_r["correct"] and not ft_r["correct"]
+                else "finetuned_correct_raw_wrong"
+            )
+
+            disagreement_cases.append(
+                {
+                    **case_entry,
+                    "disagreement_type": disagreement_type,
+                }
+            )
+
+        disagreement_file = os.path.join(output_dir, f"disagreement_cases_{timestamp}.json")
+        with open(disagreement_file, "w") as f:
+            json.dump(disagreement_cases, f, indent=2)
+        print(f"💾 Disagreement cases saved to: {disagreement_file}")
+
+        all_cases_file = os.path.join(output_dir, f"all_cases_{timestamp}.json")
+        with open(all_cases_file, "w") as f:
+            json.dump(all_cases, f, indent=2)
+        print(f"💾 All cases saved to: {all_cases_file}")
+
+    return summary
+
+
+def evaluate_all_checkpoints(args):
+    """Evaluate all checkpoints in a directory."""
+    checkpoint_dir = args.checkpoint_dir
+
+    if not os.path.isabs(checkpoint_dir):
+        checkpoint_dir = os.path.abspath(checkpoint_dir)
+
+    if not os.path.exists(checkpoint_dir):
+        print(f"❌ Error: Checkpoint directory does not exist: {checkpoint_dir}")
+        return
+
+    print("=" * 80)
+    print("🚀 UniADILR EVALUATION: ALL CHECKPOINTS")
+    print("=" * 80)
+    print(f"Checkpoint Directory: {checkpoint_dir}")
+    print(f"CUDA Device: {args.cuda_device}")
+    print(f"Batch Size: {args.batch_size}")
+    print(f"Split Path: {args.split_path}")
+    if args.max_samples:
+        print(f"Max Samples: {args.max_samples}")
+    print("=" * 80)
+
+    all_items = os.listdir(checkpoint_dir)
+    checkpoint_dirs = [
+        d
+        for d in all_items
+        if d.startswith("checkpoint-")
+        and os.path.isdir(os.path.join(checkpoint_dir, d))
+    ]
+
+    if not checkpoint_dirs:
+        print(f"❌ No checkpoint-* directories found in: {checkpoint_dir}")
+        return
+
+    checkpoint_dirs.sort(key=lambda x: int(x.split("-")[1]))
+
+    print(f"\\n📁 Found {len(checkpoint_dirs)} checkpoints:")
+    for ck in checkpoint_dirs:
+        print(f"   - {ck}")
+
+    # Optionally evaluate raw baseline once
+    raw_results = None
+    if not args.skip_raw:
+        print("\\n" + "=" * 80)
+        print("🤖 EVALUATING RAW MODEL (once)")
+        print("=" * 80)
+        raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
+        raw_results = evaluate_on_uniadilr(
+            raw_model,
+            raw_tokenizer,
+            split_path=args.split_path,
+            max_samples=args.max_samples,
+            model_name="Raw Model",
+            batch_size=args.batch_size,
+        )
+        del raw_model
+        torch.cuda.empty_cache()
+        print("\\n✅ Raw model evaluation complete")
+        print(
+            f"   Exact-match accuracy: {raw_results['metrics']['exact_match_accuracy']:.4f}"
+        )
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    summary_file = os.path.join(
+        OUTPUT_DIR, f"uniadilr_all_checkpoints_summary_{timestamp}.json"
+    )
+
+    summary_data = {
+        "evaluation_time": timestamp,
+        "dataset": "UniADILR",
+        "split_path": args.split_path,
+        "checkpoint_directory": checkpoint_dir,
+        "num_checkpoints_evaluated": len(checkpoint_dirs),
+        "raw_model": {
+            "path": RAW_MODEL_PATH,
+            "results": raw_results if raw_results else "not_evaluated",
+        },
+        "checkpoints": [],
+    }
+
+    with open(summary_file, "w") as f:
+        json.dump(summary_data, f, indent=2)
+
+    all_checkpoint_results = []
+
+    for i, ckpt_name in enumerate(checkpoint_dirs, 1):
+        ckpt_path = os.path.join(checkpoint_dir, ckpt_name)
+        print("\\n" + "=" * 80)
+        print(f"🎯 EVALUATING CHECKPOINT {i}/{len(checkpoint_dirs)}: {ckpt_name}")
+        print("=" * 80)
+
+        try:
+            ft_model, ft_tokenizer = load_finetuned_model(
+                ckpt_path, args.cuda_device
+            )
+            ft_results = evaluate_on_uniadilr(
+                ft_model,
+                ft_tokenizer,
+                split_path=args.split_path,
+                max_samples=args.max_samples,
+                model_name=ckpt_name,
+                batch_size=args.batch_size,
+            )
+            del ft_model
+            torch.cuda.empty_cache()
+
+            checkpoint_info = {
+                "checkpoint_name": ckpt_name,
+                "checkpoint_path": ckpt_path,
+                "results": ft_results,
+            }
+
+            summary_data["checkpoints"].append(
+                {
+                    "name": ckpt_name,
+                    "path": ckpt_path,
+                    "metrics": ft_results["metrics"],
+                    "improvements_vs_raw": {
+                        "exact_match_delta": ft_results["metrics"]["exact_match_accuracy"] - raw_results["metrics"]["exact_match_accuracy"] if raw_results else None,
+                    } if raw_results else None
+                }
+            )
+
+            with open(summary_file, "w") as f:
+                json.dump(summary_data, f, indent=2)
+
+            all_checkpoint_results.append(checkpoint_info)
+
+            print("\\n✅ Checkpoint evaluation complete")
+            print(
+                f"   Exact-match accuracy: {ft_results['metrics']['exact_match_accuracy']:.4f}"
+            )
+
+            if raw_results:
+                delta = (
+                    ft_results["metrics"]["exact_match_accuracy"]
+                    - raw_results["metrics"]["exact_match_accuracy"]
+                )
+                print(f"   📈 Δ vs raw (exact-match): {delta:+.4f}")
+
+        except Exception as e:
+            print(f"❌ Error evaluating {ckpt_name}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+
+    # Print summary
+    print("\\n" + "=" * 80)
+    print("📊 SUMMARY: ALL CHECKPOINTS COMPARISON (UniADILR)")
+    print("=" * 80)
+
+    if raw_results:
+        print(
+            f"\\n🤖 RAW MODEL exact-match accuracy: "
+            f"{raw_results['metrics']['exact_match_accuracy']:.4f}"
+        )
+
+    if all_checkpoint_results:
+        print(
+            f"\\n{'Checkpoint':<20} {'ExactMatch':<12} "
+            f"{'Δ vs Raw':<12}"
+        )
+        print("-" * 60)
+        for ck in all_checkpoint_results:
+            name = ck["checkpoint_name"]
+            em = ck["results"]["metrics"]["exact_match_accuracy"]
+            if raw_results:
+                delta = em - raw_results["metrics"]["exact_match_accuracy"]
+            else:
+                delta = float("nan")
+            print(f"{name:<20} {em:<12.4f} {delta:<12.4f}")
+
+        best_ckpt = max(
+            all_checkpoint_results,
+            key=lambda x: x["results"]["metrics"]["exact_match_accuracy"],
+        )
+        print(f"\\n🏆 BEST CHECKPOINT: {best_ckpt['checkpoint_name']}")
+        print(
+            f"   Exact-match accuracy: "
+            f"{best_ckpt['results']['metrics']['exact_match_accuracy']:.4f}"
+        )
+
+    print(f"\\n💾 All results saved to: {summary_file}")
+    print("=" * 80 + "\\n")
+
+
+def print_comparison(summary):
+    """Print formatted comparison results."""
+    print("\\n" + "=" * 80)
+    print("📊 UniADILR EVALUATION: RAW vs FINE-TUNED MODEL")
+    print("=" * 80)
+
+    if summary.get("raw_model"):
+        raw_metrics = summary["raw_model"]["metrics"]
+        print("\\n🤖 RAW MODEL:")
+        print(
+            f"   Exact-match accuracy: {raw_metrics['exact_match_accuracy']:.4f} "
+            f"({raw_metrics['exact_match_accuracy']*100:.2f}%)"
+        )
+        print(f"   Precision (macro):    {raw_metrics['precision']:.4f}")
+        print(f"   Recall (macro):       {raw_metrics['recall']:.4f}")
+        print(f"   F1 (macro):           {raw_metrics['f1']:.4f}")
+
+    if summary.get("finetuned_model"):
+        ft_metrics = summary["finetuned_model"]["metrics"]
+        print("\\n🎯 FINE-TUNED MODEL:")
+        print(
+            f"   Checkpoint: {os.path.basename(summary['finetuned_model']['checkpoint'])}"
+        )
+        val_score = summary["finetuned_model"]["validation_score"]
+        val_score_str = (
+            f"{val_score:.4f}" if isinstance(val_score, (int, float)) else str(val_score)
+        )
+        print(f"   Validation Score: {val_score_str}")
+        print(
+            f"   Exact-match accuracy: {ft_metrics['exact_match_accuracy']:.4f} "
+            f"({ft_metrics['exact_match_accuracy']*100:.2f}%)"
+        )
+        print(f"   Precision (macro):    {ft_metrics['precision']:.4f}")
+        print(f"   Recall (macro):       {ft_metrics['recall']:.4f}")
+        print(f"   F1 (macro):           {ft_metrics['f1']:.4f}")
+
+    if summary.get("comparison"):
+        print("\\n📈 IMPROVEMENTS:")
+        comp = summary["comparison"]
+        acc_imp = comp["exact_match_improvement"]
+        acc_rel = comp["exact_match_relative_improvement_percent"]
+
+        print(
+            f"   Exact-match: {acc_imp:+.4f} ({acc_imp*100:+.2f}%) | Relative: {acc_rel:+.2f}%"
+        )
+
+        print("\\n" + "-" * 80)
+
+        if comp["overall_improved"]:
+            print(
+                "✅ RESULT: Fine-tuning on your dataset IMPROVED performance on UniADILR!"
+            )
+            print(f"   • Exact-match accuracy improved by {acc_rel:.2f}% (relative)")
+        elif acc_imp < 0:
+            print(
+                "⚠️  RESULT: Fine-tuning on your dataset DECREASED performance on UniADILR."
+            )
+            print(f"   • Exact-match accuracy decreased by {acc_rel:.2f}% (relative)")
+        else:
+            print(
+                "➖ RESULT: Fine-tuning had NO SIGNIFICANT IMPACT on UniADILR performance."
+            )
+
+    print("=" * 80 + "\\n")
 
 
 def main():
@@ -840,7 +1253,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Make OUTPUT_DIR overridable
     OUTPUT_DIR = args.output_path
 
     # Basic validation
@@ -885,182 +1297,7 @@ def main():
 
     # If checkpoint_dir is provided, evaluate all checkpoints sequentially (summary mode)
     if args.checkpoint_dir:
-        checkpoint_dir = args.checkpoint_dir
-        if not os.path.isabs(checkpoint_dir):
-            checkpoint_dir = os.path.abspath(checkpoint_dir)
-
-        if not os.path.exists(checkpoint_dir):
-            print(f"❌ Error: Checkpoint directory does not exist: {checkpoint_dir}")
-            return
-
-        all_items = os.listdir(checkpoint_dir)
-        checkpoint_dirs = [
-            d
-            for d in all_items
-            if d.startswith("checkpoint-")
-            and os.path.isdir(os.path.join(checkpoint_dir, d))
-        ]
-
-        if not checkpoint_dirs:
-            print(f"❌ No checkpoint-* directories found in: {checkpoint_dir}")
-            return
-
-        checkpoint_dirs.sort(key=lambda x: int(x.split("-")[1]))
-
-        print("=" * 80)
-        print("🚀 UniADILR EVALUATION: ALL CHECKPOINTS")
-        print("=" * 80)
-        print(f"Raw Model:       {RAW_MODEL_PATH}")
-        print(f"Checkpoint Dir:  {checkpoint_dir}")
-        print(f"CUDA Device:     {args.cuda_device}")
-        print(f"Batch Size:      {args.batch_size}")
-        print(f"Split Path:      {args.split_path}")
-        if args.max_samples:
-            print(f"Max Samples:     {args.max_samples}")
-        print("=" * 80)
-        print("\n📁 Found checkpoints:")
-        for ck in checkpoint_dirs:
-            print(f"   - {ck}")
-
-        # Optionally evaluate raw baseline once
-        raw_results = None
-        if not args.skip_raw:
-            raw_model, raw_tokenizer = load_raw_model(args.cuda_device)
-            raw_results = evaluate_on_uniadilr(
-                raw_model,
-                raw_tokenizer,
-                split_path=args.split_path,
-                max_samples=args.max_samples,
-                model_name="Raw Model",
-                batch_size=args.batch_size,
-            )
-            del raw_model
-            torch.cuda.empty_cache()
-            print("\n✅ Raw model evaluation complete")
-            print(
-                f"   Exact-match accuracy: {raw_results['metrics']['exact_match_accuracy']:.4f}"
-            )
-        else:
-            print("\n⏭️  Skipping raw model evaluation")
-
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        summary_file = os.path.join(
-            OUTPUT_DIR, f"uniadilr_all_checkpoints_summary_{timestamp}.json"
-        )
-
-        summary_data = {
-            "evaluation_time": timestamp,
-            "dataset": "UniADILR",
-            "split_path": args.split_path,
-            "checkpoint_directory": checkpoint_dir,
-            "num_checkpoints_evaluated": len(checkpoint_dirs),
-            "raw_model": {
-                "path": RAW_MODEL_PATH,
-                "results": raw_results if raw_results else "not_evaluated",
-            },
-            "checkpoints": [],
-        }
-
-        all_checkpoint_results = []
-
-        for i, ckpt_name in enumerate(checkpoint_dirs, 1):
-            ckpt_path = os.path.join(checkpoint_dir, ckpt_name)
-            print("\n" + "=" * 80)
-            print(f"🎯 EVALUATING CHECKPOINT {i}/{len(checkpoint_dirs)}: {ckpt_name}")
-            print("=" * 80)
-
-            try:
-                ft_model, ft_tokenizer = load_finetuned_model(
-                    ckpt_path, args.cuda_device
-                )
-                ft_results = evaluate_on_uniadilr(
-                    ft_model,
-                    ft_tokenizer,
-                    split_path=args.split_path,
-                    max_samples=args.max_samples,
-                    model_name=ckpt_name,
-                    batch_size=args.batch_size,
-                )
-                del ft_model
-                torch.cuda.empty_cache()
-
-                all_checkpoint_results.append(
-                    {
-                        "checkpoint_name": ckpt_name,
-                        "checkpoint_path": ckpt_path,
-                        "results": ft_results,
-                    }
-                )
-
-                summary_data["checkpoints"].append(
-                    {
-                        "name": ckpt_name,
-                        "path": ckpt_path,
-                        "metrics": ft_results["metrics"],
-                    }
-                )
-
-                with open(summary_file, "w") as f:
-                    json.dump(summary_data, f, indent=2)
-
-                print("\n✅ Checkpoint evaluation complete")
-                print(
-                    f"   Exact-match accuracy: {ft_results['metrics']['exact_match_accuracy']:.4f}"
-                )
-
-                if raw_results:
-                    delta = (
-                        ft_results["metrics"]["exact_match_accuracy"]
-                        - raw_results["metrics"]["exact_match_accuracy"]
-                    )
-                    print(f"   📈 Δ vs raw (exact-match): {delta:+.4f}")
-
-            except Exception as e:
-                print(f"❌ Error evaluating {ckpt_name}: {e}")
-                import traceback
-
-                traceback.print_exc()
-                continue
-
-        # Print summary
-        print("\n" + "=" * 80)
-        print("📊 SUMMARY: ALL CHECKPOINTS COMPARISON (UniADILR)")
-        print("=" * 80)
-
-        if raw_results:
-            print(
-                f"\n🤖 RAW MODEL exact-match accuracy: "
-                f"{raw_results['metrics']['exact_match_accuracy']:.4f}"
-            )
-
-        if all_checkpoint_results:
-            print(
-                f"\n{'Checkpoint':<20} {'ExactMatch':<12} "
-                f"{'Δ vs Raw':<12}"
-            )
-            print("-" * 60)
-            for ck in all_checkpoint_results:
-                name = ck["checkpoint_name"]
-                em = ck["results"]["metrics"]["exact_match_accuracy"]
-                if raw_results:
-                    delta = em - raw_results["metrics"]["exact_match_accuracy"]
-                else:
-                    delta = float("nan")
-                print(f"{name:<20} {em:<12.4f} {delta:<12.4f}")
-
-            best_ckpt = max(
-                all_checkpoint_results,
-                key=lambda x: x["results"]["metrics"]["exact_match_accuracy"],
-            )
-            print(f"\n🏆 BEST CHECKPOINT: {best_ckpt['checkpoint_name']}")
-            print(
-                f"   Exact-match accuracy: "
-                f"{best_ckpt['results']['metrics']['exact_match_accuracy']:.4f}"
-            )
-
-        print(f"\n💾 All results saved to: {summary_file}")
-        print("=" * 80 + "\n")
+        evaluate_all_checkpoints(args)
         return
 
     # Standard mode: single raw vs best checkpoint (or user-specified checkpoint)
@@ -1075,6 +1312,19 @@ def main():
     if args.max_samples:
         print(f"Max Samples: {args.max_samples}")
     print("=" * 70)
+    
+    
+    print("="*70)
+    print("⚙️  Configuration Summary:")
+    if args.max_samples:
+        print(f"Max Samples: {args.max_samples}")
+    if args.skip_raw:
+        print(f"Mode: Fine-tuned model only")
+    elif args.skip_finetuned:
+        print(f"Mode: Raw model only")
+    else:
+        print(f"Mode: Both models (comparison)")
+    print("="*70)
 
     # Decide which checkpoint to use
     if not args.skip_finetuned:
@@ -1135,97 +1385,16 @@ def main():
         ft_results = None
         print("\n⏭️  Skipping fine-tuned model evaluation")
 
-    # Save simple summary JSON
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    summary_file = os.path.join(
-        OUTPUT_DIR, f"uniadilr_comparison_summary_{timestamp}.json"
-    )
-
-    summary = {
-        "evaluation_time": timestamp,
-        "dataset": "UniADILR",
-        "split_path": args.split_path,
-        "num_samples": raw_results["total"] if raw_results else ft_results["total"],
-        "raw_model": None,
-        "finetuned_model": None,
-    }
-
-    if raw_results:
-        summary["raw_model"] = {
-            "path": RAW_MODEL_PATH,
-            "metrics": raw_results["metrics"],
-        }
-
-    if ft_results:
-        summary["finetuned_model"] = {
-            "base_model": RAW_MODEL_PATH,
-            "checkpoint": best_checkpoint_info["path"]
-            if best_checkpoint_info
-            else None,
-            "validation_score": best_checkpoint_info["score"]
-            if best_checkpoint_info
-            else None,
-            "metrics": ft_results["metrics"],
-        }
-
-    if raw_results and ft_results:
-        acc_raw = raw_results["metrics"]["exact_match_accuracy"]
-        acc_ft = ft_results["metrics"]["exact_match_accuracy"]
-        summary["comparison"] = {
-            "exact_match_improvement": acc_ft - acc_raw,
-            "overall_improved": acc_ft > acc_raw,
-        }
-
-    with open(summary_file, "w") as f:
-        json.dump(summary, f, indent=2)
-    print(f"\n💾 Comparison summary saved to: {summary_file}")
-
-    # Pretty print comparison
-    print("\n" + "=" * 80)
-    print("📊 UniADILR EVALUATION: RAW vs FINE-TUNED MODEL")
-    print("=" * 80)
-
-    if raw_results:
-        print("\n🤖 RAW MODEL:")
-        print(
-            f"   Exact-match accuracy: {raw_results['metrics']['exact_match_accuracy']:.4f} "
-            f"({raw_results['metrics']['exact_match_accuracy']*100:.2f}%)"
-        )
-        print(f"   Precision (macro):    {raw_results['metrics']['precision']:.4f}")
-        print(f"   Recall (macro):       {raw_results['metrics']['recall']:.4f}")
-        print(f"   F1 (macro):           {raw_results['metrics']['f1']:.4f}")
-
-    if ft_results:
-        print("\n🎯 FINE-TUNED MODEL:")
-        if best_checkpoint_info:
-            print(
-                f"   Checkpoint: {os.path.basename(best_checkpoint_info['path'])} "
-                f"(val score: {best_checkpoint_info['score']})"
-            )
-        print(
-            f"   Exact-match accuracy: {ft_results['metrics']['exact_match_accuracy']:.4f} "
-            f"({ft_results['metrics']['exact_match_accuracy']*100:.2f}%)"
-        )
-        print(f"   Precision (macro):    {ft_results['metrics']['precision']:.4f}")
-        print(f"   Recall (macro):       {ft_results['metrics']['recall']:.4f}")
-        print(f"   F1 (macro):           {ft_results['metrics']['f1']:.4f}")
-
-    if raw_results and ft_results:
-        delta = (
-            ft_results["metrics"]["exact_match_accuracy"]
-            - raw_results["metrics"]["exact_match_accuracy"]
-        )
-        print("\n📈 IMPROVEMENT (fine-tuned vs raw):")
-        print(
-            f"   Exact-match accuracy: {delta:+.4f} ({delta*100:+.2f} percentage points)"
-        )
-        if delta > 0:
-            print("   ✅ Fine-tuning improved abductive reasoning.")
-        else:
-            print("   ⚠️  Fine-tuning did not improve exact-match accuracy.")
-
-    print("=" * 80 + "\n")
+    # Save results and print comparison
+    if raw_results or ft_results:
+        summary = save_results(raw_results, ft_results, best_checkpoint_info, OUTPUT_DIR)
+        print_comparison(summary)
+    elif raw_results:
+        print("\n✅ Raw model evaluation completed")
+    elif finetuned_results:
+        print("\n✅ Fine-tuned model evaluation completed")
+    
+    print(f"\n✅ All results saved to: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

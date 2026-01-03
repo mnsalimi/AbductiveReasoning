@@ -24,8 +24,8 @@ scripts=(
     "evaluate_art_raw_vs_finetuned.py"
     "evaluate_copa_raw_vs_finetuned_guess_effect.py"
     "evaluate_goEmotion_raw_vs_finetuned.py"
-    "evaluate_list_function_raw_vs_finetuned.py"
-    "evaluate_miniarc_raw_vs_finetuned.py"
+    # "evaluate_list_function_raw_vs_finetuned.py"
+    # "evaluate_miniarc_raw_vs_finetuned.py"
 )
 
 declare -A BATCH_SIZES=(
@@ -126,7 +126,7 @@ for script in "${scripts[@]}"; do
         --split "test" \
         --raw_path "$RAW_MODEL_PATH" \
         --output_path "$OUTPUT_DIR" \
-        --max_samples 5
+        --max_samples 200
 
     echo "Finished $script"
     echo "-------------------------------------"
@@ -136,6 +136,5 @@ python3 "${SCRIPT_DIR}/create_table.py" \
     --run "$RUN_NAME" \
     --base_model_name "$BASE_MODEL_NAME" \
     --base_result_dir "$BASE_RESULTS_DIR" \
-    --train_data "$TRAIN_DATA" \
-    --raw_model_path "$RAW_MODEL_PATH"
+    --train_data "$TRAIN_DATA" 
 done

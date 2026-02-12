@@ -49,6 +49,7 @@ import numpy as np
 from typing import Dict, Any, List, Tuple, Set, Union
 import pandas as pd
 from openpyxl.styles import PatternFill, Font, Alignment
+import re
 
 from evaluate_aime_raw_vs_finetuned import find_best_checkpoint  
 
@@ -106,7 +107,7 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
     if not os.path.isdir(root_dir):
         raise FileNotFoundError(f"Root directory not found: {root_dir}")
     
-    ckpt_path = os.path.join(root_dir, "raw_model")  
+    ckpt_path = os.path.join(root_dir, run, "raw_model")  
     row: Dict[str, Scalar] = {"checkpoint": f"{model_name}"}
     for dataset_name in sorted(os.listdir(ckpt_path)):
         dataset_path = os.path.join(ckpt_path, dataset_name)
@@ -162,8 +163,8 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
             if dir.startswith("dt"):
                 root_dir = os.path.join(root_dir, dir)
                 break
-            
-    training_step = [int(dir.split("-")[-1]) for dir in os.listdir(root_dir)]
+                
+    training_step = [int(dir.split("-")[-1]) for dir in os.listdir(root_dir) if "-" in dir]
     for ckpt_name in [f"checkpoint-{str(dir)}" for dir in sorted(training_step)]:
         ckpt_path = os.path.join(root_dir, ckpt_name)
         if not os.path.isdir(ckpt_path) or "checkpoint" not in ckpt_name:
@@ -858,7 +859,15 @@ def main():
     rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name)
     # write_csv(rows, columns, args.out_csv)
     old_sheet_name = args.run
-    sheet_name = args.run.split("e20_")[0] + args.train_data + "_e20_" + args.run.split("e20_")[1]
+
+    match = re.search(r"(_e\d+_)", args.run)
+    if match:
+        start, end = match.span()
+        # Insert train_data before the epoch part
+        sheet_name = args.run[:start] + "_" + args.train_data + args.run[start:]
+    else:
+        # Fallback if pattern not found
+        sheet_name = args.run + "_" + args.train_data
     # Google Drive service account JSON path - should be set via environment variable or config
     gdrive_json = os.environ.get('GDRIVE_SERVICE_ACCOUNT_JSON', 
                                   os.path.expanduser("~/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json"))

@@ -89,29 +89,11 @@ The `_parse_xml_response()` function in `llm_client.py` handles extraction and m
 
 ## How to add a new metric
 
-### New binary metric
+See **[docs/adding_a_metric.md](docs/adding_a_metric.md)** for the full step-by-step guide.
 
-1. Create `prompts/binary/my_metric.py` with:
-   ```python
-   SYSTEM_PROMPT = "..."
-   USER_PROMPT_TEMPLATE = "...\n\n<reasoning_trace>\n{text}\n</reasoning_trace>"
-   ```
-2. In `metrics/registry.py`:
-   ```python
-   from prompts.binary.my_metric import SYSTEM_PROMPT as MM_SYS, USER_PROMPT_TEMPLATE as MM_USR
-   # ...inside METRICS dict:
-   "my_metric": BinaryMetric(
-       name="my_metric",
-       description="One-line description.",
-       system_prompt=MM_SYS,
-       user_prompt_template=MM_USR,
-   ),
-   ```
-That's it.
-
-### New counting metric
-
-Same steps but use `prompts/counting/` and `CountingMetric`.
+Two paths are covered:
+- **Path A** — add a binary (yes/no) or counting (example-extraction) metric using the existing classes. Requires only a new prompt file and one line in `metrics/registry.py`.
+- **Path B** — add a completely new metric type with custom LLM output structure. Covers writing the Pydantic schema, the metric class, the prompt file, and registration.
 
 ## Outputs
 

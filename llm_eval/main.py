@@ -1,0 +1,185 @@
+"""
+main.py
+-------
+Entry point for the LLM evaluation pipeline.
+
+Usage
+-----
+    python main.py
+
+All settings are controlled via config.py.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Ensure Unicode characters print correctly on Windows terminals (cp1252 → utf-8)
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", buffering=1)
+
+import config
+import llm_client
+import results as results_mod
+from data_loader import (
+    find_checkpoint_dirs,
+    find_dataset_files,
+    build_pid_map,
+    load_items,
+    parse_checkpoint_number,
+    compute_sampled_pids,
+)
+from evaluator import process_single_item
+from metrics.registry import get_active_metrics
+
+
+# ---------------------------------------------------------------------------
+# Bootstrap output directories
+# ---------------------------------------------------------------------------
+
+def _setup_dirs() -> None:
+    for d in (config.BASE_OUTPUT_DIR, config.LOG_DIR, config.UNNORM_DIR, config.NORM_DIR):
+        os.makedirs(d, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
+
+def run() -> None:
+    print("=" * 60)
+    print(" LLM EVALUATION PIPELINE")
+    print("=" * 60)
+    print(f"  Run ID     : {config.RUN_ID}")
+    print(f"  Judge model: {config.JUDGE_MODEL}")
+    print(f"  N samples  : {config.N_SAMPLES}")
+    print(f"  Seed       : {config.RANDOM_SEED}")
+    print(f"  Correct %  : {config.SAMPLE_CORRECT_RATIO}")
+
+    _setup_dirs()
+
+    active_metrics = get_active_metrics(config.DISABLED_METRICS)
+    print(f"\nActive metrics ({len(active_metrics)}):")
+    for name, m in active_metrics.items():
+        print(f"  [{m.metric_type:8s}] {name}: {m.description}")
+
+    # ── 1. Find checkpoints ──────────────────────────────────────────────
+    checkpoint_dirs = find_checkpoint_dirs()
+    if not checkpoint_dirs:
+        print("\n[ERROR] No checkpoint directories found. Adjust _CKPT_PATTERNS in data_loader.py.")
+        sys.exit(1)
+    print(f"\nFound {len(checkpoint_dirs)} checkpoint(s):")
+    for d in checkpoint_dirs:
+        print(f"  {d}")
+
+    # ── 2. API connectivity check ─────────────────────────────────────────
+    if not llm_client.test_connection():
+        answer = input("\n[!] API unreachable. Continue anyway? (yes/no): ").strip().lower()
+        if answer not in ("yes", "y"):
+            sys.exit(1)
+
+    # ── 3. Pre-compute stable shared sample set ───────────────────────────
+    sampled_pids = compute_sampled_pids(checkpoint_dirs)
+
+    # ── 4. Main loop over checkpoints ─────────────────────────────────────
+    all_results: list[dict] = []          # Every item result across all checkpoints
+    global_unnorm: list = []
+    global_norm: list = []
+
+    for ckpt_dir in checkpoint_dirs:
+        ckpt_num = parse_checkpoint_number(ckpt_dir)
+        if ckpt_num is None:
+            print(f"[WARN] Cannot parse checkpoint number from '{ckpt_dir}' – skipping.")
+            continue
+
+        ckpt_name = os.path.basename(ckpt_dir)
+        print(f"\n{'─'*60}")
+        print(f"  Checkpoint: {ckpt_name}  (step {ckpt_num})")
+        print(f"{'─'*60}")
+
+        dataset_files = find_dataset_files(ckpt_dir, ckpt_num)
+        if not dataset_files:
+            print(f"  [WARN] No dataset files found in {ckpt_dir}")
+            continue
+
+        tasks: list[tuple] = []
+        for f_info in dataset_files:
+            ds = f_info["dataset"]
+            wanted_pids = sampled_pids.get(ds, [])
+            if not wanted_pids:
+                print(f"  {ds}: skipped (no sampled PIDs)")
+                continue
+
+            try:
+                items = load_items(f_info["path"])
+                pid_map = build_pid_map(items)
+            except Exception as exc:
+                print(f"  [ERROR] Loading {f_info['path']}: {exc}")
+                continue
+
+            count = 0
+            for pid in wanted_pids:
+                rec = pid_map.get(pid)
+                if rec:
+                    reasoning, item = rec
+                    tasks.append((ds, ckpt_num, pid, reasoning, item))
+                    count += 1
+            print(f"  {ds}: queued {count}/{len(wanted_pids)} items")
+
+        if not tasks:
+            print("  No tasks – skipping checkpoint.")
+            continue
+
+        # Run in parallel
+        ckpt_results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as pool:
+            futures = {pool.submit(process_single_item, t): t for t in tasks}
+            for future in as_completed(futures):
+                try:
+                    ckpt_results.append(future.result())
+                except Exception as exc:
+                    task = futures[future]
+                    print(f"  [ERROR] Task {task[0]}/{task[2]}: {exc}")
+
+        all_results.extend(ckpt_results)
+
+        # Save per-checkpoint CSVs and collect summary rows
+        unnorm_summary, norm_summary = results_mod.save_checkpoint_csvs(
+            checkpoint_num=ckpt_num,
+            checkpoint_dir_name=ckpt_name,
+            result_rows=ckpt_results,
+            active_metric_names=list(active_metrics),
+        )
+        global_unnorm.append(unnorm_summary)
+        global_norm.append(norm_summary)
+
+    # ── 5. Post-run outputs ───────────────────────────────────────────────
+    if all_results:
+        results_mod.write_debug_logs(all_results)
+
+    print("\n[Generating comparison tables …]")
+    results_mod.generate_comparison_tables(config.UNNORM_DIR, "Unnormalized")
+    results_mod.generate_comparison_tables(config.NORM_DIR, "Normalized")
+
+    tier_metrics = {"neg_constraint", "branchiness"}
+    if tier_metrics.issubset(active_metrics.keys()):
+        print("\n[Generating tier distribution plots …]")
+        results_mod.generate_tier_plots(config.UNNORM_DIR)
+        results_mod.generate_tier_plots(config.NORM_DIR)
+    else:
+        missing = tier_metrics - active_metrics.keys()
+        print(f"\n[Skipping tier distribution plots — metrics not active: {', '.join(sorted(missing))}]")
+
+    print("\n" + "=" * 60)
+    print(" DONE".center(60))
+    print("=" * 60)
+    print(f"\nOutputs in: {config.BASE_OUTPUT_DIR}/")
+    print(f"  {config.UNNORM_DIR}/")
+    print(f"  {config.NORM_DIR}/")
+    print(f"  {config.LOG_DIR}/")
+
+
+if __name__ == "__main__":
+    run()

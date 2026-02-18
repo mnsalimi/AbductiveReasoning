@@ -14,7 +14,12 @@ llm_eval/
 ├── results.py                  ← backward-compatible facade over reporting/
 ├── pyproject.toml              ← project metadata, dependencies, linter config
 ├── requirements.txt
-├── .env.example                ← copy to .env and fill in your API key
+├── .env                        ← API credentials (never commit – in .gitignore)
+├── .gitignore
+│
+├── docs/
+│   ├── adding_a_metric.md      ← step-by-step guide for adding new metrics
+│   └── metric_definitions.md  ← definitions of every metric and metric type
 │
 ├── metrics/
 │   ├── base.py                 ← MetricResult dataclass + abstract BaseMetric
@@ -24,17 +29,24 @@ llm_eval/
 │
 ├── prompts/
 │   ├── binary/
-│   │   └── uncertainty_language.py   ← example binary metric prompt
+│   │   └── uncertainty_language.py      ← binary: presence of hedging language
 │   └── counting/
-│       ├── branchiness.py
-│       ├── backtracking.py
-│       ├── self_verification.py
-│       └── neg_constraint.py
+│       ├── branchiness.py               ← counting: parallel hypothesis exploration
+│       ├── backtracking.py              ← counting: explicit self-correction moments
+│       ├── self_verification.py         ← counting: explicit verification moments
+│       ├── neg_constraint.py            ← counting: ruling-out moments
+│       └── uncertainty_markers.py       ← counting: individual hedging word occurrences
 │
-└── reporting/                  ← output-generation package
-    ├── csv.py                  ← per-checkpoint CSV writing + debug logs
-    ├── excel.py                ← colour-coded Excel workbook builder
-    └── plots.py                ← evolution line plots + tier bar charts
+├── checkpoints/                ← input data (model checkpoint outputs)
+│   ├── checkpoint-0/
+│   └── checkpoint-4096/
+│
+├── reporting/                  ← output-generation package
+│   ├── csv.py                  ← per-checkpoint CSV writing + debug logs
+│   ├── excel.py                ← colour-coded Excel workbook builder
+│   └── plots.py                ← evolution line plots + tier bar charts
+│
+└── results/                    ← generated outputs (see Outputs section)
 ```
 
 ## Metric types
@@ -58,8 +70,9 @@ pip install -r requirements.txt
 # or, using pyproject.toml:
 pip install -e .
 
-# Set up credentials
-cp .env.example .env          # then fill in OPENAI_API_KEY (and optionally OPENAI_BASE_URL)
+# Set up credentials – add your API key to .env
+# OPENAI_API_KEY=your_key_here
+# OPENAI_BASE_URL=https://api.hyperbolic.xyz/v1   (optional)
 
 # Edit config.py to set your model, sampling, and paths
 python main.py

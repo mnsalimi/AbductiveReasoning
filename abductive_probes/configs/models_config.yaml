@@ -1,0 +1,5 @@
+openai/gpt-4o-mini:
+  thinking: false
+  temperature: 0.0
+  max_output_tokens: 3000
+  sleep_time: 0.5

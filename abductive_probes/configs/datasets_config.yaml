@@ -1,0 +1,8 @@
+loading:
+  cache_directory: ./dataset_cache
+  default_max_samples: -1
+  download_timeout: 300
+  enable_cache: true
+  random_seed: 42
+  shuffle_samples: true
+  test_sample_limit: 3

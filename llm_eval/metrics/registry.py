@@ -38,6 +38,10 @@ from prompts.counting.neg_constraint import (
     SYSTEM_PROMPT as NC_SYS,
     USER_PROMPT_TEMPLATE as NC_USR,
 )
+from prompts.counting.uncertainty_markers import (
+    SYSTEM_PROMPT as UM_SYS,
+    USER_PROMPT_TEMPLATE as UM_USR,
+)
 
 # ---------------------------------------------------------------------------
 # Prompt imports – binary metrics
@@ -76,6 +80,12 @@ METRICS: dict[str, BaseMetric] = {
         description="Explicitly ruling out an option or hypothesis due to a contradiction.",
         system_prompt=NC_SYS,
         user_prompt_template=NC_USR,
+    ),
+    "uncertainty_markers": CountingMetric(
+        name="uncertainty_markers",
+        description="Count of individual probabilistic/hedging words and phrases in the reasoning trace.",
+        system_prompt=UM_SYS,
+        user_prompt_template=UM_USR,
     ),
     # ── Binary metrics ──────────────────────────────────────────────────────
     "uncertainty_language": BinaryMetric(

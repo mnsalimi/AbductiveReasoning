@@ -39,15 +39,17 @@ llm_eval/
 
 ## Metric types
 
+See **[docs/metric_definitions.md](docs/metric_definitions.md)** for full definitions of every metric and both metric types.
+
 ### Binary metrics
 The LLM reasons about whether a phenomenon is present (`detected: true/false`) and explains why.  It also quotes the strongest piece of supporting evidence.
 
-**Example:** `uncertainty_language` – Does the model use probabilistic language rather than expressing absolute certainty?
+**Metrics:** `uncertainty_language`
 
 ### Counting metrics
 The LLM does **not** produce a number.  Instead it returns a list of concrete **examples** (excerpt + explanation) of the phenomenon.  The pipeline derives a count as `len(examples)` for plotting.
 
-**Examples:** `branchiness`, `backtracking`, `self_verification`, `neg_constraint`
+**Metrics:** `branchiness`, `backtracking`, `self_verification`, `neg_constraint`, `uncertainty_markers`
 
 ## Quick start
 

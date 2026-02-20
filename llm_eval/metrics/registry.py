@@ -50,6 +50,10 @@ from prompts.binary.uncertainty_language import (
     SYSTEM_PROMPT as UL_SYS,
     USER_PROMPT_TEMPLATE as UL_USR,
 )
+from prompts.binary.detail_coverage import (
+    SYSTEM_PROMPT as DC_SYS,
+    USER_PROMPT_TEMPLATE as DC_USR,
+)
 
 # ---------------------------------------------------------------------------
 # Registry
@@ -93,6 +97,12 @@ METRICS: dict[str, BaseMetric] = {
         description="Use of probabilistic language rather than absolute certainty.",
         system_prompt=UL_SYS,
         user_prompt_template=UL_USR,
+    ),
+    "detail_coverage": BinaryMetric(
+        name="detail_coverage",
+        description="Hypothesis accounts for all specific observation details, not just the main event.",
+        system_prompt=DC_SYS,
+        user_prompt_template=DC_USR,
     ),
 }
 

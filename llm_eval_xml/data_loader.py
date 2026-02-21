@@ -1,0 +1,256 @@
+"""
+data_loader.py
+--------------
+Checkpoint discovery, dataset file resolution, item loading, and sampling.
+
+All file-system concerns live here so the rest of the pipeline is agnostic to
+the on-disk layout.
+"""
+
+from __future__ import annotations
+
+import glob
+import json
+import os
+import random
+from typing import Any
+
+import config
+
+
+# ---------------------------------------------------------------------------
+# Types
+# ---------------------------------------------------------------------------
+
+Item = dict[str, Any]
+PidMap = dict[Any, tuple[str, Item]]  # problem_id → (reasoning_text, raw_item)
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint discovery
+# ---------------------------------------------------------------------------
+
+_CKPT_PATTERNS = [
+    "checkpoint-*",
+    "checkpoints/checkpoint-*",
+    "evaluation-llm/checkpoints/checkpoint-*",
+    "../checkpoint-*",
+]
+
+
+def find_checkpoint_dirs() -> list[str]:
+    """Return a sorted, de-duplicated list of checkpoint directory paths."""
+    found: list[str] = []
+    for pattern in _CKPT_PATTERNS:
+        found.extend(glob.glob(pattern))
+    return sorted(set(found))
+
+
+def parse_checkpoint_number(ckpt_dir: str) -> int | None:
+    """Extract the integer checkpoint step from a directory name like ``checkpoint-500``."""
+    try:
+        return int(os.path.basename(os.path.normpath(ckpt_dir)).split("-")[-1])
+    except (ValueError, IndexError):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Dataset file discovery inside a checkpoint
+# ---------------------------------------------------------------------------
+
+def _target_filename(ckpt_num: int) -> str:
+    """Checkpoint-0 uses a different file than trained checkpoints."""
+    return "raw_results_train_all.json" if ckpt_num == 0 else "all_cases.json"
+
+
+def find_dataset_files(ckpt_dir: str, ckpt_num: int) -> list[dict[str, str]]:
+    """
+    Return a list of ``{"path": ..., "dataset": ...}`` dicts for all dataset
+    files found under ``ckpt_dir``.
+    """
+    target = _target_filename(ckpt_num)
+    pattern = os.path.join(ckpt_dir, "*", target)
+    results: list[dict[str, str]] = []
+    for path in sorted(glob.glob(pattern)):
+        parts = os.path.normpath(path).split(os.sep)
+        dataset_name = parts[-2].lower()
+        results.append({"path": path, "dataset": dataset_name})
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Item loading
+# ---------------------------------------------------------------------------
+
+def load_items(path: str) -> list[Item]:
+    """Load the list of evaluation items from a JSON file."""
+    with open(path, encoding="utf-8") as fh:
+        content = json.load(fh)
+    if isinstance(content, dict) and "results" in content:
+        return content["results"]
+    if isinstance(content, list):
+        return content
+    return []
+
+
+def extract_reasoning(item: Item) -> str | None:
+    """
+    Pull the reasoning text from an item regardless of the schema variant.
+    Returns None if no usable reasoning is found.
+    """
+    # Schema variant 1: {"finetuned": {"reasoning": ...}}
+    ft = item.get("finetuned")
+    if isinstance(ft, dict):
+        r = ft.get("reasoning")
+        if r:
+            return r
+    if isinstance(ft, str) and ft:
+        return ft
+    # Schema variant 2: {"reasoning": ...}
+    r = item.get("reasoning")
+    if r:
+        return r
+    return None
+
+
+def _is_placeholder(text: str) -> bool:
+    """True if the reasoning text is a template placeholder, not real reasoning."""
+    return "here you write your chain-of-thought" in text.lower()
+
+
+def get_labels(item: Item) -> tuple[Any, Any]:
+    """Return (true_label, predicted_label), supporting ART and MedQA schemas."""
+    t = item.get("true_label") or item.get("true_answer")
+    p = item.get("predicted_label") or item.get("predicted_answer")
+    return t, p
+
+
+def build_pid_map(items: list[Item]) -> PidMap:
+    """
+    Build a mapping ``problem_id → (reasoning_text, raw_item)`` for all items
+    that have a valid, non-placeholder reasoning trace.
+    """
+    out: PidMap = {}
+    for item in items:
+        reasoning = extract_reasoning(item)
+        if not reasoning or _is_placeholder(reasoning):
+            continue
+        pid = item.get("problem_id")
+        if pid is not None:
+            out[pid] = (reasoning, item)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Sampling
+# ---------------------------------------------------------------------------
+
+def _sort_pids(pids: set) -> list:
+    def _key(x: Any) -> tuple:
+        try:
+            return (0, int(str(x)))
+        except (ValueError, TypeError):
+            return (1, str(x))
+    return sorted(pids, key=_key)
+
+
+def compute_sampled_pids(
+    checkpoint_dirs: list[str],
+    *,
+    n_samples: int = config.N_SAMPLES,
+    seed: int = config.RANDOM_SEED,
+    correct_ratio: float | None = config.SAMPLE_CORRECT_RATIO,
+) -> dict[str, list]:
+    """
+    Pre-compute ONE shared sample set per dataset across ALL checkpoints.
+
+    Benefits:
+    - The same problem IDs are evaluated in every checkpoint → fair cross-checkpoint
+      comparison.
+    - Status (Correct / Incorrect) is stable across checkpoints within the sampled
+      pool when ``correct_ratio`` is set.
+
+    Returns a dict ``{dataset_name: [pid, ...]}`` for every dataset that is
+    present across *all* checkpoints.
+    """
+    ckpt_nums_by_dir: dict[str, int] = {}
+    for ckpt_dir in checkpoint_dirs:
+        n = parse_checkpoint_number(ckpt_dir)
+        if n is not None:
+            ckpt_nums_by_dir[ckpt_dir] = n
+
+    expected_ckpt_count = len(ckpt_nums_by_dir)
+
+    intersection: dict[str, set] = {}
+    correct_sets: dict[str, set] = {}
+    incorrect_sets: dict[str, set] = {}
+    dataset_ckpt_count: dict[str, int] = {}
+
+    for ckpt_dir, ckpt_num in ckpt_nums_by_dir.items():
+        for f_info in find_dataset_files(ckpt_dir, ckpt_num):
+            ds = f_info["dataset"]
+            try:
+                items = load_items(f_info["path"])
+                pid_map = build_pid_map(items)
+            except Exception as exc:
+                print(f"[WARN] Could not load {f_info['path']}: {exc}")
+                continue
+
+            valid_pids = set(pid_map)
+            correct_pids: set = set()
+            incorrect_pids: set = set()
+            for pid, (_r, itm) in pid_map.items():
+                t, p = get_labels(itm)
+                if t is not None and p is not None:
+                    (correct_pids if str(t) == str(p) else incorrect_pids).add(pid)
+
+            dataset_ckpt_count[ds] = dataset_ckpt_count.get(ds, 0) + 1
+
+            if ds not in intersection:
+                intersection[ds] = valid_pids
+                correct_sets[ds] = correct_pids
+                incorrect_sets[ds] = incorrect_pids
+            else:
+                intersection[ds] &= valid_pids
+                correct_sets[ds] &= correct_pids
+                incorrect_sets[ds] &= incorrect_pids
+
+    # Drop datasets not present in every checkpoint
+    for ds in list(intersection):
+        if dataset_ckpt_count.get(ds, 0) < expected_ckpt_count:
+            print(
+                f"[WARN] Dataset '{ds}' found in only "
+                f"{dataset_ckpt_count[ds]}/{expected_ckpt_count} checkpoints – skipping."
+            )
+            del intersection[ds]
+
+    random.seed(seed)
+    sampled: dict[str, list] = {}
+
+    for ds, pid_set in intersection.items():
+        if not pid_set:
+            print(f"[WARN] Dataset '{ds}': no common valid items across checkpoints.")
+            continue
+
+        if correct_ratio is not None and 0.0 <= correct_ratio <= 1.0:
+            stable_correct = _sort_pids(correct_sets.get(ds, set()) & pid_set)
+            stable_incorrect = _sort_pids(incorrect_sets.get(ds, set()) & pid_set)
+
+            target_correct = int(n_samples * correct_ratio)
+            target_incorrect = n_samples - target_correct
+
+            pool: list = []
+            pool.extend(random.sample(stable_correct, min(target_correct, len(stable_correct))))
+            pool.extend(random.sample(stable_incorrect, min(target_incorrect, len(stable_incorrect))))
+
+            sampled[ds] = _sort_pids(set(pool))
+            print(
+                f"[OK] '{ds}': sampled {len(sampled[ds])} items "
+                f"(correct pool={len(stable_correct)}, incorrect pool={len(stable_incorrect)})"
+            )
+        else:
+            k = min(n_samples, len(pid_set))
+            sampled[ds] = _sort_pids(random.sample(_sort_pids(pid_set), k))
+            print(f"[OK] '{ds}': sampled {len(sampled[ds])} items (no stratification)")
+
+    return sampled

@@ -33,8 +33,7 @@ llm_eval/
 │   └── counting/
 │       ├── branchiness.py               ← counting: parallel hypothesis exploration
 │       ├── backtracking.py              ← counting: explicit self-correction moments
-│       ├── self_verification.py         ← counting: explicit verification moments
-│       ├── neg_constraint.py            ← counting: ruling-out moments
+
 │       └── uncertainty_markers.py       ← counting: individual hedging word occurrences
 │
 ├── checkpoints/                ← input data (model checkpoint outputs)
@@ -44,7 +43,7 @@ llm_eval/
 ├── reporting/                  ← output-generation package
 │   ├── csv.py                  ← per-checkpoint CSV writing + debug logs
 │   ├── excel.py                ← colour-coded Excel workbook builder
-│   └── plots.py                ← evolution line plots + tier bar charts
+│   └── plots.py                ← evolution line plots
 │
 └── results/                    ← generated outputs (see Outputs section)
 ```
@@ -61,7 +60,7 @@ The LLM reasons about whether a phenomenon is present (`detected: true/false`) a
 ### Counting metrics
 The LLM does **not** produce a number.  Instead it returns a list of concrete **examples** (excerpt + explanation) of the phenomenon.  The pipeline derives a count as `len(examples)` for plotting.
 
-**Metrics:** `branchiness`, `backtracking`, `self_verification`, `neg_constraint`, `uncertainty_markers`
+**Metrics:** `branchiness`, `backtracking`, `uncertainty_markers`
 
 ## Quick start
 
@@ -120,8 +119,7 @@ results/
 │   │   └── summary_metrics.csv        ← per-dataset averages
 │   ├── all_checkpoints_summary.csv
 │   ├── checkpoint_comparison.xlsx     ← colour-coded comparison table
-│   ├── evolution_<metric>_*.png       ← line plots
-│   └── tier_distribution_<dataset>.png
+│   └── evolution_<metric>_*.png       ← line plots
 ├── normalized/                        ← same files but counts per 100 words
 └── llm_logs/
     ├── <dataset>_llm_responses.jsonl  ← raw LLM call log (for debugging)
@@ -137,5 +135,5 @@ results/
 | `MAX_WORKERS` | `5` | Parallel threads |
 | `SAMPLE_CORRECT_RATIO` | `1.0` | Fraction of correct items in sample |
 | `RANDOM_SEED` | `42` | Reproducibility seed |
-| `DISABLED_METRICS` | `[]` | Names of metrics to skip |
+| `DISABLED_METRICS` | `["backtracking", "branchiness"]` | Names of metrics to skip |
 | `CLEAR_PREVIOUS_OUTPUTS` | `False` | Delete existing JSONL logs on start |

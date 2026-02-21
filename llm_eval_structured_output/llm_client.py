@@ -13,7 +13,6 @@ from __future__ import annotations
 import datetime
 import json
 import os
-import re
 import threading
 from typing import Any
 
@@ -188,18 +187,17 @@ def ask_llm(
 
     key = _cache_key(run_id, checkpoint, dataset, problem_id, metric_type, model)
     if key in _response_cache:
+        print(f"  [LLM] Cache hit – {metric_type}/{problem_id} (ckpt={checkpoint})")
         return _response_cache[key]
 
-    # More retries for large OSS models that are prone to transient failures
-    max_tries = config.API_MAX_RETRIES if any(
-        t in model.lower() for t in ("oss", "deepseek", "qwen")
-    ) else 1
+    # All models honour API_MAX_RETRIES; transient errors are always worth retrying
+    max_tries = max(1, config.API_MAX_RETRIES)
 
     last_error: str = ""
     for attempt in range(max_tries):
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         try:
-            response = get_client().chat.completions.create(
+            response = get_client().chat.completions.parse(
                 model=model,
                 temperature=0.0,
                 max_tokens=2000,
@@ -207,37 +205,45 @@ def ask_llm(
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                response_format=response_schema,
             )
 
             msg = response.choices[0].message
             raw_content: str | None = getattr(msg, "content", None)
             raw_reasoning: str | None = getattr(msg, "reasoning_content", None)
 
-            oss_thinking, final_content = _split_oss_channels(raw_content)
+            oss_thinking, _ = _split_oss_channels(raw_content)
             thinking = raw_reasoning or oss_thinking
 
-            if not final_content:
+            if msg.refusal:
                 _append_log(log_path, {
                     "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
                     "dataset": dataset, "problem_id": problem_id,
                     "metric_type": metric_type, "model": model,
-                    "parse_status": "empty_response", "error_message": "Empty response",
-                    "raw_response": None, "raw_reasoning": thinking,
+                    "parse_status": "refusal", "error_message": msg.refusal,
+                    "raw_response": raw_content, "raw_reasoning": thinking,
                 })
                 return _default_payload(response_schema)
 
-            # Parse XML returned by the model
-            data = _parse_xml_response(final_content, response_schema)
+            if not msg.parsed:
+                _append_log(log_path, {
+                    "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
+                    "dataset": dataset, "problem_id": problem_id,
+                    "metric_type": metric_type, "model": model,
+                    "parse_status": "empty_response", "error_message": "Empty or unparsed response",
+                    "raw_response": raw_content, "raw_reasoning": thinking,
+                })
+                return _default_payload(response_schema)
 
-            # Validate against schema
-            validated = response_schema.model_validate(data).model_dump()
+            # Structured output parsed directly by the SDK
+            validated = msg.parsed.model_dump()
 
             _append_log(log_path, {
                 "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
                 "dataset": dataset, "problem_id": problem_id,
                 "metric_type": metric_type, "model": model,
                 "parse_status": "success",
-                "raw_response": final_content,
+                "raw_response": raw_content,
                 "raw_reasoning": thinking,
                 "parsed_data": validated,
             })
@@ -247,14 +253,14 @@ def ask_llm(
         except (ValueError, KeyError) as parse_err:
             last_error = str(parse_err)
             if attempt < max_tries - 1:
-                print(f"  [LLM] JSON parse failed (attempt {attempt + 1}): {last_error[:120]} – retrying …")
+                print(f"  [LLM] JSON parse error (attempt {attempt + 1}/{max_tries}): {last_error[:120]} – retrying …")
                 continue
 
         except Exception as api_err:
             last_error = str(api_err)
             err_lower = last_error.lower()
             if attempt < max_tries - 1:
-                print(f"  [LLM] API error (attempt {attempt + 1}): {last_error[:120]} – retrying …")
+                print(f"  [LLM] API error (attempt {attempt + 1}/{max_tries}): {last_error[:120]} – retrying …")
                 continue
             # Surface useful hints
             if "timeout" in err_lower:
@@ -270,53 +276,9 @@ def ask_llm(
         "parse_status": "failed", "error_message": last_error,
         "raw_response": None, "raw_reasoning": None,
     })
-    print(f"  [LLM] All attempts failed for {metric_type}/{problem_id}: {last_error[:200]}")
+    print(f"  [LLM] FAILED {metric_type}/{problem_id} ckpt={checkpoint} after {max_tries} attempt(s): {last_error[:200]}")
     return _default_payload(response_schema)
 
-
-def _parse_xml_response(text: str, schema: type[BaseModel]) -> dict:
-    """
-    Extract fields from an XML-formatted LLM response.
-
-    Supports two response shapes:
-
-    Binary  → <detected>, <reasoning>, <evidence>
-    Counting → <analysis>, <matches> containing <match> blocks
-                with <excerpt> and <explanation> children.
-    """
-    def _tag(tag: str, src: str) -> str:
-        """Return the inner text of the first occurrence of <tag>…</tag>."""
-        m = re.search(rf"<{tag}>(.*?)</{tag}>", src, re.DOTALL | re.IGNORECASE)
-        return m.group(1).strip() if m else ""
-
-    fields = {f for f in schema.model_fields}
-
-    # ---- Binary shape -------------------------------------------------------
-    if "detected" in fields:
-        raw_detected = _tag("detected", text).lower()
-        detected = raw_detected in ("true", "1", "yes")
-        return {
-            "detected": detected,
-            "reasoning": _tag("reasoning", text),
-            "evidence": _tag("evidence", text),
-        }
-
-    # ---- Counting shape -----------------------------------------------------
-    analysis = _tag("analysis", text)
-    examples: list[dict] = []
-    matches_block_m = re.search(r"<matches>(.*?)</matches>", text, re.DOTALL | re.IGNORECASE)
-    if matches_block_m:
-        matches_block = matches_block_m.group(1)
-        for match in re.finditer(r"<match>(.*?)</match>", matches_block, re.DOTALL | re.IGNORECASE):
-            block = match.group(1)
-            examples.append({
-                "excerpt": _tag("excerpt", block),
-                "explanation": _tag("explanation", block),
-            })
-    return {
-        "overall_analysis": analysis,
-        "examples": examples,
-    }
 
 
 def _default_payload(schema: type[BaseModel]) -> dict:

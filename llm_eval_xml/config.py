@@ -64,6 +64,6 @@ CLEAR_PREVIOUS_OUTPUTS: bool = False
 # Controlled by the metric registry (metrics/registry.py).
 # You can disable individual metrics here by name.
 # ---------------------------------------------------------------------------
-DISABLED_METRICS = ["backtracking", "self_verification", "neg_constraint", "branchiness"]
+DISABLED_METRICS = ["backtracking", "branchiness"]
 # DISABLED_METRICS: list[str] = []
 # Example: DISABLED_METRICS = ["backtracking", "self_verification"]

@@ -50,7 +50,7 @@ Markers are grouped into five categories:
 4. **Degree / approximation qualifiers** — "approximately", "roughly", "to some extent", "somewhat"
 5. **Epistemic uncertainty statements** — "we cannot be sure", "it is unclear", "the evidence is inconclusive"
 
-**Does not count:** logical negations (covered by `neg_constraint`), boiler-plate disclaimers, purely logical hypotheticals ("if we could assume…")
+**Does not count:** logical negations, boiler-plate disclaimers, purely logical hypotheticals ("if we could assume…")
 
 ---
 
@@ -69,34 +69,10 @@ Measures whether the model thinks divergently rather than following a single lin
 
 > **How many times does the reasoning explicitly identify an error or flaw and change direction?**
 
-Captures deliberate self-correction: the model realises something it said or computed is wrong and reverses course.  This is distinct from `branchiness` (exploring valid alternatives) and `self_verification` (checking whether something is correct).
+Captures deliberate self-correction: the model realises something it said or computed is wrong and reverses course.  This is distinct from `branchiness` (exploring valid alternatives).
 
 **Positive examples:** "Wait, that's wrong", "On second thought…", "Let me re-read the problem", "I realise I forgot to account for…"  
 **Does not count:** comparing two valid paths (Branchiness), a simple "however" contrast without admitting an error, the final answer selection
-
----
-
-### `self_verification` — Counting
-
-> **How many times does the reasoning explicitly check, confirm, or validate a previous step or conclusion?**
-
-Captures moments where the model pauses to verify its own work rather than just moving forward.  This is separate from `backtracking` (finding and fixing an error) — verification can confirm something is *correct* as well as find a mistake.
-
-**Positive examples:** "Let me double-check", "Verify that…", "Does this match…?", "Substitute back to confirm", "This is consistent with…"  
-**Does not count:** casual use of "check" in forward reasoning, mentioning a requirement without verifying it, the final answer selection
-
----
-
-### `neg_constraint` — Counting
-
-> **How many times does the reasoning explicitly rule out an option or hypothesis by citing a contradiction with known facts or constraints?**
-
-Captures active elimination of possibilities.  Each event where the model names a candidate and provides a concrete reason it is impossible or incompatible is one example.
-
-**Positive examples:** "Rule out X because…", "Y is contraindicated because…", "Diagnosis Z requires symptom W, which is absent", "Option A contradicts the given lab value"  
-**Does not count:** the final answer selection alone, vague preferences ("A is less likely than B") without a concrete reason, comparative exploration of hypotheses (Branchiness)
-
----
 
 ## Relationship Between Metrics
 
@@ -109,11 +85,7 @@ Reasoning trace phenomenon
 │
 ├── Does it explore multiple paths in parallel?    → branchiness           (counting)
 │
-├── Does it catch and fix its own mistakes?        → backtracking          (counting)
-│
-├── Does it verify its own work?                   → self_verification     (counting)
-│
-└── Does it actively eliminate wrong options?      → neg_constraint        (counting)
+└── Does it catch and fix its own mistakes?        → backtracking          (counting)
 ```
 
 Note that `uncertainty_language` and `uncertainty_markers` measure the **same underlying phenomenon** at different granularities — binary presence vs. raw occurrence count.  They are designed to complement rather than replace each other.

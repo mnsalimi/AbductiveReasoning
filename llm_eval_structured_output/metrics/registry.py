@@ -30,14 +30,6 @@ from prompts.counting.backtracking import (
     SYSTEM_PROMPT as BT_SYS,
     USER_PROMPT_TEMPLATE as BT_USR,
 )
-from prompts.counting.self_verification import (
-    SYSTEM_PROMPT as SV_SYS,
-    USER_PROMPT_TEMPLATE as SV_USR,
-)
-from prompts.counting.neg_constraint import (
-    SYSTEM_PROMPT as NC_SYS,
-    USER_PROMPT_TEMPLATE as NC_USR,
-)
 from prompts.counting.uncertainty_markers import (
     SYSTEM_PROMPT as UM_SYS,
     USER_PROMPT_TEMPLATE as UM_USR,
@@ -72,18 +64,6 @@ METRICS: dict[str, BaseMetric] = {
         description="Explicit self-correction or revision of a previous reasoning step.",
         system_prompt=BT_SYS,
         user_prompt_template=BT_USR,
-    ),
-    "self_verification": CountingMetric(
-        name="self_verification",
-        description="Checking, confirming, or validating a previous step or conclusion.",
-        system_prompt=SV_SYS,
-        user_prompt_template=SV_USR,
-    ),
-    "neg_constraint": CountingMetric(
-        name="neg_constraint",
-        description="Explicitly ruling out an option or hypothesis due to a contradiction.",
-        system_prompt=NC_SYS,
-        user_prompt_template=NC_USR,
     ),
     "uncertainty_markers": CountingMetric(
         name="uncertainty_markers",

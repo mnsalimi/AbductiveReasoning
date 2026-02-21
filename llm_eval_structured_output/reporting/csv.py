@@ -158,6 +158,7 @@ def write_debug_logs(all_results: list[dict]) -> None:
                 row[f"{mname}_example_count"] = mdata.get("example_count")
                 row[f"{mname}_analysis"] = mdata.get("reasoning")
                 row[f"{mname}_examples"] = _safe_json(mdata.get("examples", []))
+                row[f"{mname}_error"] = mdata.get("error") or ""
             rows.append(row)
 
         out_path = os.path.join(config.LOG_DIR, f"{ds}_full_debug_{config.RUN_ID}.csv")

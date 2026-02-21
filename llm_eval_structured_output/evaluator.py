@@ -77,10 +77,16 @@ def process_single_item(
             run_id=run_id,
         )
         metric_results[metric_name] = result
+        status_icon = "OK" if not result.error else "FAIL"
+        detail = f"count={len(result.examples)}" if metric.metric_type == "counting" else f"detected={result.detected}"
+        err_suffix = f"  ERR: {result.error[:80]}" if result.error else ""
+        print(f"    [{status_icon:4s}] {metric_name}: {detail}{err_suffix}")
 
     print(
-        f"  [Done]       {dataset_name}  ckpt={checkpoint}  pid={pid}  "
-        f"metrics={list(metric_results)}"
+        f"  [Done] {dataset_name}  ckpt={checkpoint}  pid={pid}  "
+        f"({len(metric_results)} metrics, "
+        f"{sum(1 for r in metric_results.values() if not r.error)} OK, "
+        f"{sum(1 for r in metric_results.values() if r.error)} failed)"
     )
 
     # ── Assemble output ───────────────────────────────────────────────────

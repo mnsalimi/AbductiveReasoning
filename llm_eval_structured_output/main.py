@@ -163,15 +163,6 @@ def run() -> None:
     results_mod.generate_comparison_tables(config.UNNORM_DIR, "Unnormalized")
     results_mod.generate_comparison_tables(config.NORM_DIR, "Normalized")
 
-    tier_metrics = {"neg_constraint", "branchiness"}
-    if tier_metrics.issubset(active_metrics.keys()):
-        print("\n[Generating tier distribution plots …]")
-        results_mod.generate_tier_plots(config.UNNORM_DIR)
-        results_mod.generate_tier_plots(config.NORM_DIR)
-    else:
-        missing = tier_metrics - active_metrics.keys()
-        print(f"\n[Skipping tier distribution plots — metrics not active: {', '.join(sorted(missing))}]")
-
     print("\n" + "=" * 60)
     print(" DONE".center(60))
     print("=" * 60)

@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data and results
+checkpoints/
+results/
+llm_logs/
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.*
+!.env.example
+venv/
+env/
+
+test.py

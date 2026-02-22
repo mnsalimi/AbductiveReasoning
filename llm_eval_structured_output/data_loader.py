@@ -99,14 +99,27 @@ def find_dataset_files(ckpt_dir: str, ckpt_num: int) -> list[dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 def load_items(path: str) -> list[Item]:
-    """Load the list of evaluation items from a JSON file."""
+    """Load the list of evaluation items from a JSON file.
+
+    If any item is missing a ``problem_id``, sequential integer IDs (0-based)
+    are assigned in the order the items appear in the file so that the sampling
+    logic can treat them as normal items.
+    """
     with open(path, encoding="utf-8") as fh:
         content = json.load(fh)
     if isinstance(content, dict) and "results" in content:
-        return content["results"]
-    if isinstance(content, list):
-        return content
-    return []
+        items = content["results"]
+    elif isinstance(content, list):
+        items = content
+    else:
+        items = []
+
+    # Assign sequential IDs to items that are missing problem_id
+    for idx, item in enumerate(items):
+        if item.get("problem_id") is None:
+            item["problem_id"] = idx
+
+    return items
 
 
 def extract_reasoning(item: Item) -> str | None:

@@ -143,6 +143,14 @@ results/
 | `ACTIVE_DATASETS` | `["art", "copa_guess_effect"]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
 | `CLEAR_PREVIOUS_OUTPUTS` | `False` | Delete existing JSONL logs on start |
 
+## Changelog
+
+### 2026-02-22
+- **`data_loader.py` — auto-assign `problem_id` for datasets without IDs**  
+  Some dataset JSON files (e.g. `art`, `copa_guess_effect`) do not include a `problem_id` field on each result item.  `load_items()` now assigns a sequential integer ID (0-based, matching the order items appear in the file) to any item that is missing this field.  This ensures every item passes through `build_pid_map()` and the sampling / cross-checkpoint comparison logic works correctly for these datasets.
+
+---
+
 ## Model compatibility
 
 The pipeline auto-detects the judge model family and adjusts the API call accordingly:

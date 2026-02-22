@@ -35,10 +35,14 @@ def generate_comparison_tables(base_dir: str, label: str) -> None:
     print(f"\n{'='*60}\nGenerating comparison tables: {label}\n{'='*60}")
 
     ckpt_dirs = [
-        d for d in glob.glob(os.path.join(base_dir, "checkpoint-*")) if os.path.isdir(d)
+        d for d in (
+            glob.glob(os.path.join(base_dir, "checkpoint-*")) +
+            glob.glob(os.path.join(base_dir, "raw_model"))
+        )
+        if os.path.isdir(d)
     ]
     if not ckpt_dirs:
-        print(f"[WARN] No checkpoint-* dirs in {base_dir}")
+        print(f"[WARN] No checkpoint-* or raw_model dirs in {base_dir}")
         return
 
     frames: list[pd.DataFrame] = []

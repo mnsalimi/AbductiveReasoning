@@ -2,6 +2,8 @@
 
 This document defines each metric type and every metric currently implemented in the pipeline.  For instructions on adding new metrics see [adding_a_metric.md](adding_a_metric.md).
 
+> **Controlling which metrics run:** edit `ACTIVE_METRICS` in `config.py`.  List the metric names you want; leave the list empty (`[]`) to run all registered metrics.
+
 ---
 
 ## Metric Types
@@ -104,3 +106,18 @@ Reasoning trace phenomenon
 ```
 
 Note that `uncertainty_language` and `uncertainty_markers` measure the **same underlying phenomenon** at different granularities — binary presence vs. raw occurrence count.  They are designed to complement rather than replace each other.
+
+---
+
+## Dataset & Checkpoint Selection
+
+Datasets and checkpoints to include in a run are controlled via `config.py`:
+
+| Setting | Effect when empty (`[]`) | Effect when non-empty |
+|---|---|---|
+| `ACTIVE_DATASETS` | All dataset folders found in each checkpoint are evaluated | Only the listed dataset names are evaluated |
+| `ACTIVE_METRICS` | All registered metrics are run | Only the listed metric names are run |
+
+### `raw_model` as a checkpoint alias
+
+A checkpoint directory named `raw_model` is automatically treated as **checkpoint-0** (the untrained baseline).  Both `checkpoint-0/` and `raw_model/` are discovered and reported identically — no manual renaming is needed.

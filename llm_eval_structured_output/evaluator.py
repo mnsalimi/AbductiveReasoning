@@ -65,7 +65,7 @@ def process_single_item(
     word_count = len(reasoning.split()) if reasoning else 0
 
     # ── Metric evaluation ─────────────────────────────────────────────────
-    active_metrics = get_active_metrics(config.DISABLED_METRICS)
+    active_metrics = get_active_metrics(config.ACTIVE_METRICS)
     metric_results: dict[str, MetricResult] = {}
 
     for metric_name, metric in active_metrics.items():

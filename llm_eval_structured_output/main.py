@@ -60,7 +60,7 @@ def run() -> None:
 
     _setup_dirs()
 
-    active_metrics = get_active_metrics(config.DISABLED_METRICS)
+    active_metrics = get_active_metrics(config.ACTIVE_METRICS)
     print(f"\nActive metrics ({len(active_metrics)}):")
     for name, m in active_metrics.items():
         print(f"  [{m.metric_type:8s}] {name}: {m.description}")

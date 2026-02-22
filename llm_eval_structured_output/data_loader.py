@@ -32,9 +32,13 @@ PidMap = dict[Any, tuple[str, Item]]  # problem_id → (reasoning_text, raw_item
 
 _CKPT_PATTERNS = [
     "checkpoint-*",
+    "raw_model",
     "checkpoints/checkpoint-*",
+    "checkpoints/raw_model",
     "evaluation-llm/checkpoints/checkpoint-*",
+    "evaluation-llm/checkpoints/raw_model",
     "../checkpoint-*",
+    "../raw_model",
 ]
 
 
@@ -47,9 +51,15 @@ def find_checkpoint_dirs() -> list[str]:
 
 
 def parse_checkpoint_number(ckpt_dir: str) -> int | None:
-    """Extract the integer checkpoint step from a directory name like ``checkpoint-500``."""
+    """Extract the integer checkpoint step from a directory name like ``checkpoint-500``.
+
+    ``raw_model`` is treated as an alias for ``checkpoint-0``.
+    """
+    basename = os.path.basename(os.path.normpath(ckpt_dir))
+    if basename == "raw_model":
+        return 0
     try:
-        return int(os.path.basename(os.path.normpath(ckpt_dir)).split("-")[-1])
+        return int(basename.split("-")[-1])
     except (ValueError, IndexError):
         return None
 
@@ -67,13 +77,19 @@ def find_dataset_files(ckpt_dir: str, ckpt_num: int) -> list[dict[str, str]]:
     """
     Return a list of ``{"path": ..., "dataset": ...}`` dicts for all dataset
     files found under ``ckpt_dir``.
+
+    Only datasets listed in ``config.ACTIVE_DATASETS`` are returned;
+    if that list is empty, all datasets are returned.
     """
     target = _target_filename(ckpt_num)
     pattern = os.path.join(ckpt_dir, "*", target)
+    active_ds = [d.lower() for d in config.ACTIVE_DATASETS] if config.ACTIVE_DATASETS else []
     results: list[dict[str, str]] = []
     for path in sorted(glob.glob(pattern)):
         parts = os.path.normpath(path).split(os.sep)
         dataset_name = parts[-2].lower()
+        if active_ds and dataset_name not in active_ds:
+            continue
         results.append({"path": path, "dataset": dataset_name})
     return results
 

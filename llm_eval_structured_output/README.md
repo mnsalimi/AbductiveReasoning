@@ -37,7 +37,8 @@ llm_eval/
 │       └── uncertainty_markers.py       ← counting: individual hedging word occurrences
 │
 ├── checkpoints/                ← input data (model checkpoint outputs)
-│   ├── checkpoint-0/
+│   ├── checkpoint-0/           ← baseline; ``raw_model/`` is treated as an alias
+│   ├── raw_model/              ← optional alias for checkpoint-0
 │   └── checkpoint-4096/
 │
 ├── reporting/                  ← output-generation package
@@ -132,10 +133,23 @@ results/
 
 | Variable | Default | Description |
 |---|---|---|
-| `JUDGE_MODEL` | `deepseek-ai/DeepSeek-V3` | LLM used for judging |
-| `N_SAMPLES` | `2` | Items per dataset per checkpoint |
+| `JUDGE_MODEL` | `gpt-5-nano` | LLM used for judging |
+| `REASONING_EFFORT` | `"low"` | Reasoning token budget for GPT-5+ models (`"low"` / `"medium"` / `"high"`). Ignored for older models. |
+| `N_SAMPLES` | `1` | Items per dataset per checkpoint |
 | `MAX_WORKERS` | `5` | Parallel threads |
 | `SAMPLE_CORRECT_RATIO` | `1.0` | Fraction of correct items in sample |
 | `RANDOM_SEED` | `42` | Reproducibility seed |
-| `DISABLED_METRICS` | `[]` | Names of metrics to skip |
+| `ACTIVE_METRICS` | `["uncertainty_markers"]` | Names of metrics to run. Empty list activates **all** registered metrics. |
+| `ACTIVE_DATASETS` | `["art", "copa_guess_effect"]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
 | `CLEAR_PREVIOUS_OUTPUTS` | `False` | Delete existing JSONL logs on start |
+
+## Model compatibility
+
+The pipeline auto-detects the judge model family and adjusts the API call accordingly:
+
+| Model family | Role used | Token limit param | Extras |
+|---|---|---|---|
+| GPT-5 and newer (`gpt-5*`) | `developer` | `max_completion_tokens` | `reasoning_effort` |
+| Older / OSS models | `system` | `max_tokens` | `temperature=0.0` |
+
+Detection is name-based: any model matching `gpt-N` where N ≥ 5 uses the modern path. Everything else uses the legacy path. To change the reasoning budget for GPT-5+ models, adjust `REASONING_EFFORT` in `config.py`.

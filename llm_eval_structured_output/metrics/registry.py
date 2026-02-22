@@ -10,7 +10,7 @@ To add a new metric:
   4. Add it to METRICS.
 
 The pipeline resolves active metrics at runtime by filtering METRICS against
-config.DISABLED_METRICS.
+config.ACTIVE_METRICS.
 """
 
 from __future__ import annotations
@@ -87,7 +87,11 @@ METRICS: dict[str, BaseMetric] = {
 }
 
 
-def get_active_metrics(disabled: list[str] | None = None) -> dict[str, BaseMetric]:
-    """Return only the metrics not present in ``disabled``."""
-    disabled = disabled or []
-    return {name: m for name, m in METRICS.items() if name not in disabled}
+def get_active_metrics(active: list[str] | None = None) -> dict[str, BaseMetric]:
+    """Return only the metrics whose names appear in ``active``.
+
+    If ``active`` is empty or None, all registered metrics are returned.
+    """
+    if not active:
+        return dict(METRICS)
+    return {name: m for name, m in METRICS.items() if name in active}

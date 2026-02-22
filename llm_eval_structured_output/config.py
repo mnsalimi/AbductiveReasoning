@@ -20,7 +20,7 @@ RUN_ID: str = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 # ---------------------------------------------------------------------------
 # Sampling
 # ---------------------------------------------------------------------------
-N_SAMPLES: int = 2          # How many items to evaluate per dataset per checkpoint
+N_SAMPLES: int = 1          # How many items to evaluate per dataset per checkpoint
 MAX_WORKERS: int = 5        # Parallel threads for LLM calls
 RANDOM_SEED: int = 42       # Fixed seed for reproducible sampling
 
@@ -31,10 +31,14 @@ SAMPLE_CORRECT_RATIO: float | None = 1.0
 # ---------------------------------------------------------------------------
 # Judge model
 # ---------------------------------------------------------------------------
-JUDGE_MODEL: str = "gpt-4o-2024-08-06"
+JUDGE_MODEL: str = "gpt-5-nano"
 #JUDGE_MODEL: str = "openai/gpt-oss-120b"
 # JUDGE_MODEL = "gpt-4o"
 # JUDGE_MODEL = "Qwen/Qwen3-235B-A22B"
+
+# Reasoning effort for GPT-5+ models ("low" | "medium" | "high").
+# Ignored for older models that do not support this parameter.
+REASONING_EFFORT: str = "low"
 
 # ---------------------------------------------------------------------------
 # API credentials
@@ -63,8 +67,19 @@ CLEAR_PREVIOUS_OUTPUTS: bool = False
 # ---------------------------------------------------------------------------
 # Metrics to run
 # Controlled by the metric registry (metrics/registry.py).
-# You can disable individual metrics here by name.
+# List only the metric names you want to evaluate.
+# Available metrics: "backtracking", "branchiness", "uncertainty_markers",
+#                    "uncertainty_language", "detail_coverage"
+# An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-DISABLED_METRICS = ["backtracking", "branchiness"]
-# DISABLED_METRICS: list[str] = []
-# Example: DISABLED_METRICS = ["backtracking", "branchiness"]
+ACTIVE_METRICS: list[str] = ["uncertainty_markers"]
+# Example: ACTIVE_METRICS = ["uncertainty_markers", "backtracking"]
+# Example (all metrics): ACTIVE_METRICS = []
+
+# ---------------------------------------------------------------------------
+# Datasets to evaluate
+# List only the dataset names (folder names inside each checkpoint) to include.
+# An empty list evaluates ALL datasets found in each checkpoint.
+# ---------------------------------------------------------------------------
+ACTIVE_DATASETS: list[str] = ["art", "copa_guess_effect"]
+# Example (all datasets): ACTIVE_DATASETS = []

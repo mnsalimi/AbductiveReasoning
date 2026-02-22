@@ -145,10 +145,12 @@ from prompts.counting.your_metric_name import (
 ),
 ```
 
-**3. Make sure it is not disabled** in [`config.py`](../config.py):
+**3. Make sure it is active** in [`config.py`](../config.py):
 
 ```python
-DISABLED_METRICS = ["backtracking", ...]  # remove your_metric_name if it appears here
+ACTIVE_METRICS = ["uncertainty_markers", "your_metric_name", ...]  # add your metric
+# or leave the list empty to run ALL registered metrics
+ACTIVE_METRICS = []
 ```
 
 That's it. The pipeline picks it up automatically — no changes needed to `evaluator.py`, `main.py`, or the reporting layer.
@@ -318,7 +320,7 @@ METRICS: dict[str, BaseMetric] = {
 }
 ```
 
-Then make sure it is active in [`config.py`](../config.py) (not listed in `DISABLED_METRICS`).
+Then make sure it is active in [`config.py`](../config.py) by adding it to `ACTIVE_METRICS` (or leave `ACTIVE_METRICS = []` to run all registered metrics).
 
 ---
 
@@ -337,4 +339,4 @@ Then make sure it is active in [`config.py`](../config.py) (not listed in `DISAB
 | Format instructions in system prompt | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) |
 | Import in `registry.py` | Prompts only | Prompts only | Class + prompts |
 | Add to `METRICS` dict | `BinaryMetric(...)` | `CountingMetric(...)` | `YourTypeMetric(...)` |
-| Enable in `config.py` | Remove from `DISABLED_METRICS` | Remove from `DISABLED_METRICS` | Remove from `DISABLED_METRICS` |
+| Enable in `config.py` | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) |

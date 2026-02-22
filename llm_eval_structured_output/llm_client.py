@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import re
 import threading
 from typing import Any
 
@@ -35,6 +36,25 @@ _loaded_logs: set[str] = set()
 _cleared_logs: set[str] = set()
 
 
+# ---------------------------------------------------------------------------
+# Model-capability detection
+# ---------------------------------------------------------------------------
+
+def _is_modern_model(model: str) -> bool:
+    """
+    Return True for GPT-5 and newer models that require updated API parameters:
+      - ``max_completion_tokens`` instead of ``max_tokens``
+      - ``reasoning_effort`` instead of ``temperature``
+      - ``"developer"`` role instead of ``"system"``
+    Detection is based on the numeric major version in the model name
+    (e.g. ``gpt-5-nano`` → 5 ≥ 5 → True; ``gpt-4o`` → 4 < 5 → False).
+    """
+    m = re.match(r"gpt-(\d+)", model.lower())
+    if m:
+        return int(m.group(1)) >= 5
+    return False
+
+
 def get_client() -> OpenAI:
     """Return (and lazily initialise) the shared OpenAI client."""
     global _client
@@ -51,14 +71,21 @@ def get_client() -> OpenAI:
 def test_connection() -> bool:
     """Ping the API with a minimal request; return True if reachable."""
     print("\n[Testing API connection …]")
+    model = config.JUDGE_MODEL
     try:
-        get_client().chat.completions.create(
-            model=config.JUDGE_MODEL,
+        modern = _is_modern_model(model)
+        kwargs: dict = dict(
+            model=model,
             messages=[{"role": "user", "content": "ping"}],
-            max_tokens=5,
-            temperature=0.0,
         )
-        print(f"[OK] Connected – model '{config.JUDGE_MODEL}' is accessible.")
+        if modern:
+            kwargs["max_completion_tokens"] = 5
+            kwargs["reasoning_effort"] = config.REASONING_EFFORT
+        else:
+            kwargs["max_tokens"] = 5
+            kwargs["temperature"] = 0.0
+        get_client().chat.completions.create(**kwargs)
+        print(f"[OK] Connected – model '{model}' is accessible.")
         return True
     except Exception as exc:
         print(f"[ERROR] API test failed: {exc}")
@@ -193,20 +220,29 @@ def ask_llm(
     # All models honour API_MAX_RETRIES; transient errors are always worth retrying
     max_tries = max(1, config.API_MAX_RETRIES)
 
+    modern = _is_modern_model(model)
+    system_role = "developer" if modern else "system"
+
     last_error: str = ""
     for attempt in range(max_tries):
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         try:
-            response = get_client().chat.completions.parse(
+            call_kwargs: dict = dict(
                 model=model,
-                temperature=0.0,
-                max_tokens=2000,
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
+                    {"role": system_role, "content": system_prompt},
+                    {"role": "user",      "content": user_prompt},
                 ],
                 response_format=response_schema,
             )
+            if modern:
+                call_kwargs["max_completion_tokens"] = 2000
+                call_kwargs["reasoning_effort"] = config.REASONING_EFFORT
+            else:
+                call_kwargs["max_tokens"] = 2000
+                call_kwargs["temperature"] = 0.0
+
+            response = get_client().chat.completions.parse(**call_kwargs)
 
             msg = response.choices[0].message
             raw_content: str | None = getattr(msg, "content", None)

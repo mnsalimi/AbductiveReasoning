@@ -125,8 +125,17 @@ def save_checkpoint_csvs(
 
 def write_debug_logs(all_results: list[dict]) -> None:
     """
-    Write one consolidated CSV per dataset containing every evaluated item
-    across all checkpoints.
+    Write two consolidated debug files per dataset across all checkpoints:
+
+    1. ``{dataset}_full_debug.jsonl`` – one JSON object per row combining the
+       full source-item fields (observation_1/2, hypothesis_1/2, true_label,
+       predicted_label, the model reasoning, correct) with the evaluated metric
+       results.  ``timestamp`` and ``run_id`` are intentionally omitted so the
+       file is stable across re-runs.
+
+    2. ``{dataset}_full_debug_{RUN_ID}.csv`` – same content as a spreadsheet,
+       without ``timestamp`` / ``run_id`` columns, with the source-item fields
+       prepended.
     """
     import os
     _ensure(config.LOG_DIR)
@@ -138,29 +147,61 @@ def write_debug_logs(all_results: list[dict]) -> None:
 
     for ds, records in by_dataset.items():
         rows = []
+        jsonl_lines: list[str] = []
+
         for rec in records:
-            row = {
-                "timestamp": rec.get("timestamp"),
-                "run_id": rec.get("run_id"),
+            status = rec.get("status", "")
+
+            # All raw source-item fields, exactly as they appear in the JSON
+            # file (works for ART, copa_guess_effect, or any other schema).
+            raw_item: dict = rec.get("item") or {}
+
+            # ── JSONL record ───────────────────────────────────────────────
+            jsonl_obj: dict = {
+                **raw_item,          # all source fields first
+                "checkpoint":  rec.get("checkpoint"),
+                "dataset":     rec.get("dataset"),
+                "problem_id":  rec.get("pid"),
+                "word_count":  rec.get("word_count"),
+                "metrics": {
+                    mname: {
+                        "type":          mdata.get("type"),
+                        "detected":      mdata.get("detected"),
+                        "example_count": mdata.get("example_count"),
+                        "analysis":      mdata.get("reasoning"),
+                        "examples":      mdata.get("examples", []),
+                        "error":         mdata.get("error") or "",
+                    }
+                    for mname, mdata in (rec.get("metrics") or {}).items()
+                },
+            }
+            jsonl_lines.append(json.dumps(jsonl_obj, ensure_ascii=False))
+
+            # ── CSV row ────────────────────────────────────────────────────
+            row: dict = {
                 "checkpoint": rec.get("checkpoint"),
-                "dataset": rec.get("dataset"),
+                "dataset":    rec.get("dataset"),
                 "problem_id": rec.get("pid"),
-                "status": rec.get("status"),
-                "true_label": rec.get("true_label"),
-                "predicted_label": rec.get("pred_label"),
-                "question": rec.get("question"),
+                "status":     status,
+                **raw_item,          # all source fields
                 "word_count": rec.get("word_count"),
-                "reasoning": rec.get("reasoning"),
             }
             for mname, mdata in (rec.get("metrics") or {}).items():
-                row[f"{mname}_type"] = mdata.get("type")
-                row[f"{mname}_detected"] = mdata.get("detected")
+                row[f"{mname}_type"]          = mdata.get("type")
+                row[f"{mname}_detected"]      = mdata.get("detected")
                 row[f"{mname}_example_count"] = mdata.get("example_count")
-                row[f"{mname}_analysis"] = mdata.get("reasoning")
-                row[f"{mname}_examples"] = _safe_json(mdata.get("examples", []))
-                row[f"{mname}_error"] = mdata.get("error") or ""
+                row[f"{mname}_analysis"]      = mdata.get("reasoning")
+                row[f"{mname}_examples"]      = _safe_json(mdata.get("examples", []))
+                row[f"{mname}_error"]         = mdata.get("error") or ""
             rows.append(row)
 
-        out_path = os.path.join(config.LOG_DIR, f"{ds}_full_debug_{config.RUN_ID}.csv")
-        pd.DataFrame(rows).to_csv(out_path, index=False, encoding="utf-8-sig")
-        print(f"[OK] Debug log → {out_path}  ({len(rows)} rows)")
+        # Write JSONL
+        jsonl_path = os.path.join(config.LOG_DIR, f"{ds}_full_debug.jsonl")
+        with open(jsonl_path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(jsonl_lines) + ("\n" if jsonl_lines else ""))
+        print(f"[OK] Full-debug JSONL → {jsonl_path}  ({len(jsonl_lines)} records)")
+
+        # Write CSV
+        csv_path = os.path.join(config.LOG_DIR, f"{ds}_full_debug_{config.RUN_ID}.csv")
+        pd.DataFrame(rows).to_csv(csv_path, index=False, encoding="utf-8-sig")
+        print(f"[OK] Full-debug CSV  → {csv_path}  ({len(rows)} rows)")

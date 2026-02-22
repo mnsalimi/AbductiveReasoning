@@ -108,8 +108,9 @@ def process_single_item(
         "true_text": true_text,
         "pred_text": pred_text,
         "reasoning": reasoning,
-        "word_count": word_count,
-        # Per-metric structured results
+        "word_count": word_count,        # Full raw item – used by write_debug_logs to emit all source fields
+        # regardless of dataset schema (ART, copa_guess_effect, etc.)
+        "item": item if isinstance(item, dict) else {},        # Per-metric structured results
         "metrics": {
             name: {
                 "type": active_metrics[name].metric_type,

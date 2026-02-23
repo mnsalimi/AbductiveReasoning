@@ -117,6 +117,7 @@ class CountingMetric(BaseMetric):
             run_id=run_id,
         )
 
+        tokens: dict = payload.pop("__tokens__", {})
         analysis: str = payload.get("overall_analysis", "")
         raw_examples: list = payload.get("examples", [])
 
@@ -133,6 +134,7 @@ class CountingMetric(BaseMetric):
             detected=len(examples) > 0,
             reasoning=analysis,
             examples=examples,
+            tokens=tokens,
             raw=payload,
         )
 

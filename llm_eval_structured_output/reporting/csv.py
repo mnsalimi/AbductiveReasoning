@@ -69,22 +69,36 @@ def save_checkpoint_csvs(
 
         for mname in active_metric_names:
             mdata = row.get("metrics", {}).get(mname, {})
+            mtype = mdata.get("type", "")
             count = mdata.get("example_count", 0) or 0
             detected = mdata.get("detected", False)
             analysis = mdata.get("reasoning", "")
-            examples_str = "; ".join(
-                e.get("excerpt", "") for e in mdata.get("examples", []) if isinstance(e, dict)
-            )
+            score = mdata.get("score")  # float | None
+
+            # For coverage metrics, detail_str lists each observation detail + addressed flag
+            if mtype == "coverage":
+                examples_str = "; ".join(
+                    f"[{'Y' if e.get('addressed') else 'N'}] {e.get('detail', '')}"
+                    for e in mdata.get("examples", []) if isinstance(e, dict)
+                )
+            else:
+                examples_str = "; ".join(
+                    e.get("excerpt", "") for e in mdata.get("examples", []) if isinstance(e, dict)
+                )
 
             unnorm_item[f"{mname}_count"] = count
             unnorm_item[f"{mname}_detected"] = detected
             unnorm_item[f"{mname}_analysis"] = analysis
             unnorm_item[f"{mname}_examples"] = examples_str
+            if score is not None:
+                unnorm_item[f"{mname}_score"] = score
 
             norm_item[f"{mname}_count"] = count * norm_factor
             norm_item[f"{mname}_detected"] = detected
             norm_item[f"{mname}_analysis"] = analysis
             norm_item[f"{mname}_examples"] = examples_str
+            if score is not None:
+                norm_item[f"{mname}_score"] = score
 
         unnorm_rows.append(unnorm_item)
         norm_rows.append(norm_item)
@@ -94,10 +108,12 @@ def save_checkpoint_csvs(
 
     count_cols = [f"{m}_count" for m in active_metric_names if f"{m}_count" in unnorm_df.columns]
     detected_cols = [f"{m}_detected" for m in active_metric_names if f"{m}_detected" in unnorm_df.columns]
+    score_cols = [f"{m}_score" for m in active_metric_names if f"{m}_score" in unnorm_df.columns]
 
     def _summarise(df: pd.DataFrame) -> pd.DataFrame:
         agg: dict[str, str] = {c: "mean" for c in count_cols if c in df.columns}
         agg.update({c: "mean" for c in detected_cols if c in df.columns})
+        agg.update({c: "mean" for c in score_cols if c in df.columns})
         if "Word Count" in df.columns:
             agg["Word Count"] = "mean"
         summary = df.groupby(["Dataset", "Status"]).agg(agg).reset_index()
@@ -170,6 +186,7 @@ def write_debug_logs(all_results: list[dict]) -> None:
                         "example_count": mdata.get("example_count"),
                         "analysis":      mdata.get("reasoning"),
                         "examples":      mdata.get("examples", []),
+                        "tokens":        mdata.get("tokens") or {},
                         "error":         mdata.get("error") or "",
                     }
                     for mname, mdata in (rec.get("metrics") or {}).items()
@@ -187,12 +204,20 @@ def write_debug_logs(all_results: list[dict]) -> None:
                 "word_count": rec.get("word_count"),
             }
             for mname, mdata in (rec.get("metrics") or {}).items():
-                row[f"{mname}_type"]          = mdata.get("type")
-                row[f"{mname}_detected"]      = mdata.get("detected")
-                row[f"{mname}_example_count"] = mdata.get("example_count")
-                row[f"{mname}_analysis"]      = mdata.get("reasoning")
-                row[f"{mname}_examples"]      = _safe_json(mdata.get("examples", []))
-                row[f"{mname}_error"]         = mdata.get("error") or ""
+                tok = mdata.get("tokens") or {}
+                row[f"{mname}_type"]             = mdata.get("type")
+                row[f"{mname}_detected"]         = mdata.get("detected")
+                row[f"{mname}_example_count"]    = mdata.get("example_count")
+                row[f"{mname}_analysis"]         = mdata.get("reasoning")
+                row[f"{mname}_examples"]         = _safe_json(mdata.get("examples", []))
+                row[f"{mname}_tokens_input"]     = tok.get("input")
+                row[f"{mname}_tokens_output"]    = tok.get("output")
+                # Only written when the model separates reasoning tokens
+                if "reasoning" in tok:
+                    row[f"{mname}_tokens_reasoning"] = tok["reasoning"]
+                if "cached_input" in tok:
+                    row[f"{mname}_tokens_cached_input"] = tok["cached_input"]
+                row[f"{mname}_error"]            = mdata.get("error") or ""
             rows.append(row)
 
         # Write JSONL

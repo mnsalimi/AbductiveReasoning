@@ -115,6 +115,7 @@ class BinaryMetric(BaseMetric):
         detected: bool = bool(payload.get("detected", False))
         reasoning: str = payload.get("reasoning", "")
         evidence: str = payload.get("evidence", "")
+        tokens: dict = payload.pop("__tokens__", {})
 
         examples = [{"excerpt": evidence, "explanation": reasoning}] if detected and evidence else []
 
@@ -123,6 +124,7 @@ class BinaryMetric(BaseMetric):
             detected=detected,
             reasoning=reasoning,
             examples=examples,
+            tokens=tokens,
             raw=payload,
         )
 

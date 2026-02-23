@@ -69,10 +69,11 @@ CLEAR_PREVIOUS_OUTPUTS: bool = False
 # Controlled by the metric registry (metrics/registry.py).
 # List only the metric names you want to evaluate.
 # Available metrics: "backtracking", "branchiness", "uncertainty_markers",
-#                    "uncertainty_language", "detail_coverage"
+#                    "uncertainty_language", "detail_coverage",
+#                    "observation_coverage"
 # An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-ACTIVE_METRICS: list[str] = ["uncertainty_markers"]
+ACTIVE_METRICS: list[str] = ["uncertainty_markers", "observation_coverage"]
 # Example: ACTIVE_METRICS = ["uncertainty_markers", "backtracking"]
 # Example (all metrics): ACTIVE_METRICS = []
 

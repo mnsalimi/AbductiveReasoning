@@ -30,17 +30,31 @@ class MetricResult:
         detected  – True / False
         reasoning – model's explanation for its decision
         examples  – empty list (not used)
+        score     – None (not applicable)
 
     Counting metrics:
         detected  – True when at least one example was found
         reasoning – model's overall analysis
         examples  – list of {"excerpt": str, "explanation": str} dicts
+        score     – None (not applicable; use example_count instead)
+
+    Coverage metrics:
+        detected  – True when all observation details are addressed (score == 1.0)
+        reasoning – model's overall analysis
+        examples  – list of {"detail": str, "addressed": bool, "evidence": str} dicts
+        score     – proportion of addressed details (0.0 – 1.0)
     """
     metric_name: str
     detected: bool = False
     reasoning: str = ""
     examples: list[dict[str, str]] = field(default_factory=list)
     error: str = ""
+    score: float | None = None
+
+    # Token usage reported by the LLM API for this metric call.
+    # Keys present: "input", "output", and optionally "reasoning" / "cached_input".
+    # Empty dict when response came from cache or the API did not report usage.
+    tokens: dict[str, int] = field(default_factory=dict)
 
     # Raw payload returned by the LLM (for debugging / logging)
     raw: dict[str, Any] = field(default_factory=dict)

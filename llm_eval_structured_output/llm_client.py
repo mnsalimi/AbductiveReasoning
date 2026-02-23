@@ -274,15 +274,32 @@ def ask_llm(
             # Structured output parsed directly by the SDK
             validated = msg.parsed.model_dump()
 
+            # ── Token usage ────────────────────────────────────────────────
+            usage = response.usage
+            _details = getattr(usage, "completion_tokens_details", None)
+            _prompt_details = getattr(usage, "prompt_tokens_details", None)
+            tokens: dict[str, int | None] = {
+                "input":     getattr(usage, "prompt_tokens",     None),
+                "output":    getattr(usage, "completion_tokens", None),
+                "reasoning": getattr(_details, "reasoning_tokens", None),
+                "cached_input": getattr(_prompt_details, "cached_tokens", None),
+            }
+            # Remove keys that are always None to keep logs clean
+            tokens = {k: v for k, v in tokens.items() if v is not None}
+
             _append_log(log_path, {
                 "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
                 "dataset": dataset, "problem_id": problem_id,
                 "metric_type": metric_type, "model": model,
                 "parse_status": "success",
+                "tokens": tokens,
                 "raw_response": raw_content,
                 "raw_reasoning": thinking,
                 "parsed_data": validated,
             })
+            # Attach token info as a side-channel key so callers can read it
+            # without it polluting the schema-validated fields.
+            validated["__tokens__"] = tokens
             _response_cache[key] = validated
             return validated
 

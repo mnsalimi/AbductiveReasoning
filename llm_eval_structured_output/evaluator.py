@@ -78,7 +78,12 @@ def process_single_item(
         )
         metric_results[metric_name] = result
         status_icon = "OK" if not result.error else "FAIL"
-        detail = f"count={len(result.examples)}" if metric.metric_type == "counting" else f"detected={result.detected}"
+        if metric.metric_type == "counting":
+            detail = f"count={len(result.examples)}"
+        elif metric.metric_type == "coverage":
+            detail = f"score={result.score:.2%}  ({sum(1 for e in result.examples if e.get('addressed'))}/{len(result.examples)} details)"
+        else:
+            detail = f"detected={result.detected}"
         err_suffix = f"  ERR: {result.error[:80]}" if result.error else ""
         print(f"    [{status_icon:4s}] {metric_name}: {detail}{err_suffix}")
 
@@ -118,6 +123,8 @@ def process_single_item(
                 "reasoning": r.reasoning,
                 "examples": r.examples,
                 "example_count": len(r.examples),
+                "score": r.score,
+                "tokens": r.tokens,   # {input, output, reasoning?, cached_input?}
                 "error": r.error,
             }
             for name, r in metric_results.items()

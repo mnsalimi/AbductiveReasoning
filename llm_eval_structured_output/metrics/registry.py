@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from metrics.binary import BinaryMetric
 from metrics.counting import CountingMetric
+from metrics.coverage import CoverageMetric
 from metrics.base import BaseMetric
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,14 @@ from prompts.counting.backtracking import (
 from prompts.counting.uncertainty_markers import (
     SYSTEM_PROMPT as UM_SYS,
     USER_PROMPT_TEMPLATE as UM_USR,
+)
+
+# ---------------------------------------------------------------------------
+# Prompt imports – coverage metrics
+# ---------------------------------------------------------------------------
+from prompts.coverage.observation_coverage import (
+    SYSTEM_PROMPT as OC_SYS,
+    USER_PROMPT_TEMPLATE as OC_USR,
 )
 
 # ---------------------------------------------------------------------------
@@ -83,6 +92,13 @@ METRICS: dict[str, BaseMetric] = {
         description="Hypothesis accounts for all specific observation details, not just the main event.",
         system_prompt=DC_SYS,
         user_prompt_template=DC_USR,
+    ),
+    # ── Coverage metrics ────────────────────────────────────────────────────
+    "observation_coverage": CoverageMetric(
+        name="observation_coverage",
+        description="Proportion of specific observation details explicitly accounted for by the chosen hypothesis.",
+        system_prompt=OC_SYS,
+        user_prompt_template=OC_USR,
     ),
 }
 

@@ -1,10 +1,10 @@
 # How to Add a New Metric
 
-There are two paths. Follow **Path A** if your metric fits the yes/no (binary) or example-extraction (counting) model that already exists in the pipeline. Follow **Path B** if you need fundamentally different LLM output structure or evaluation logic.
+There are two paths. Follow **Path A** if your metric fits the existing binary (yes/no), counting (example-extraction), or coverage (per-detail coverage + score) patterns. Follow **Path B** if you need fundamentally different LLM output structure or evaluation logic.
 
 ---
 
-## Path A — Adding a Binary or Counting Metric
+## Path A — Adding a Binary, Counting, or Coverage Metric
 
 This is the normal path. You only touch two things: a new prompt file and one registration entry.
 
@@ -14,13 +14,15 @@ This is the normal path. You only touch two things: a new prompt file and one re
 |---|---|---|---|
 | **Binary** | `detected` bool + `reasoning` + `evidence` quote | Direct from LLM | Empty (or one item if evidence exists) |
 | **Counting** | `overall_analysis` string + list of `{excerpt, explanation}` pairs | `true` when at least one example found | All extracted examples |
+| **Coverage** | `observation_details` list + `overall_analysis` | Derived in code (true only when score = 1.0) | List of per-detail `{detail, addressed, evidence}` dicts |
 
 ---
 
 ### Step 1 — Create the prompt file
 
 **Binary** → create `prompts/binary/your_metric_name.py`  
-**Counting** → create `prompts/counting/your_metric_name.py`
+**Counting** → create `prompts/counting/your_metric_name.py`  
+**Coverage** → create `prompts/coverage/your_metric_name.py`
 
 Both files must export exactly these two names:
 
@@ -103,6 +105,37 @@ Analyze the following reasoning trace for <Your Metric> and extract concrete exa
 
 The LLM response is validated against `CountingResponse` (defined in `metrics/counting.py`), which has two fields: `overall_analysis` (str) and `examples` (list of `{excerpt, explanation}` items).  The OpenAI Structured Outputs API enforces the schema automatically — no additional format instructions are needed.
 
+#### Coverage prompt template
+
+```python
+"""
+prompts/coverage/your_metric_name.py
+"""
+
+SYSTEM_PROMPT = """\
+You are an expert evaluator of abductive reasoning traces.
+
+Extract every specific detail in the observation and, for each detail, decide
+whether the reasoning trace explicitly connects it to the chosen hypothesis.
+
+Return:
+- observation_details: list of {detail, addressed, evidence}
+- overall_analysis: brief synthesis
+"""
+
+USER_PROMPT_TEMPLATE = """\
+Dataset: {dataset}
+
+Analyze the following reasoning trace.
+
+<reasoning_trace>
+{text}
+</reasoning_trace>
+"""
+```
+
+The LLM response is validated against `ObservationCoverageResponse` (defined in `metrics/coverage.py`), which has two fields: `observation_details` (list of per-detail objects) and `overall_analysis` (str).
+
 ---
 
 ### Step 2 — Register the metric in `metrics/registry.py`
@@ -123,6 +156,12 @@ from prompts.counting.your_metric_name import (
     SYSTEM_PROMPT as YM_SYS,
     USER_PROMPT_TEMPLATE as YM_USR,
 )
+
+# OR Coverage:
+from prompts.coverage.your_metric_name import (
+    SYSTEM_PROMPT as YM_SYS,
+    USER_PROMPT_TEMPLATE as YM_USR,
+)
 ```
 
 **2. Add an entry to the `METRICS` dict**:
@@ -138,6 +177,14 @@ from prompts.counting.your_metric_name import (
 
 # OR Counting:
 "your_metric_name": CountingMetric(
+    name="your_metric_name",
+    description="One-line description shown in reports.",
+    system_prompt=YM_SYS,
+    user_prompt_template=YM_USR,
+),
+
+# OR Coverage:
+"your_metric_name": CoverageMetric(
     name="your_metric_name",
     description="One-line description shown in reports.",
     system_prompt=YM_SYS,
@@ -237,6 +284,8 @@ class YourTypeMetric(BaseMetric):
             detected     – bool: was the phenomenon present? (required)
             reasoning    – str: model's justification (required)
             examples     – list[dict{"excerpt", "explanation"}]: evidence items
+            score        – float|None: optional numeric score (e.g. coverage proportion)
+            tokens       – dict: token usage for this LLM call (input/output, etc)
             error        – str: non-empty only on failure
             raw          – dict: the full LLM payload for logging/debugging
         """

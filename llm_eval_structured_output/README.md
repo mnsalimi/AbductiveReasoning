@@ -25,12 +25,15 @@ llm_eval/
 │   ├── base.py                 ← MetricResult dataclass + abstract BaseMetric
 │   ├── binary.py               ← BinaryMetric class (yes/no + reasoning)
 │   ├── counting.py             ← CountingMetric class (list of examples)
+│   ├── coverage.py             ← CoverageMetric class (per-detail coverage + score)
 │   └── registry.py             ← METRICS dict – add new metrics here
 │
 ├── prompts/
 │   ├── binary/
 │   │   ├── uncertainty_language.py      ← binary: presence of hedging language
 │   │   └── detail_coverage.py           ← binary: hypothesis covers all observation details
+│   ├── coverage/
+│   │   └── observation_coverage.py      ← coverage: per-detail observation coverage + score
 │   └── counting/
 │       ├── branchiness.py               ← counting: parallel hypothesis exploration
 │       ├── backtracking.py              ← counting: explicit self-correction moments
@@ -51,7 +54,7 @@ llm_eval/
 
 ## Metric types
 
-See **[docs/metric_definitions.md](docs/metric_definitions.md)** for full definitions of every metric and both metric types.
+See **[docs/metric_definitions.md](docs/metric_definitions.md)** for full definitions of every metric and metric type.
 
 ### Binary metrics
 The LLM reasons about whether a phenomenon is present (`detected: true/false`) and explains why.  It also quotes the strongest piece of supporting evidence.
@@ -62,6 +65,11 @@ The LLM reasons about whether a phenomenon is present (`detected: true/false`) a
 The LLM does **not** produce a number.  Instead it returns a list of concrete **examples** (excerpt + explanation) of the phenomenon.  The pipeline derives a count as `len(examples)` for plotting.
 
 **Metrics:** `branchiness`, `backtracking`, `uncertainty_markers`
+
+### Coverage metrics
+The LLM extracts an exhaustive list of observation details, marks whether each one is explicitly addressed by the chosen hypothesis, and the pipeline computes a coverage score.
+
+**Metrics:** `observation_coverage`
 
 ## Quick start
 
@@ -101,6 +109,20 @@ class CountingResponse(BaseModel):
     examples: list[ExampleItem]    # All extracted occurrences (empty list if none)
 ```
 
+**Coverage metrics** use `ObservationCoverageResponse`:
+```python
+class ObservationDetail(BaseModel):
+    detail: str           # One specific observation fact
+    addressed: bool       # Was it connected to the hypothesis?
+    evidence: str         # Quote from the trace (empty if addressed=False)
+
+class ObservationCoverageResponse(BaseModel):
+    observation_details: list[ObservationDetail]
+    overall_analysis: str
+```
+
+Token usage (input/output, and optionally reasoning/cached input) is recorded per LLM call and propagated into the full-debug outputs.
+
 The `ask_llm()` function in `llm_client.py` handles the API call, structured-output parsing, JSONL logging, and in-memory caching.
 
 ## How to add a new metric
@@ -108,7 +130,7 @@ The `ask_llm()` function in `llm_client.py` handles the API call, structured-out
 See **[docs/adding_a_metric.md](docs/adding_a_metric.md)** for the full step-by-step guide.
 
 Two paths are covered:
-- **Path A** — add a binary (yes/no) or counting (example-extraction) metric using the existing classes. Requires only a new prompt file and one line in `metrics/registry.py`.
+- **Path A** — add a binary (yes/no), counting (example-extraction), or coverage (per-detail) metric using the existing classes. Requires only a new prompt file and one line in `metrics/registry.py`.
 - **Path B** — add a completely new metric type with custom LLM output structure. Covers writing the Pydantic schema, the metric class, the prompt file, and registration.
 
 ## Outputs
@@ -124,7 +146,7 @@ results/
 │   └── evolution_<metric>_*.png       ← line plots
 ├── normalized/                        ← same files but counts per 100 words
 └── llm_logs/
-    ├── <dataset>_llm_responses.jsonl  ← raw LLM call log (for debugging)
+    ├── <dataset>_llm_responses.jsonl  ← raw LLM call log (includes token usage per call)
     └── <dataset>_full_debug_<run>.csv ← all items × all metrics × all checkpoints
                                           (includes <metric>_error column per metric)
 ```

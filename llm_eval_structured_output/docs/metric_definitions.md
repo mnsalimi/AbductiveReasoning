@@ -24,6 +24,14 @@ A counting metric asks the judge LLM to extract every individual occurrence of a
 - **Count used in reports:** `len(examples)` — the raw number of extracted occurrences.  This can be normalized per 100 words in the `normalized/` results.
 - **Use when:** you want to measure the *density* or *frequency* of a phenomenon, not just its presence.
 
+### Coverage Metric
+
+A coverage metric asks the judge LLM to enumerate **all specific details** present in the observation and assess whether the reasoning trace explicitly connects each detail to the chosen hypothesis.
+
+- **Output:** `observation_details` as a list of `{detail, addressed, evidence}` and an `overall_analysis` synthesis.
+- **Score used in reports:** `addressed_count / total_details` (a float in 0.0–1.0). Aggregations typically use the mean score per dataset.
+- **Use when:** you want to measure *how completely* a hypothesis accounts for the full set of observation details, not just whether it mentions them.
+
 ---
 
 ## Implemented Metrics
@@ -89,6 +97,27 @@ Captures deliberate self-correction: the model realises something it said or com
 
 ---
 
+### `observation_coverage` — Coverage
+
+> **What fraction of specific observation details are explicitly accounted for by the chosen hypothesis?**
+
+Extracts an exhaustive set of observation details and marks each one as addressed or not addressed.
+
+- **Per-detail fields:**
+	- `detail` — one concrete observation fact
+	- `addressed` — whether the trace explicitly links that fact to the hypothesis
+	- `evidence` — a direct quote showing the link (empty if `addressed = false`)
+
+The metric score is:
+
+$$
+	ext{score} = \frac{\#\text{addressed details}}{\#\text{total details}}
+$$
+
+`detected` is set to true only when the score is 1.0 (all details addressed).
+
+---
+
 ## Relationship Between Metrics
 
 ```
@@ -97,6 +126,8 @@ Reasoning trace phenomenon
 ├── Is a phenomenon present at all?                → uncertainty_language  (binary)
 │
 ├── Does it cover all observation details?         → detail_coverage       (binary)
+│
+├── What fraction of details are addressed?        → observation_coverage  (coverage)
 │
 ├── How densely does it hedge?                     → uncertainty_markers   (counting)
 │

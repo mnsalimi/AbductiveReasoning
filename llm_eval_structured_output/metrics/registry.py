@@ -35,6 +35,10 @@ from prompts.counting.uncertainty_markers import (
     SYSTEM_PROMPT as UM_SYS,
     USER_PROMPT_TEMPLATE as UM_USR,
 )
+from prompts.counting.prior import (
+    SYSTEM_PROMPT as PRIOR_SYS,
+    USER_PROMPT_TEMPLATE as PRIOR_USR,
+)
 
 # ---------------------------------------------------------------------------
 # Prompt imports – coverage metrics
@@ -79,6 +83,12 @@ METRICS: dict[str, BaseMetric] = {
         description="Count of individual probabilistic/hedging words and phrases in the reasoning trace.",
         system_prompt=UM_SYS,
         user_prompt_template=UM_USR,
+    ),
+    "prior": CountingMetric(
+        name="prior",
+        description="Instances where the model considers prior probabilities or base rates in its reasoning.",
+        system_prompt=PRIOR_SYS,
+        user_prompt_template=PRIOR_USR,
     ),
     # ── Binary metrics ──────────────────────────────────────────────────────
     "uncertainty_language": BinaryMetric(

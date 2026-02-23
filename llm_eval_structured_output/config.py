@@ -20,7 +20,7 @@ RUN_ID: str = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 # ---------------------------------------------------------------------------
 # Sampling
 # ---------------------------------------------------------------------------
-N_SAMPLES: int = 1          # How many items to evaluate per dataset per checkpoint
+N_SAMPLES: int = 3          # How many items to evaluate per dataset per checkpoint
 MAX_WORKERS: int = 5        # Parallel threads for LLM calls
 RANDOM_SEED: int = 42       # Fixed seed for reproducible sampling
 
@@ -73,7 +73,7 @@ CLEAR_PREVIOUS_OUTPUTS: bool = False
 #                    "observation_coverage"
 # An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-ACTIVE_METRICS: list[str] = ["uncertainty_markers", "observation_coverage"]
+ACTIVE_METRICS: list[str] = ["prior"]
 # Example: ACTIVE_METRICS = ["uncertainty_markers", "backtracking"]
 # Example (all metrics): ACTIVE_METRICS = []
 

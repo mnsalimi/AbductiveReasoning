@@ -1,5 +1,0 @@
-Dataset,Status,observation_coverage_count,observation_coverage_detected,observation_coverage_score,Word Count,Checkpoint
-medqa,Correct,8.98,0.24,0.575292,172.42,0
-medqa,Correct,8.34,0.26,0.60856,177.84,2560
-musr_murder,Correct,8.02,0.08,0.56187,170.96,0
-musr_murder,Correct,8.4,0.04,0.47118,180.98,2560

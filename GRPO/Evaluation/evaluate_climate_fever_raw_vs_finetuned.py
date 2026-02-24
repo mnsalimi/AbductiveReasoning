@@ -165,23 +165,32 @@ def load_finetuned_model(checkpoint_path, device):
 
 
 SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
-    You are an expert climate scientist and professional fact-checker.
-    You will be given a specific Claim and a list of Evidences.
+    You are an expert climate scientist and professional fact-checker. Your task is to determine whether a set of provided evidences supports, refutes, or is insufficient to evaluate a specific claim.
 
-    Your task:
-    1. Read the Claim and the provided Evidence carefully.
-    2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO.
-    3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision.
-    4. Provide the final label.
+    You will be provided with:
+    1. A specific Claim
+    2. A list of Evidences
 
-    Your entire output MUST use exactly the following format and nothing else:
+    Your goal is to decide whether the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO, and to justify that decision by citing specific parts of the evidence.
 
-    <reasoning>
-    [Your step-by-step analysis of how the evidence relates to the claim]
-    </reasoning>
+    ## Instructions:
+    1. Carefully read the Claim and all provided Evidences
+    2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO
+    3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision
+    4. Output the final label
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Explain your thought process: step-by-step analysis of how the evidence relates to the claim]
+    </think>
+
     <answer>
     [Output exactly one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO]
     </answer>
+
+    CRITICAL: The answer section must contain ONLY one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO. Do not include any other text.
 """).strip()
 
 def create_climate_fever_prompt(example: dict):

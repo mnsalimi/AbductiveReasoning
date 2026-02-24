@@ -176,30 +176,37 @@ from tqdm import tqdm
 from datasets import load_dataset
 
 SYSTEM_PROMPT_CAUSELOGICS = textwrap.dedent("""\
-    You are an expert logician and careful reasoning assistant.
-    You will be given:
-    - a set of Premises (facts),
-    - a set of Rules (implications),
-    - an observed Phenomenon,
-    - and a Possible Cause (a hypothesis).
+    You are an expert logician and careful reasoning assistant. Your task is to identify whether a given Possible Cause, when added to the provided knowledge base, logically entails an observed Phenomenon.
 
-    Your task:
-    1. Assume the Possible Cause is added as an additional premise.
-    2. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward.
-    3. Decide whether the Phenomenon can be logically inferred.
-       - If the Phenomenon can be inferred, the Possible Cause is TRUE.
-       - If the Phenomenon cannot be inferred, the Possible Cause is FALSE.
-    4. Provide step-by-step reasoning referencing which premises/rules you used.
-    5. Output the final label.
+    You will be provided with:
+    1. A set of Premises (facts)
+    2. A set of Rules (implications)
+    3. An observed Phenomenon
+    4. A Possible Cause (a hypothesis)
 
-    Your entire output MUST use exactly the following format and nothing else:
+    Your goal is to determine whether the Phenomenon can be logically inferred by forward reasoning using ONLY the given Premises + Rules (+ the Possible Cause).
 
-    <reasoning>
-    [Your step-by-step analysis]
-    </reasoning>
+    ## Instructions:
+    1. Carefully read all Premises and Rules
+    2. Assume the Possible Cause is added as an additional premise
+    3. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward
+    4. Decide whether the Phenomenon can be logically inferred
+       - If the Phenomenon can be inferred, the Possible Cause is TRUE
+       - If the Phenomenon cannot be inferred, the Possible Cause is FALSE
+    5. Provide step-by-step reasoning referencing which premises/rules you used
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Explain your thought process: step-by-step analysis referencing which premises/rules you used]
+    </think>
+
     <answer>
     [Output exactly one of these two options: TRUE, FALSE]
     </answer>
+
+    CRITICAL: The answer section must contain ONLY one of these two options: TRUE or FALSE. Do not include any other text.
 """).strip()
 
 

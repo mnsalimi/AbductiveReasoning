@@ -309,6 +309,7 @@ def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="M
             true_answers.append(true_answer)
             
             batch_data.append({
+                'premise': premise,
                 'hypothesis': hypothesis,
                 'update': update,
                 'id': start_idx + i
@@ -348,6 +349,7 @@ def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="M
             
             results.append({
                 'id': batch_data[i]['id'],
+                'premise': batch_data[i]['premise'],
                 'hypothesis': batch_data[i]['hypothesis'],
                 'update': batch_data[i]['update'],
                 'true_answer': true_answers[i],
@@ -540,6 +542,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         
         case_entry = {
             "problem_id": pid,
+            'premise': raw_r["premise"],
             "hypothesis": raw_r["hypothesis"],  
             "update": raw_r["update"],
             "true_answer": raw_r["true_answer"],  

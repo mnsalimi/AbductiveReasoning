@@ -245,9 +245,9 @@ def create_strategyqa_prompt(question, evidence_text):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Your step-by-step analysis grounded in the evidence]
-        </reasoning>
+        </think>
         <answer>
         [Output exactly one of these two options: YES, NO]
         </answer>

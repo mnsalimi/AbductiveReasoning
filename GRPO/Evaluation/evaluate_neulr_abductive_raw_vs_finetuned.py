@@ -185,9 +185,9 @@ def create_neulr_abductive_prompt(problem, context):
         Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion true based on the Rules.
 
         Output Format:
-        <reasoning>
+        <think>
         [Step-by-step logic: Identify the rule triggered by the Conclusion, trace backwards to find what condition is missing.]
-        </reasoning>
+        </think>
         <answer>
         [The missing fact as a complete sentence. Example: NPsw0v0k is ADP37scy8.]
         </answer>
@@ -207,10 +207,10 @@ def create_neulr_abductive_prompt(problem, context):
 
 
 def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags."""
+    """Extract chain-of-thought reasoning from <think>...</think> tags."""
     if not response:
         return None
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    match = re.search(r'<think>(.*?)</think>', response, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     return None

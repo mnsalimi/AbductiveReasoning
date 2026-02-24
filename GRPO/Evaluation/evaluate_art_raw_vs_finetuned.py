@@ -172,9 +172,9 @@ def create_art_prompt(obs1, obs2, hyp1, hyp2):
 
         Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-        <reasoning>
+        <think>
         [here you write your chain-of-thought reasoning about which hypothesis is better]
-        </reasoning>
+        </think>
         <answer>
         [here you output ONLY the number 1 or 2]
         </answer>""").strip()
@@ -191,8 +191,8 @@ def create_art_prompt(obs1, obs2, hyp1, hyp2):
     return system_prompt, user_prompt
 
 def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""
+    match = re.search(r'<think>(.*?)</think>', response, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     return None

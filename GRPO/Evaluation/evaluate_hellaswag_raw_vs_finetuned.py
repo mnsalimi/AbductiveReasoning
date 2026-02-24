@@ -181,9 +181,9 @@ def create_hellaswag_prompt(ctx, endings):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Brief explanation of why the chosen ending best fits the context]
-        </reasoning>
+        </think>
         <answer>
         [Output exactly one of these four options: A, B, C, D]
         </answer>

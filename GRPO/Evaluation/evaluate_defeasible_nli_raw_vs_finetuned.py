@@ -174,9 +174,9 @@ def create_defeasible_nli_prompt(premise, hypothesis, update):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Your step-by-step analysis of how the update affects the hypothesis]
-        </reasoning>
+        </think>
         <answer>
         [Output exactly one word: STRENGTHENS or WEAKENS]
         </answer>

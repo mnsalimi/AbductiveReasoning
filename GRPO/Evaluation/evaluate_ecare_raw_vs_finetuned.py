@@ -189,9 +189,9 @@ def create_ecare_prompt(claim, evidence_text):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Your step-by-step causal analysis comparing CHOICE1 vs CHOICE2]
-        </reasoning>
+        </think>
         <answer>
         [Output exactly one of these two options: CHOICE1, CHOICE2]
         </answer>

@@ -215,8 +215,8 @@ def create_copa_prompt(example):
     return system_prompt, user_prompt
 
 def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""
+    match = re.search(r'<think>(.*?)</think>', response, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     return None

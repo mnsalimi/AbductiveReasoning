@@ -183,9 +183,9 @@ def create_gsm8k_prompt(problem):
 
         Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
 
-        <reasoning>
+        <think>
         [here you write your chain-of-thought reasoning and intermediate steps]
-        </reasoning>
+        </think>
         <answer>
         [here you output ONLY the final numeric answer, e.g. 42 or 3.14]
         </answer>
@@ -201,8 +201,8 @@ def create_gsm8k_prompt(problem):
 
 
 def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags, if present."""
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""
+    match = re.search(r'<think>(.*?)</think>', response, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     return None

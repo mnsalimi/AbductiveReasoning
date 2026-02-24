@@ -188,9 +188,9 @@ def create_clutrr_prompt(story, query):
 
         Your entire output MUST use exactly the following format:
 
-        <reasoning>
+        <think>
         [Step-by-step deduction of the family tree path]
-        </reasoning>
+        </think>
         <answer>
         [The exact kinship relation word, e.g., grandmother]
         </answer>

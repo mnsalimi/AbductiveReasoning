@@ -273,9 +273,9 @@ SYSTEM_PROMPT_ACR_V1 = textwrap.dedent("""\
     Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
 
     ### Output format:
-    <reasoning>
+    <think>
     Briefly describe the rule you inferred and any important edge cases.
-    </reasoning>
+    </think>
     <answer>
     def transform(grid):
         ...
@@ -290,7 +290,7 @@ SYSTEM_PROMPT_ACR_V1 = textwrap.dedent("""\
     - Do not hardcode specific training inputs/outputs; generalize the logic.
 
     STRICT FORMATTING RULES:
-    - Output ONLY the <reasoning> and <answer> blocks—no other text.
+    - Output ONLY the <think> and <answer> blocks—no other text.
     - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
     - Do NOT repeat the code. Write the function exactly once.
     - Ensure you close the tag with </answer>.
@@ -310,9 +310,9 @@ SYSTEM_PROMPT_ACR_V2 = textwrap.dedent("""\
     Hint: MiniARC tasks often involve identifying distinct objects (connected components of the same color), counting elements, or applying simple geometric transformations like flips and rotations.
 
     ### Output format:
-    <reasoning>
+    <think>
     Briefly describe the rule you inferred and any important edge cases.
-    </reasoning>
+    </think>
     <answer>
     def transform(grid):
         ...
@@ -327,7 +327,7 @@ SYSTEM_PROMPT_ACR_V2 = textwrap.dedent("""\
     - Do not hardcode specific training inputs/outputs; generalize the logic.
 
     STRICT FORMATTING RULES:
-    - Output ONLY the <reasoning> and <answer> blocks—no other text.
+    - Output ONLY the <think> and <answer> blocks—no other text.
     - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
     - Do NOT repeat the code. Write the function exactly once.
     - Ensure you close the tag with </answer>.
@@ -354,9 +354,9 @@ SYSTEM_PROMPT_ACR_V3 = textwrap.dedent("""\
     7. Movement: Moving objects until they hit a boundary or another object (gravity, bouncing).
 
     ### Output format:
-    <reasoning>
+    <think>
     Briefly describe the rule you inferred and any important edge cases.
-    </reasoning>
+    </think>
     <answer>
     def transform(grid):
         ...
@@ -371,7 +371,7 @@ SYSTEM_PROMPT_ACR_V3 = textwrap.dedent("""\
     - Do not hardcode specific training inputs/outputs; generalize the logic.
 
     STRICT FORMATTING RULES:
-    - Output ONLY the <reasoning> and <answer> blocks—no other text.
+    - Output ONLY the <think> and <answer> blocks—no other text.
     - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
     - Do NOT repeat the code. Write the function exactly once.
     - Ensure you close the tag with </answer>.
@@ -408,8 +408,8 @@ def create_acr_prompt(example):
 # ============================================================================
 
 def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags."""
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    """Extract chain-of-thought reasoning from <think>...</think> tags."""
+    match = re.search(r'<think>(.*?)</think>', response, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     return None

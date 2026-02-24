@@ -176,9 +176,9 @@ def create_winogrande_prompt(sentence, option1, option2):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Your step-by-step analysis of which option best completes the sentence]
-        </reasoning>
+        </think>
         <answer>
         [Output exactly one of these two options: 1 or 2]
         </answer>

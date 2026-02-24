@@ -193,9 +193,9 @@ def create_inabhyd_prompt(claim, evidence_text):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Your step-by-step analysis of how candidate hypotheses explain all observations]
-        </reasoning>
+        </think>
         <answer>
         [Your final hypotheses only, one per line, no bullet symbols or numbering]
         </answer>

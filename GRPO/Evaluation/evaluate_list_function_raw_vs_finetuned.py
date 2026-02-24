@@ -268,9 +268,9 @@ SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
     Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
 
     Output format (MUST follow exactly):
-    <reasoning>
+    <think>
     Briefly describe the rule you inferred and any edge cases you considered.
-    </reasoning>
+    </think>
     <answer>
     def transform(lst):
         ...
@@ -325,8 +325,8 @@ def create_list_functions_prompt(example):
 # ============================================================================
 
 def extract_reasoning(response):
-    """Extract chain-of-thought reasoning from <reasoning>...</reasoning> tags."""
-    match = re.search(r'<reasoning>(.*?)</reasoning>', response, re.IGNORECASE | re.DOTALL)
+    """Extract chain-of-thought reasoning from <think>...</think> tags."""
+    match = re.search(r'<think>(.*?)</think>', response, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     return None

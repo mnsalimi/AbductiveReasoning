@@ -176,9 +176,9 @@ def create_vitaminc_prompt(claim, evidence_text):
 
         Your entire output MUST use exactly the following format and nothing else:
 
-        <reasoning>
+        <think>
         [Your step-by-step analysis]
-        </reasoning>
+        </think>
         <answer>
         [Output exactly one: SUPPORTS, REFUTES, NOT ENOUGH INFO]
         </answer>

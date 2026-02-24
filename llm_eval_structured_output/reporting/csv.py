@@ -1,12 +1,14 @@
 """
 reporting/csv.py
 ----------------
-Per-checkpoint CSV writing and the end-of-run full debug log.
+Per-checkpoint CSV writing, the end-of-run full debug log, and the run
+configuration snapshot.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 import pandas as pd
@@ -230,3 +232,65 @@ def write_debug_logs(all_results: list[dict]) -> None:
         csv_path = os.path.join(config.LOG_DIR, f"{ds}_full_debug_{config.RUN_ID}.csv")
         pd.DataFrame(rows).to_csv(csv_path, index=False, encoding="utf-8-sig")
         print(f"[OK] Full-debug CSV  → {csv_path}  ({len(rows)} rows)")
+
+
+# ---------------------------------------------------------------------------
+# Run configuration snapshot
+# ---------------------------------------------------------------------------
+
+def write_config_snapshot(
+    checkpoint_dirs: list[str],
+    active_metric_names: list[str],
+    active_datasets: list[str],
+) -> None:
+    """Write a JSON snapshot of the current run configuration to the results folder.
+
+    The file is named ``run_config_{RUN_ID}.json`` and is placed in
+    ``config.BASE_OUTPUT_DIR``.  It captures every setting that materially
+    affects the results so that any run can be reproduced or audited later.
+
+    Parameters
+    ----------
+    checkpoint_dirs:
+        The resolved (post-exclusion) checkpoint directories being evaluated.
+    active_metric_names:
+        Names of the metrics actually used in this run.
+    active_datasets:
+        Names of the datasets being evaluated (empty = all discovered).
+    """
+    _ensure(config.BASE_OUTPUT_DIR)
+
+    snapshot: dict[str, Any] = {
+        "run_id": config.RUN_ID,
+        "run_date": config.RUN_ID[:8],          # YYYYMMDD prefix
+        # ── Judge model ───────────────────────────────────────────────────
+        "judge_model": config.JUDGE_MODEL,
+        "reasoning_effort": config.REASONING_EFFORT,
+        "api_base_url": config.OPENAI_BASE_URL,
+        "api_timeout_s": config.API_TIMEOUT,
+        "api_max_retries": config.API_MAX_RETRIES,
+        # ── Sampling ─────────────────────────────────────────────────────
+        "n_samples": config.N_SAMPLES,
+        "random_seed": config.RANDOM_SEED,
+        "sample_correct_ratio": config.SAMPLE_CORRECT_RATIO,
+        "max_workers": config.MAX_WORKERS,
+        # ── Scope ────────────────────────────────────────────────────────
+        "active_metrics": active_metric_names,
+        "active_datasets": active_datasets if active_datasets else ["(all discovered)"],
+        "excluded_checkpoints": list(config.EXCLUDED_CHECKPOINTS),
+        "evaluated_checkpoints": [os.path.basename(os.path.normpath(d)) for d in checkpoint_dirs],
+        # ── I/O ──────────────────────────────────────────────────────────
+        "output_base_dir": config.BASE_OUTPUT_DIR,
+        "unnorm_dir": config.UNNORM_DIR,
+        "norm_dir": config.NORM_DIR,
+        "log_dir": config.LOG_DIR,
+        "comparison_log_dir": os.path.join(config.BASE_OUTPUT_DIR, "comparison_logs"),
+        "latex_slides_dir": os.path.join(config.BASE_OUTPUT_DIR, "latex_slides"),
+        "clear_previous_outputs": config.CLEAR_PREVIOUS_OUTPUTS,
+    }
+
+    out_path = os.path.join(config.BASE_OUTPUT_DIR, f"run_config_{config.RUN_ID}.json")
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(snapshot, fh, indent=2, ensure_ascii=False)
+
+    print(f"[OK] Config snapshot  → {out_path}")

@@ -236,10 +236,10 @@ def ask_llm(
                 response_format=response_schema,
             )
             if modern:
-                call_kwargs["max_completion_tokens"] = 2000
+                call_kwargs["max_completion_tokens"] = 2500
                 call_kwargs["reasoning_effort"] = config.REASONING_EFFORT
             else:
-                call_kwargs["max_tokens"] = 2000
+                call_kwargs["max_tokens"] = 2500
                 call_kwargs["temperature"] = 0.0
 
             response = get_client().chat.completions.parse(**call_kwargs)

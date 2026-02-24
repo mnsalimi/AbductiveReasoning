@@ -26,7 +26,7 @@ RANDOM_SEED: int = 42       # Fixed seed for reproducible sampling
 
 # Fraction of N_SAMPLES drawn from correct items (0.0–1.0).
 # Set to None to disable stratified sampling (pure random draw).
-SAMPLE_CORRECT_RATIO: float | None = 1.0
+SAMPLE_CORRECT_RATIO: float | None = None
 
 # ---------------------------------------------------------------------------
 # Judge model
@@ -73,7 +73,7 @@ CLEAR_PREVIOUS_OUTPUTS: bool = False
 #                    "observation_coverage"
 # An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-ACTIVE_METRICS: list[str] = ["prior"]
+ACTIVE_METRICS: list[str] = ["prior", "uncertainty_markers", "observation_coverage"]
 # Example: ACTIVE_METRICS = ["uncertainty_markers", "backtracking"]
 # Example (all metrics): ACTIVE_METRICS = []
 
@@ -82,5 +82,14 @@ ACTIVE_METRICS: list[str] = ["prior"]
 # List only the dataset names (folder names inside each checkpoint) to include.
 # An empty list evaluates ALL datasets found in each checkpoint.
 # ---------------------------------------------------------------------------
-ACTIVE_DATASETS: list[str] = ["art", "copa_guess_effect"]
+ACTIVE_DATASETS: list[str] = ["medqa", "copa_guess_effect"]
 # Example (all datasets): ACTIVE_DATASETS = []
+
+# ---------------------------------------------------------------------------
+# Excluded checkpoints
+# List checkpoint directory names (basenames) to skip entirely.
+# Supports both trained checkpoints ("checkpoint-500") and "raw_model".
+# An empty list means no checkpoints are excluded.
+# ---------------------------------------------------------------------------
+EXCLUDED_CHECKPOINTS: list[str] = []
+# Example: EXCLUDED_CHECKPOINTS = ["checkpoint-500", "raw_model"]

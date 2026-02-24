@@ -2,6 +2,12 @@
 reporting/plots.py
 ------------------
 Evolution line plots.
+
+Plotting behaviour is driven by ``config.SAMPLE_CORRECT_RATIO``:
+  == 1.0  →  only "Correct" items were sampled → produce a single "correct" plot
+  == 0.0  →  only "Incorrect" items were sampled → produce a single "incorrect" plot
+  otherwise → produce three plots: "correct", "incorrect", and a "mix"
+              (all statuses averaged together)
 """
 
 from __future__ import annotations
@@ -12,23 +18,14 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 
+import config
+
 matplotlib.use("Agg")
 
+
 # ---------------------------------------------------------------------------
-# Evolution line plots
+# Helpers
 # ---------------------------------------------------------------------------
-
-def build_evolution_plots(combined: pd.DataFrame, base_dir: str) -> None:
-    """Produce one PNG per (metric_col × status) pair."""
-    metric_cols = [c for c in combined.columns if c.endswith("_count")]
-
-    for col in metric_cols:
-        if "Status" in combined.columns:
-            for status in combined["Status"].unique():
-                _evolution_plot(combined[combined["Status"] == status], col, base_dir, suffix=status.lower())
-        else:
-            _evolution_plot(combined, col, base_dir)
-
 
 def _evolution_plot(df: pd.DataFrame, metric_col: str, base_dir: str, suffix: str = "") -> None:
     if metric_col not in df.columns:
@@ -54,3 +51,42 @@ def _evolution_plot(df: pd.DataFrame, metric_col: str, base_dir: str, suffix: st
     plt.close(fig)
 
 
+# ---------------------------------------------------------------------------
+# Evolution line plots
+# ---------------------------------------------------------------------------
+
+def build_evolution_plots(combined: pd.DataFrame, base_dir: str) -> None:
+    """Produce evolution PNGs based on ``config.SAMPLE_CORRECT_RATIO``.
+
+    * ratio == 1.0  →  only a "correct" plot per metric column
+    * ratio == 0.0  →  only an "incorrect" plot per metric column
+    * anything else →  three plots: "correct", "incorrect", and "mix"
+                       where "mix" averages over all statuses
+    """
+    metric_cols = [c for c in combined.columns if c.endswith("_count")]
+    ratio = config.SAMPLE_CORRECT_RATIO
+
+    has_status = "Status" in combined.columns
+
+    for col in metric_cols:
+        if ratio == 1.0:
+            # Only correct
+            sub = combined[combined["Status"] == "Correct"] if has_status else combined
+            _evolution_plot(sub, col, base_dir, suffix="correct")
+
+        elif ratio == 0.0:
+            # Only incorrect
+            sub = combined[combined["Status"] == "Incorrect"] if has_status else combined
+            _evolution_plot(sub, col, base_dir, suffix="incorrect")
+
+        else:
+            # Both individual statuses plus a mixed aggregate
+            if has_status:
+                for status in ("Correct", "Incorrect"):
+                    sub = combined[combined["Status"] == status]
+                    if not sub.empty:
+                        _evolution_plot(sub, col, base_dir, suffix=status.lower())
+                # Mix: aggregate over all statuses
+                _evolution_plot(combined, col, base_dir, suffix="mix")
+            else:
+                _evolution_plot(combined, col, base_dir, suffix="mix")

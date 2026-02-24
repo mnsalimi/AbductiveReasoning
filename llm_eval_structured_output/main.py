@@ -33,6 +33,7 @@ from data_loader import (
 )
 from evaluator import process_single_item
 from metrics.registry import get_active_metrics
+from reporting.comparison_logs import write_comparison_logs, COMPARISON_LOG_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +41,7 @@ from metrics.registry import get_active_metrics
 # ---------------------------------------------------------------------------
 
 def _setup_dirs() -> None:
-    for d in (config.BASE_OUTPUT_DIR, config.LOG_DIR, config.UNNORM_DIR, config.NORM_DIR):
+    for d in (config.BASE_OUTPUT_DIR, config.LOG_DIR, config.UNNORM_DIR, config.NORM_DIR, COMPARISON_LOG_DIR):
         os.makedirs(d, exist_ok=True)
 
 
@@ -57,6 +58,8 @@ def run() -> None:
     print(f"  N samples  : {config.N_SAMPLES}")
     print(f"  Seed       : {config.RANDOM_SEED}")
     print(f"  Correct %  : {config.SAMPLE_CORRECT_RATIO}")
+    if config.EXCLUDED_CHECKPOINTS:
+        print(f"  Excluded   : {', '.join(config.EXCLUDED_CHECKPOINTS)}")
 
     _setup_dirs()
 
@@ -73,6 +76,13 @@ def run() -> None:
     print(f"\nFound {len(checkpoint_dirs)} checkpoint(s):")
     for d in checkpoint_dirs:
         print(f"  {d}")
+
+    # ── Write config snapshot now that checkpoints are resolved ──────────
+    results_mod.write_config_snapshot(
+        checkpoint_dirs=checkpoint_dirs,
+        active_metric_names=list(active_metrics),
+        active_datasets=config.ACTIVE_DATASETS,
+    )
 
     # ── 2. API connectivity check ─────────────────────────────────────────
     if not llm_client.test_connection():
@@ -158,6 +168,7 @@ def run() -> None:
     # ── 5. Post-run outputs ───────────────────────────────────────────────
     if all_results:
         results_mod.write_debug_logs(all_results)
+        write_comparison_logs(all_results, active_metrics)
 
     print("\n[Generating comparison tables …]")
     results_mod.generate_comparison_tables(config.UNNORM_DIR, "Unnormalized")
@@ -170,6 +181,7 @@ def run() -> None:
     print(f"  {config.UNNORM_DIR}/")
     print(f"  {config.NORM_DIR}/")
     print(f"  {config.LOG_DIR}/")
+    print(f"  {COMPARISON_LOG_DIR}/  (pairwise, 2-checkpoint runs only)")
 
 
 if __name__ == "__main__":

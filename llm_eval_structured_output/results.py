@@ -20,7 +20,7 @@ import os
 import pandas as pd
 
 import config
-from reporting.csv import save_checkpoint_csvs, write_debug_logs  # noqa: F401
+from reporting.csv import save_checkpoint_csvs, write_debug_logs, write_config_snapshot  # noqa: F401
 from reporting.excel import build_excel_workbook
 from reporting.plots import build_evolution_plots  # noqa: F401
 

@@ -43,11 +43,24 @@ _CKPT_PATTERNS = [
 
 
 def find_checkpoint_dirs() -> list[str]:
-    """Return a sorted, de-duplicated list of checkpoint directory paths."""
+    """Return a sorted, de-duplicated list of checkpoint directory paths.
+
+    Checkpoints whose base directory name appears in
+    ``config.EXCLUDED_CHECKPOINTS`` are silently dropped.
+    """
     found: list[str] = []
     for pattern in _CKPT_PATTERNS:
         found.extend(glob.glob(pattern))
-    return sorted(set(found))
+
+    excluded = {e.strip() for e in (config.EXCLUDED_CHECKPOINTS or [])}
+    result: list[str] = []
+    for path in sorted(set(found)):
+        basename = os.path.basename(os.path.normpath(path))
+        if basename in excluded:
+            print(f"[INFO] Skipping excluded checkpoint: {path}")
+            continue
+        result.append(path)
+    return result
 
 
 def parse_checkpoint_number(ckpt_dir: str) -> int | None:

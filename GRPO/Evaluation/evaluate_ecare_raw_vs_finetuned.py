@@ -351,7 +351,7 @@ CHOICE2:
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=2048  # CHANGED: smaller is fine; prompts are short
         ).to(model.device)
 

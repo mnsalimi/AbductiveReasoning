@@ -318,7 +318,7 @@ def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", bat
         inputs = tokenizer(
             batch_prompts, 
             return_tensors="pt", 
-            truncation=True, 
+            truncation=False, 
             max_length=2048,
             padding=True
         )

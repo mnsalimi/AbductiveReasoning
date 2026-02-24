@@ -640,7 +640,7 @@ def evaluate_on_acr(model, tokenizer, max_samples=None, model_name="Model", batc
                 formatted_prompts,
                 return_tensors="pt",
                 padding=True,
-                truncation=True,
+                truncation=False,
                 max_length=4096
             )
             inputs = {k: v.to(model.device) for k, v in inputs.items()}

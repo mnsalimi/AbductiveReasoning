@@ -317,7 +317,7 @@ def evaluate_on_winogrande(
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=max_length,
         ).to(model.device)
 

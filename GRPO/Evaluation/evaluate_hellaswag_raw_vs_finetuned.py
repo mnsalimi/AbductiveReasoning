@@ -342,7 +342,7 @@ def evaluate_on_hellaswag(
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=4096,
         ).to(model.device)
 

@@ -301,7 +301,7 @@ def evaluate_on_musr_object(model, tokenizer, max_samples=None, model_name="Mode
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=2048
         )
         inputs = {k: v.to(model.device) for k, v in inputs.items()}

@@ -432,7 +432,7 @@ def evaluate_on_inabhyd(
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=4096,
         ).to(model.device)
 

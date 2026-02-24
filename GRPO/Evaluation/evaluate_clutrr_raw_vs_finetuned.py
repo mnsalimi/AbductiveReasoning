@@ -313,7 +313,7 @@ def evaluate_on_clutrr(model, tokenizer, max_samples=None, model_name="Model", b
         
         # Tokenize
         inputs = tokenizer(
-            formatted_prompts, return_tensors="pt", padding=True, truncation=True, max_length=4096
+            formatted_prompts, return_tensors="pt", padding=True, truncation=False, max_length=4096
         ).to(model.device)
         
         # Generate

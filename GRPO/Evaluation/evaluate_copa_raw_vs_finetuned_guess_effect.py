@@ -336,7 +336,7 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=512
         )
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
@@ -1189,3 +1189,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

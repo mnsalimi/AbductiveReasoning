@@ -496,7 +496,7 @@ def evaluate_on_strategyqa(
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=max_prompt_length,
         ).to(model.device)
 

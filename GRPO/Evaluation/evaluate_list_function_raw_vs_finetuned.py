@@ -361,7 +361,7 @@ def evaluate_on_list_functions(model, tokenizer, max_samples=None, model_name="M
             formatted_prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=4096 # Allow for larger contexts
         )
         inputs = {k: v.to(model.device) for k, v in inputs.items()}

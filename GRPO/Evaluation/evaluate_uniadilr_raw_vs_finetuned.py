@@ -435,7 +435,7 @@ def evaluate_on_uniadilr(
             prompts,
             return_tensors="pt",
             padding=True,
-            truncation=True,
+            truncation=False,
             max_length=1024,
         )
         inputs = {k: v.to(model.device) for k, v in inputs.items()}

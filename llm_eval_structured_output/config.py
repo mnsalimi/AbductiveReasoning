@@ -28,6 +28,14 @@ RANDOM_SEED: int = 42       # Fixed seed for reproducible sampling
 # Set to None to disable stratified sampling (pure random draw).
 SAMPLE_CORRECT_RATIO: float | None = None
 
+# Directory that contains pre-generated sample index files.
+# When N_SAMPLES matches one of these files (e.g. random_samples/samples_10.json),
+# those fixed indices are used instead of random sampling, ensuring exact
+# reproducibility across runs without relying on RANDOM_SEED.
+# Supported sizes: 3, 5, 10, 50  (add more files to extend this set).
+# Set to None or "" to always use random sampling.
+RANDOM_SAMPLES_DIR: str = "random_samples"
+
 # ---------------------------------------------------------------------------
 # Judge model
 # ---------------------------------------------------------------------------

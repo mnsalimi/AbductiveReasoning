@@ -44,6 +44,12 @@ llm_eval/
 │   ├── generate_latex_slides.py ← generate Beamer .tex comparing one item across 2 checkpoints
 │   └── gen_slides.sh            ← edit variables here and run to generate slides
 │
+├── random_samples/             ← pre-generated sample index files (pinned PIDs)
+│   ├── samples_3.json
+│   ├── samples_5.json
+│   ├── samples_10.json
+│   └── samples_50.json
+│
 ├── checkpoints/                ← input data (model checkpoint outputs)
 │   ├── raw_model/              ← treated as checkpoint-0
 │   └── checkpoint-<N>/
@@ -231,13 +237,55 @@ results/
 | `N_SAMPLES` | `3` | Items per dataset per checkpoint |
 | `MAX_WORKERS` | `5` | Parallel threads |
 | `SAMPLE_CORRECT_RATIO` | `None` | Fraction of correct items in sample. `1.0` = all correct, `0.0` = all incorrect, `None` = pure random. |
-| `RANDOM_SEED` | `42` | Reproducibility seed |
+| `RANDOM_SEED` | `42` | Reproducibility seed (used only when no pinned sample file is found) |
+| `RANDOM_SAMPLES_DIR` | `"random_samples"` | Directory of pre-generated sample index files (see [Pinned samples](#pinned-samples-random_samples)). Set to `None` or `""` to always use random sampling. |
 | `ACTIVE_METRICS` | `["prior", "uncertainty_markers", "observation_coverage"]` | Names of metrics to run. Empty list activates **all** registered metrics. |
 | `ACTIVE_DATASETS` | `["medqa", "copa_guess_effect"]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
 | `EXCLUDED_CHECKPOINTS` | `[]` | Checkpoint directory basenames to skip entirely (e.g. `["raw_model", "checkpoint-500"]`). |
 | `CLEAR_PREVIOUS_OUTPUTS` | `False` | Delete existing JSONL logs on start |
 
+## Pinned samples (`random_samples/`)
+
+The `random_samples/` directory holds pre-generated, version-controlled index files.  Each file is a JSON array of integers representing the problem IDs (indices 1–130) that will be evaluated when `N_SAMPLES` matches the file size.
+
+```
+random_samples/
+├── samples_3.json     # [7, 29, 71]
+├── samples_5.json     # [7, 29, 32, 71, 130]
+├── samples_10.json    # [7, 14, 18, 29, 32, 71, 87, 95, 124, 130]
+└── samples_50.json    # 50 indices drawn from [1, 130]
+```
+
+### How it works
+
+When `compute_sampled_pids()` is called it checks `{RANDOM_SAMPLES_DIR}/samples_{N_SAMPLES}.json`:
+
+| Condition | Behaviour |
+|---|---|
+| File found, indices overlap dataset | Those indices are used as-is (filtered to valid PIDs only) |
+| File found, **no overlap** with dataset | Falls back to seeded random sampling with a warning |
+| File **not found** | Falls back to seeded random sampling (controlled by `RANDOM_SEED`) |
+
+This guarantees that runs with `N_SAMPLES = 3 / 5 / 10 / 50` always evaluate exactly the same problem IDs across experiments, making results directly comparable without relying on seed reproducibility.
+
+### Adding more sizes
+
+To pin a new size (e.g. 20), generate the file and commit it:
+
+```python
+import random, json
+random.seed(42)
+print(json.dumps(sorted(random.sample(range(1, 131), 20))))
+# paste output into random_samples/samples_20.json
+```
+
+Then set `N_SAMPLES = 20` in `config.py` — the pipeline picks it up automatically.
+
 ## Changelog
+
+### 2026-02-25 (pinned samples)
+- **Pinned sample files** — added `random_samples/` with pre-generated index files for sizes 3, 5, 10, and 50.  When `N_SAMPLES` matches one of these files, `compute_sampled_pids()` loads the fixed indices instead of drawing randomly, making cross-experiment comparisons fully deterministic without relying on `RANDOM_SEED`.
+- **`RANDOM_SAMPLES_DIR`** — new `config.py` setting pointing to the pinned-samples directory.  Set to `None` or `""` to restore pure random sampling.
 
 ### 2026-02-25
 - **Excluded checkpoints** — new `EXCLUDED_CHECKPOINTS` list in `config.py`. Any checkpoint whose directory basename appears in this list is silently skipped by `find_checkpoint_dirs()`.

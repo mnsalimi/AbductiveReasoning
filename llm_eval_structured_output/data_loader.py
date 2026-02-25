@@ -187,6 +187,29 @@ def build_pid_map(items: list[Item]) -> PidMap:
 # Sampling
 # ---------------------------------------------------------------------------
 
+def _load_pinned_sample(n_samples: int) -> list | None:
+    """
+    Look for ``{config.RANDOM_SAMPLES_DIR}/samples_{n_samples}.json``.
+
+    If the file exists, load and return its contents as a list of integers.
+    Returns ``None`` when no matching file is found or the directory is not
+    configured, so the caller falls back to seeded random sampling.
+    """
+    samples_dir = getattr(config, "RANDOM_SAMPLES_DIR", None)
+    if not samples_dir:
+        return None
+    candidate = os.path.join(samples_dir, f"samples_{n_samples}.json")
+    if not os.path.isfile(candidate):
+        return None
+    with open(candidate, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if not isinstance(data, list):
+        print(f"[WARN] {candidate}: expected a JSON array, got {type(data).__name__} – ignoring.")
+        return None
+    print(f"[INFO] Using pinned sample from '{candidate}' ({len(data)} indices).")
+    return [int(x) for x in data]
+
+
 def _sort_pids(pids: set) -> list:
     def _key(x: Any) -> tuple:
         try:
@@ -266,6 +289,9 @@ def compute_sampled_pids(
             )
             del intersection[ds]
 
+    # Check for a pre-generated pinned sample file for this N
+    pinned_indices: list | None = _load_pinned_sample(n_samples)
+
     random.seed(seed)
     sampled: dict[str, list] = {}
 
@@ -273,6 +299,25 @@ def compute_sampled_pids(
         if not pid_set:
             print(f"[WARN] Dataset '{ds}': no common valid items across checkpoints.")
             continue
+
+        # ── Pinned-sample path ───────────────────────────────────────────
+        if pinned_indices is not None:
+            # Keep only indices that are valid PIDs for this dataset
+            available = [p for p in pinned_indices if p in pid_set]
+            if not available:
+                print(
+                    f"[WARN] Dataset '{ds}': pinned sample has no overlap with valid PIDs – "
+                    "falling back to random sampling."
+                )
+            else:
+                sampled[ds] = _sort_pids(set(available))
+                print(
+                    f"[OK] '{ds}': using {len(sampled[ds])} pinned indices "
+                    f"({n_samples - len(sampled[ds])} requested indices not present in dataset)"
+                    if len(sampled[ds]) < n_samples else
+                    f"[OK] '{ds}': using {len(sampled[ds])} pinned indices"
+                )
+                continue
 
         if correct_ratio is not None and 0.0 <= correct_ratio <= 1.0:
             stable_correct = _sort_pids(correct_sets.get(ds, set()) & pid_set)

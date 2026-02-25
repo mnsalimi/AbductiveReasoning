@@ -16,19 +16,19 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # >>>  EDIT THESE  <<<
 # ---------------------------------------------------------------------------
-DATASET="copa_guess_effect"   # e.g. medqa, art, copa_guess_effect, musr_murder
-PROBLEM_ID=70                 # problem / sample ID from the JSON data
+DATASET="MedQA"   # e.g. medqa, art, copa_guess_effect, musr_murder
+PROBLEM_ID=9                 # problem / sample ID from the JSON data
 CHECKPOINT_A=0                # lower checkpoint (0 = raw_model)
 CHECKPOINT_B=2560             # upper checkpoint
-METRIC="uncertainty_markers"  # backtracking | branchiness | uncertainty_markers
+METRIC="observation_coverage"  # backtracking | branchiness | uncertainty_markers
                               # uncertainty_language | detail_coverage
                               # observation_coverage | prior
 
 # ---------------------------------------------------------------------------
 # Paths  (relative to project root – rarely need changing)
 # ---------------------------------------------------------------------------
-OUTPUT_DIR="results/latex_slides"
-LOG_DIR="results/llm_logs"
+OUTPUT_DIR="results2/latex_slides"
+LOG_DIR="results2/llm_logs"
 CHECKPOINTS_DIR="checkpoints"
 
 # ---------------------------------------------------------------------------

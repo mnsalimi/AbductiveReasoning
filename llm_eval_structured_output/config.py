@@ -20,7 +20,7 @@ RUN_ID: str = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 # ---------------------------------------------------------------------------
 # Sampling
 # ---------------------------------------------------------------------------
-N_SAMPLES: int = 3          # How many items to evaluate per dataset per checkpoint
+N_SAMPLES: int = 1          # How many items to evaluate per dataset per checkpoint
 MAX_WORKERS: int = 5        # Parallel threads for LLM calls
 RANDOM_SEED: int = 42       # Fixed seed for reproducible sampling
 
@@ -46,7 +46,7 @@ JUDGE_MODEL: str = "gpt-5-nano"
 
 # Reasoning effort for GPT-5+ models ("low" | "medium" | "high").
 # Ignored for older models that do not support this parameter.
-REASONING_EFFORT: str = "low"
+REASONING_EFFORT: str = "medium"
 
 # ---------------------------------------------------------------------------
 # API credentials
@@ -56,6 +56,9 @@ OPENAI_BASE_URL: str = os.environ.get("OPENAI_BASE_URL", "https://api.hyperbolic
 
 API_TIMEOUT: float = 60.0   # seconds
 API_MAX_RETRIES: int = 3
+# Maximum completion length per LLM call.
+# If responses fail with "length limit was reached", increase this value.
+MAX_COMPLETION_TOKENS: int = 10000
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -81,7 +84,7 @@ CLEAR_PREVIOUS_OUTPUTS: bool = False
 #                    "observation_coverage"
 # An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-ACTIVE_METRICS: list[str] = ["prior", "uncertainty_markers", "observation_coverage"]
+ACTIVE_METRICS: list[str] = ["uncertainty_markers"]
 # Example: ACTIVE_METRICS = ["uncertainty_markers", "backtracking"]
 # Example (all metrics): ACTIVE_METRICS = []
 
@@ -90,7 +93,7 @@ ACTIVE_METRICS: list[str] = ["prior", "uncertainty_markers", "observation_covera
 # List only the dataset names (folder names inside each checkpoint) to include.
 # An empty list evaluates ALL datasets found in each checkpoint.
 # ---------------------------------------------------------------------------
-ACTIVE_DATASETS: list[str] = ["medqa", "copa_guess_effect"]
+ACTIVE_DATASETS: list[str] = ["medqa"]
 # Example (all datasets): ACTIVE_DATASETS = []
 
 # ---------------------------------------------------------------------------
@@ -99,5 +102,5 @@ ACTIVE_DATASETS: list[str] = ["medqa", "copa_guess_effect"]
 # Supports both trained checkpoints ("checkpoint-500") and "raw_model".
 # An empty list means no checkpoints are excluded.
 # ---------------------------------------------------------------------------
-EXCLUDED_CHECKPOINTS: list[str] = []
+EXCLUDED_CHECKPOINTS: list[str] = ["checkpoint-2560"]
 # Example: EXCLUDED_CHECKPOINTS = ["checkpoint-500", "raw_model"]

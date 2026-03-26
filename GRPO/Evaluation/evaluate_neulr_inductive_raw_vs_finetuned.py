@@ -18,7 +18,7 @@ from tqdm import tqdm
 import torch
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
 from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import time
 import numpy as np
@@ -114,12 +114,18 @@ def load_raw_model(device):
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
+    )
+    
     model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,             
         device_map={"": f"cuda:0"},
         trust_remote_code=True,
-        load_in_4bit=True,
+        quantization_config=bnb_config,         
     )
     
     if tokenizer.pad_token is None:
@@ -131,21 +137,24 @@ def load_raw_model(device):
     return model, tokenizer
 
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
     print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
     
-    # Load base model
     base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
+    )
     
     base_model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,             
         device_map={"": f"cuda:0"},
         trust_remote_code=True,
-        load_in_4bit=True,
+        quantization_config=bnb_config,         
     )
     
-    # Load LoRA adapter
     model = PeftModel.from_pretrained(base_model, checkpoint_path)
     
     if base_tokenizer.pad_token is None:
@@ -155,7 +164,6 @@ def load_finetuned_model(checkpoint_path, device):
     print("✅ Fine-tuned model loaded successfully")
     
     return model, base_tokenizer
-
 
 def create_neulr_inductive_prompt(problem, context):
     """Create a prompt for a detective-style reasoning question involving shared properties."""

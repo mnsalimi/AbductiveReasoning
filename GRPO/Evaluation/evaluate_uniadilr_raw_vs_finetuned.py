@@ -18,7 +18,7 @@ from datetime import datetime
 
 from tqdm import tqdm
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import numpy as np
 import warnings
@@ -130,53 +130,62 @@ def find_best_checkpoint(training_dir: str):
     return checkpoint_path, best_score
 
 
-def load_raw_model(device: str):
+def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
-
+    
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-
+    
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
+    )
+    
     model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,             
         device_map={"": f"cuda:0"},
         trust_remote_code=True,
-        load_in_4bit=True,
+        quantization_config=bnb_config,         
     )
-
+    
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
+    
     model.eval()
     print("✅ Raw model loaded successfully")
-
+    
     return model, tokenizer
 
-
-def load_finetuned_model(checkpoint_path: str, device: str):
-    """Load base model + LoRA adapter checkpoint."""
+def load_finetuned_model(checkpoint_path, device):
     print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
-
+    
     base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
-
+    
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
+    )
+    
     base_model = AutoModelForCausalLM.from_pretrained(
         RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,             
         device_map={"": f"cuda:0"},
         trust_remote_code=True,
-        load_in_4bit=True,
+        quantization_config=bnb_config,         
     )
-
+    
     model = PeftModel.from_pretrained(base_model, checkpoint_path)
-
+    
     if base_tokenizer.pad_token is None:
         base_tokenizer.pad_token = base_tokenizer.eos_token
-
+    
     model.eval()
     print("✅ Fine-tuned model loaded successfully")
-
+    
     return model, base_tokenizer
-
 
 # ============================================================================
 # Helper functions: prompting, parsing, metrics

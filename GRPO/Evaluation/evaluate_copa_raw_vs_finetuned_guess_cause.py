@@ -250,21 +250,7 @@ def extract_answer(response):
         answer = matches[-1].strip()  # Take the last match
         if answer in ['1', '2']:
             return int(answer) - 1  # Convert to 0-indexed
-    
-    # Fallback: Look for "answer: 1" or "answer: 2" patterns
-    fallback_patterns = [
-        r'(?:answer|choice)[\s:]+(\d+)',
-        r'option\s+(\d+)',
-        r'(?:^|\s)([12])(?:\s|$|\.|,)'
-    ]
-    
-    for pattern in fallback_patterns:
-        matches = re.findall(pattern, response, re.IGNORECASE)
-        if matches:
-            answer = matches[-1].strip()
-            if answer in ['1', '2']:
-                return int(answer) - 1
-    
+        
     return None
 
 def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="validation"):

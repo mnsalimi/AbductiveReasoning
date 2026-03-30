@@ -225,74 +225,14 @@ def extract_emotions(response, valid_emotions=GOEMOTION_LABELS):
         list: List of extracted emotion labels, or None if extraction fails
     """
     # First try to extract <answer>...</answer> tags
-    tag_match = re.search(r'<answer>\s*([^<]+)\s*</answer>', response, re.IGNORECASE)
+    tag_match = re.search(r'<answer>\s*([^<]+)\s*</answer>', response, re.IGNORECASE | re.DOTALL)
     if tag_match:
         answer_text = tag_match.group(1).strip()
-        emotions = [e.strip() for e in answer_text.split(',') if e.strip()]
+        emotions = [e.strip().lower() for e in answer_text.split(',') if e.strip()]
         
         return list(set(emotions))  # Remove duplicates
 
-    # if not successful, follow the old logic
-    response = response.strip().lower()
-    
-    # Try various patterns
-    patterns = [
-        r'emotions?:\s*([^\n]+)',
-        r'the emotions? (?:is|are)\s*:?\s*([^\n]+)',
-        r'detected emotions?:\s*([^\n]+)',
-        r'(?:i detect|i identify|i sense)\s*(?:the emotions?)?\s*:?\s*([^\n]+)',
-    ]
-    
-    extracted_text = None
-    for pattern in patterns:
-        matches = re.findall(pattern, response, re.IGNORECASE)
-        if matches:
-            extracted_text = matches[-1].strip()
-            break
-    
-    if not extracted_text:
-        # Try to find any valid emotion words in the response
-        found_emotions = []
-        for emotion in valid_emotions:
-            if emotion.lower() in response:
-                found_emotions.append(emotion.lower())
-        
-        if found_emotions:
-            return list(set(found_emotions))  # Remove duplicates
-        return None
-    
-    # Parse the extracted text
-    # Remove common separators and clean up
-    extracted_text = extracted_text.replace(' and ', ', ')
-    extracted_text = extracted_text.replace('&', ',')
-    extracted_text = re.sub(r'[.!?;]', '', extracted_text)
-    
-    # Split by commas
-    emotion_candidates = [e.strip() for e in extracted_text.split(',')]
-    
-    # Filter to valid emotions
-    valid_emotions_lower = [e.lower() for e in valid_emotions]
-    detected_emotions = []
-    
-    for candidate in emotion_candidates:
-        candidate_clean = candidate.strip().lower()
-        # Remove quotes
-        candidate_clean = candidate_clean.replace('"', '').replace("'", '')
-        
-        # Check if it's a valid emotion
-        if candidate_clean in valid_emotions_lower:
-            detected_emotions.append(candidate_clean)
-        else:
-            # Check for partial matches
-            for valid_emotion in valid_emotions_lower:
-                if valid_emotion in candidate_clean or candidate_clean in valid_emotion:
-                    detected_emotions.append(valid_emotion)
-                    break
-    
-    if not detected_emotions:
-        return None
-    
-    return list(set(detected_emotions))  # Remove duplicates
+    return None
 
 def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="test"):
     """Evaluate model on GoEmotions dataset with batch processing support."""

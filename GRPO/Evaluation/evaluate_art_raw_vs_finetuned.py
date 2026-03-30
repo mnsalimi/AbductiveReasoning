@@ -210,42 +210,11 @@ def extract_reasoning(response):
 def extract_answer(response):
     """Extract the hypothesis number (1 or 2) from model response."""
     # First try to extract <answer>...</answer> tags
-    tag_match = re.search(r'<answer>\s*([12])\s*</answer>', response, re.IGNORECASE)
+    tag_match = re.search(r'<answer>\s*([12])\s*</answer>', response, re.IGNORECASE | re.DOTALL)
     if tag_match:
         return int(tag_match.group(1))
     
-    # if not successful, follow the old logic
-    # Clean the response
-    response = response.strip().lower()
-    
-    # Try various patterns
-    patterns = [
-        r'^\s*(\d)\s*$',  # Just a number
-        r'(?:hypothesis\s*)?(\d)',  # "hypothesis 1" or just "1"
-        r'(?:answer|select|choose)(?:\s+is)?\s*(\d)',  # "answer is 1"
-        r'(?:^|\s)(\d)(?:\s|$|\.)',  # Number with spaces
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, response)
-        if match:
-            num = match.group(1)
-            if num in ['1', '2']:
-                return int(num)
-    
-    # Check if response starts with 1 or 2
-    if response.startswith('1'):
-        return 1
-    if response.startswith('2'):
-        return 2
-    
-    # Look for "first" or "second"
-    if 'first' in response[:20]:
-        return 1
-    if 'second' in response[:20]:
-        return 2
-    
-    return None  # Unable to extract
+    return None 
 
 def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batch_size=1,split='validation'):
     """Evaluate model on ART dataset with batch processing support."""
@@ -335,7 +304,7 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=1024,
+                max_new_tokens=2048,
                 temperature=0.0,
                 do_sample=False,
                 # top_p=0.95,

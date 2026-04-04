@@ -117,13 +117,30 @@ def load_raw_model(device):
     
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
+    bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
     )
+    
+    if "gemma" in RAW_MODEL_PATH.lower():
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
+        )
+        print("\nGemma model detected!\n")
+
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
     
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -134,21 +151,35 @@ def load_raw_model(device):
     return model, tokenizer
 
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter."""
     print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
     
-    # Load base model
     base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.float16,
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
+    bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
     )
     
-    # Load LoRA adapter
+    if "gemma" in RAW_MODEL_PATH.lower():
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
+        )
+        print("\nGemma model detected!\n")
+
+    else:
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
+    
     model = PeftModel.from_pretrained(base_model, checkpoint_path)
     
     if base_tokenizer.pad_token is None:

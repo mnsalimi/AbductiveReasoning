@@ -108,6 +108,7 @@ def find_best_checkpoint(training_dir):
     
     return checkpoint_path, best_score
 
+
 def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
@@ -120,13 +121,24 @@ def load_raw_model(device):
         bnb_4bit_quant_type="nf4"
     )
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.bfloat16,             
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        quantization_config=bnb_config,         
-    )
+    if "gemma" in RAW_MODEL_PATH.lower():
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
+        )
+        print("\nGemma model detected!\n")
+
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
     
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -147,13 +159,24 @@ def load_finetuned_model(checkpoint_path, device):
         bnb_4bit_quant_type="nf4"
     )
     
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.bfloat16,             
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        quantization_config=bnb_config,         
-    )
+    if "gemma" in RAW_MODEL_PATH.lower():
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
+        )
+        print("\nGemma model detected!\n")
+
+    else:
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
     
     model = PeftModel.from_pretrained(base_model, checkpoint_path)
     

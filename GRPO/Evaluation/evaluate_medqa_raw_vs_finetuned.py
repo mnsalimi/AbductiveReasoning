@@ -120,13 +120,24 @@ def load_raw_model(device):
         bnb_4bit_quant_type="nf4"
     )
     
-    model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.bfloat16,             
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        quantization_config=bnb_config,         
-    )
+    if "gemma" in RAW_MODEL_PATH.lower():
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
+        )
+        print("\nGemma model detected!\n")
+
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
     
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -147,13 +158,24 @@ def load_finetuned_model(checkpoint_path, device):
         bnb_4bit_quant_type="nf4"
     )
     
-    base_model = AutoModelForCausalLM.from_pretrained(
-        RAW_MODEL_PATH,
-        torch_dtype=torch.bfloat16,             
-        device_map={"": f"cuda:0"},
-        trust_remote_code=True,
-        quantization_config=bnb_config,         
-    )
+    if "gemma" in RAW_MODEL_PATH.lower():
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
+        )
+        print("\nGemma model detected!\n")
+
+    else:
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            load_in_4bit=True,
+        )
     
     model = PeftModel.from_pretrained(base_model, checkpoint_path)
     
@@ -359,20 +381,23 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
     # Calculate comprehensive metrics
     y_true = [r['true_answer'] for r in results]
     y_pred = [r['predicted_answer'] for r in results]
-    
-    # Calculate precision, recall, f1 (macro and weighted averages)
-    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
-        y_true, y_pred, average='macro', zero_division=0
-    )
-    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
-        y_true, y_pred, average='weighted', zero_division=0
-    )
-    
-    # Per-class metrics
-    precision_per_class, recall_per_class, f1_per_class, support_per_class = precision_recall_fscore_support(
-        y_true, y_pred, average=None, zero_division=0
-    )
+
+    try:
+        # Calculate precision, recall, f1 (macro and weighted averages)
+        precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
+            y_true, 3, average='macro', zero_division=0
+        )
+        precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
+            y_true, y_pred, average='weighted', zero_division=0
+        )
         
+        # Per-class metrics
+        precision_per_class, recall_per_class, f1_per_class, support_per_class = precision_recall_fscore_support(
+            y_true, y_pred, average=None, zero_division=0
+        )
+    except Exception as e:
+        print(f"\nError {e}\n")
+
     # Calculate additional metrics
     extraction_rate = (total - failed_extractions) / total if total > 0 else 0.0
     

@@ -148,83 +148,83 @@ def find_best_checkpoint(training_dir):
     return checkpoint_path, best_score
 
 def load_raw_model(device):
-    """Load the raw/base model, using Unsloth if available for speed."""
+    """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
-
-    try:
-        from unsloth import FastLanguageModel
-        print("🚀 Using Unsloth for faster inference")
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name = RAW_MODEL_PATH,
-            max_seq_length = 4096,
-            load_in_4bit = True,
-            trust_remote_code = True,
+    
+    tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
+    )
+    
+    if "gemma" in RAW_MODEL_PATH.lower():
+        model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
         )
-        FastLanguageModel.for_inference(model)
-    except ImportError:
-        print("⚠️ Unsloth not found, falling back to standard transformers")
-        tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+        print("\nGemma model detected!\n")
+
+    else:
         model = AutoModelForCausalLM.from_pretrained(
             RAW_MODEL_PATH,
             torch_dtype=torch.float16,
-            device_map={"": f"cuda:{device}"},
+            device_map={"": f"cuda:0"},
             trust_remote_code=True,
             load_in_4bit=True,
         )
-
+    
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
+    
     model.eval()
     print("✅ Raw model loaded successfully")
-
+    
     return model, tokenizer
 
 def load_finetuned_model(checkpoint_path, device):
-    """Load the fine-tuned model with LoRA adapter, using Unsloth if available."""
-    if not os.path.exists(checkpoint_path):
-        print(f"⚠️ Checkpoint path not found: {checkpoint_path}")
-        parent_dir = os.path.dirname(checkpoint_path)
-        if os.path.exists(parent_dir):
-            print(f"Contents of {parent_dir}:")
-            print(os.listdir(parent_dir))
-        else:
-            print(f"Parent directory also not found: {parent_dir}")
-        raise FileNotFoundError(f"Checkpoint path not found: {checkpoint_path}")
-
-    try:
-        from unsloth import FastLanguageModel
-        print("🚀 Using Unsloth for faster inference")
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name = checkpoint_path, # Unsloth can load adapters directly
-            max_seq_length = 4096,
-            load_in_4bit = True,
-            trust_remote_code = True,
+    print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
+    
+    base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+    
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,  
+        bnb_4bit_quant_type="nf4"
+    )
+    
+    if "gemma" in RAW_MODEL_PATH.lower():
+        base_model = AutoModelForCausalLM.from_pretrained(
+            RAW_MODEL_PATH,
+            torch_dtype=torch.bfloat16,             
+            device_map={"": f"cuda:0"},
+            trust_remote_code=True,
+            quantization_config=bnb_config,         
         )
-        FastLanguageModel.for_inference(model)
-    except ImportError:
-        print("⚠️ Unsloth not found, falling back to standard transformers")
-        # Load base model
-        base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
+        print("\nGemma model detected!\n")
+
+    else:
         base_model = AutoModelForCausalLM.from_pretrained(
             RAW_MODEL_PATH,
             torch_dtype=torch.float16,
-            device_map={"": f"cuda:{device}"},
+            device_map={"": f"cuda:0"},
             trust_remote_code=True,
             load_in_4bit=True,
         )
-        # Load LoRA adapter
-        model = PeftModel.from_pretrained(base_model, checkpoint_path)
-        tokenizer = base_tokenizer
-
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
+    
+    model = PeftModel.from_pretrained(base_model, checkpoint_path)
+    
+    if base_tokenizer.pad_token is None:
+        base_tokenizer.pad_token = base_tokenizer.eos_token
+    
     model.eval()
     print("✅ Fine-tuned model loaded successfully")
-
-    return model, tokenizer
-
+    
+    return model, base_tokenizer
 
 # ## 4. Data Processing and Prompt Engineering
 # Define `string_to_list` and `list_to_string` for data serialization. Include `SYSTEM_PROMPT_LIST_FUNCTION` and `create_list_functions_prompt` to format inputs for the LLM.

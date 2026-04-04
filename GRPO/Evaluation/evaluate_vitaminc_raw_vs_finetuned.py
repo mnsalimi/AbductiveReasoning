@@ -259,6 +259,32 @@ def evaluate_on_vitaminc(model, tokenizer, max_samples=None, model_name="Model",
     print(f"Loading tals/vitaminc dataset (split={split})...")
     dataset = load_dataset("tals/vitaminc", split="test")
 
+    print("\nFiltering dataset for samples with input tokens <= 4096...")
+    original_len = len(dataset)
+    
+    def filter_by_token_length(sample):
+        system_prompt, user_prompt = create_vitaminc_prompt(sample)
+        try:
+            messages =[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+            formatted_prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except Exception:
+            formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
+            
+        # Get the tokenized length
+        tokenized = tokenizer(formatted_prompt, truncation=False, add_special_tokens=True)
+        return len(tokenized["input_ids"]) <= 4096
+        
+    dataset = dataset.filter(filter_by_token_length, desc="Filtering lengths")
+    print(f"Filtered out {original_len - len(dataset)} samples exceeding 4096 tokens.")
+    print(f"{len(dataset)} valid samples remaining.\n")
+
     indices = np.random.choice(len(dataset), int(1000), replace=False)
     dataset = dataset.select(indices)
     

@@ -164,6 +164,9 @@ def load_raw_model(device):
     """Load the raw/base model."""
     print(f"\n🤖 Loading raw model from: {RAW_MODEL_PATH}")
     
+    if not device.startswith("cuda"):
+        device = f"cuda:{device}"
+
     tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
     bnb_config = BitsAndBytesConfig(
@@ -176,7 +179,7 @@ def load_raw_model(device):
         model = AutoModelForCausalLM.from_pretrained(
             RAW_MODEL_PATH,
             torch_dtype=torch.bfloat16,             
-            device_map={"": f"cuda:0"},
+            device_map={"": device},
             trust_remote_code=True,
             quantization_config=bnb_config,         
         )
@@ -186,7 +189,7 @@ def load_raw_model(device):
         model = AutoModelForCausalLM.from_pretrained(
             RAW_MODEL_PATH,
             torch_dtype=torch.float16,
-            device_map={"": f"cuda:0"},
+            device_map={"": device},
             trust_remote_code=True,
             load_in_4bit=True,
         )
@@ -202,6 +205,9 @@ def load_raw_model(device):
 def load_finetuned_model(checkpoint_path, device):
     print(f"\n🎯 Loading fine-tuned model from: {checkpoint_path}")
     
+    if not device.startswith("cuda"):
+        device = f"cuda:{device}"
+        
     base_tokenizer = AutoTokenizer.from_pretrained(RAW_MODEL_PATH, trust_remote_code=True)
     
     bnb_config = BitsAndBytesConfig(
@@ -214,7 +220,7 @@ def load_finetuned_model(checkpoint_path, device):
         base_model = AutoModelForCausalLM.from_pretrained(
             RAW_MODEL_PATH,
             torch_dtype=torch.bfloat16,             
-            device_map={"": f"cuda:0"},
+            device_map={"": device},
             trust_remote_code=True,
             quantization_config=bnb_config,         
         )
@@ -224,7 +230,7 @@ def load_finetuned_model(checkpoint_path, device):
         base_model = AutoModelForCausalLM.from_pretrained(
             RAW_MODEL_PATH,
             torch_dtype=torch.float16,
-            device_map={"": f"cuda:0"},
+            device_map={"": device},
             trust_remote_code=True,
             load_in_4bit=True,
         )

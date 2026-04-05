@@ -341,7 +341,7 @@ def evaluate_on_ml_debugging(model, tokenizer, max_samples=None, model_name="Mod
             
         # Get the tokenized length
         tokenized = tokenizer(formatted_prompt, truncation=False, add_special_tokens=True)
-        return len(tokenized["input_ids"]) <= 4096
+        return (len(tokenized["input_ids"]) <= 4096) and ("import tkinter" not in user_prompt and "from lxml" not in user_prompt)
         
     dataset = dataset.filter(filter_by_token_length, desc="Filtering lengths")
     print(f"Filtered out {original_len - len(dataset)} samples exceeding 4096 tokens.")

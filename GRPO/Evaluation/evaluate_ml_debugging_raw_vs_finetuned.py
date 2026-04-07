@@ -437,6 +437,8 @@ def evaluate_on_ml_debugging(model, tokenizer, max_samples=None, model_name="Mod
                 'problem_id': batch_data[i].get('ID', f"{start_idx + i}"),
                 'category': batch_data[i].get('category'),
                 'bug_code': batch_data[i].get('bug_code'),
+                'runtime_feedback' = batch_data[i].get('runtime_feedback'),
+                'instruct_prompt' = batch_data[i].get('instruct_prompt'),
                 'generated_code': generated_code,
                 'reasoning': reasoning,
                 'passed': passed,
@@ -630,7 +632,9 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         case_entry = {
             "problem_id": pid,
             "category": raw_r["category"],
-            "bug_code": raw_r["bug_code"],          
+            "bug_code": raw_r["bug_code"],  
+            'runtime_feedback': raw_r['runtime_feedback'],
+            'instruct_prompt': raw_r['instruct_prompt'],        
             "raw": {
                 "generated_code": raw_r["generated_code"],
                 "reasoning": raw_r["reasoning"],
@@ -786,7 +790,9 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         all_cases.append({
             "problem_id": pid,
             "category": raw_r["category"],
-            "bug_code": raw_r["bug_code"],          
+            "bug_code": raw_r["bug_code"],
+            'runtime_feedback': raw_r['runtime_feedback'],
+            'instruct_prompt': raw_r['instruct_prompt'],           
             "raw": {
                 "generated_code": raw_r["generated_code"],
                 "reasoning": raw_r["reasoning"],
@@ -810,7 +816,9 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         disagreement_cases.append({
             "problem_id": pid,
             "category": raw_r["category"],
-            "bug_code": raw_r["bug_code"],          
+            "bug_code": raw_r["bug_code"],    
+            'runtime_feedback': raw_r['runtime_feedback'],
+            'instruct_prompt': raw_r['instruct_prompt'],       
             "raw": {
                 "generated_code": raw_r["generated_code"],
                 "reasoning": raw_r["reasoning"],

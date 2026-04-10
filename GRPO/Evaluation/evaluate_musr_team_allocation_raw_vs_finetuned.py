@@ -192,17 +192,18 @@ def load_finetuned_model(checkpoint_path, device):
     print("✅ Fine-tuned model loaded successfully")
     
     return model, base_tokenizer
+    
 
 def create_musr_team_prompt(problem, context):
-    """Create a prompt for a detective-style multiple-choice reasoning question."""
+    """Create a prompt for a Team Allocation social and constraint reasoning question."""
 
     system_prompt = textwrap.dedent("""\
-        You are a brilliant detective analyzing clues to solve a mystery. 
-        You will be given context and a multiple-choice question.
+        You are an expert manager skilled at allocating human resources based on individual skills and interpersonal team dynamics. 
+        You will be given a story context and a multiple-choice question.
 
         Your task:
         1. Carefully read the context and the question.
-        2. Perform step-by-step detective reasoning.
+        2. Perform step-by-step reasoning to evaluate skills and team compatibility.
         3. Select the **index number** (0, 1, 2, ...) of the correct choice.
 
         Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
@@ -222,7 +223,15 @@ def create_musr_team_prompt(problem, context):
         Problem:
         {problem}
 
-        Solve this problem step by step using detective reasoning, then provide your final answer (the index number of the correct choice).
+        The story should allow you to determine how good each person is at a skill. 
+        Roughly, each person is either great, acceptable, or bad at a task. 
+        We want to find an optimal assignment of people to tasks that uses their skills as well as possible. 
+        In addition, one task will have to have two people assigned to it. 
+        The effectiveness of their teamwork (great team, acceptable team, or bad team) also impacts the overall quality of the assignment. 
+        When two people need to work on a task and one is bad at it, they don’t necessarily benefit from the other person being good, unless they work well together. 
+        With different strengths, weaknesses, and interpersonal dynamics at play, you should allocate your team to find the single assignment to ensure that the tasks overall are completed as effectively as possible.
+
+        Solve this problem step by step using the rules above, then provide your final answer (the index number of the correct choice).
     """).strip()
 
     return system_prompt, user_prompt

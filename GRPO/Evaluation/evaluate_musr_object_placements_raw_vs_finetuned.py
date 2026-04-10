@@ -193,16 +193,17 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+    
 def create_musr_object_prompt(problem, context):
-    """Create a prompt for a detective-style multiple-choice reasoning question."""
+    """Create a prompt for an Object Placements theory-of-mind reasoning question."""
 
     system_prompt = textwrap.dedent("""\
-        You are a brilliant detective analyzing clues to solve a mystery. 
-        You will be given context and a multiple-choice question.
+        You are an expert at spatial reasoning and understanding people's beliefs (theory of mind). 
+        You will be given a story context and a multiple-choice question about where a person believes an object is located.
 
         Your task:
         1. Carefully read the context and the question.
-        2. Perform step-by-step detective reasoning.
+        2. Perform step-by-step reasoning based on the observational rules provided.
         3. Select the **index number** (0, 1, 2, ...) of the correct choice.
 
         Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
@@ -222,11 +223,16 @@ def create_musr_object_prompt(problem, context):
         Problem:
         {problem}
 
-        Solve this problem step by step using detective reasoning, then provide your final answer (the index number of the correct choice).
+        Based on this story, we want to identify where someone believes that a certain object is at the end of the story. 
+        In order to do that, you need to read the story and keep track of where they think the object is at each point. 
+        When an object is moved, the person may observe its new location if they saw it move. 
+        To see where an object ends up, they must be able to see the location that it moves to and not be too distracted by what they are doing. 
+        If they do not observe the object moving, then they will still believe it to be in the last location where they observed it.
+
+        Solve this problem step by step using the rules above, then provide your final answer (the index number of the correct choice).
     """).strip()
 
     return system_prompt, user_prompt
-
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

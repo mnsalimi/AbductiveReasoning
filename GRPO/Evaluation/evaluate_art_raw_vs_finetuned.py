@@ -14,7 +14,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
@@ -248,10 +248,28 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
     """Evaluate model on ART dataset with batch processing support."""
     print(f"\n🔍 Evaluating {model_name} on ART dataset...")
     print(f"   Batch size: {batch_size}")
+    print(f"   Split: {split}")
+
+    # Determine the dataset name
+    dataset_name = "allenai/art"
     
+    # Get available splits and find the first available one
+    available_splits = get_dataset_split_names(dataset_name)
+    fallback_order = ["test", "validation", "train"]
+
+    # Find the first available split
+    selected_split = None
+    for split_name in fallback_order:
+        if split_name in available_splits:
+            selected_split = split_name
+            break
+
+    if selected_split is None:
+        raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+
     # Load ART dataset
-    print("Loading ART dataset...")
-    dataset = load_dataset("allenai/art", split="validation")
+    print(f"Loading ART dataset (split={selected_split})...")
+    dataset = load_dataset(dataset_name, split=selected_split)
 
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import numpy as np
@@ -297,18 +297,38 @@ def normalize_answer(ans):
 def evaluate_on_aimo(model, tokenizer, max_samples=None, model_name="Model", batch_size=1, split="test"):
     """Evaluate model on AIMO dataset."""
     print(f"\n🔍 Evaluating {model_name} on AIMO dataset...")
+    print(f"   Batch size: {batch_size}")
+    print(f"   Split: {split}")
+
+    # Determine the dataset name
+    dataset_name = "AI-MO/aimo-validation-amc"
     
-    # Load dataset
+    # Get available splits and find the first available one
+    available_splits = get_dataset_split_names(dataset_name)
+    fallback_order = ["test", "validation", "train"]
+
+    # Find the first available split
+    selected_split = None
+    for split_name in fallback_order:
+        if split_name in available_splits:
+            selected_split = split_name
+            break
+
+    if selected_split is None:
+        raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+
+    # Load AIMO dataset
+    print(f"Loading AIMO dataset (split={selected_split})...")
     try:
-        dataset = load_dataset("AI-MO/aimo-validation-amc", split="train")
-        print(f"✅ Loaded {len(dataset)} samples from AIMO validation (AMC) dataset")
-        
+        dataset = load_dataset(dataset_name, split=selected_split)
+        print(f"✅ Loaded {len(dataset)} samples from AIMO dataset")
+
         # Debug: Print sample
         print(f"\n📋 Sample from dataset:")
         print(f"   Problem: {dataset[0]['problem'][:150]}...")
         print(f"   Answer: {dataset[0]['answer']}")
         print(f"   Answer type: {type(dataset[0]['answer'])}")
-        
+
     except Exception as e:
         print(f"❌ Error loading dataset: {e}")
         return None

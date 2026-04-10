@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import numpy as np
@@ -281,10 +281,27 @@ def evaluate_on_gsm8k(model, tokenizer, max_samples=None, model_name="Model", ba
     """Evaluate model on GSM8K dataset with batch processing support."""
     print(f"\n🔍 Evaluating {model_name} on GSM8K dataset (split: {split})...")
     print(f"   Batch size: {batch_size}")
-    
+
     # Load GSM8K dataset
-    print("Loading GSM8K dataset...")
-    dataset = load_dataset("gsm8k", "main", split=split)
+    dataset_name = "gsm8k"
+    dataset_config = "main"
+    
+    # Get available splits and find the first available one
+    available_splits = get_dataset_split_names(dataset_name, dataset_config)
+    fallback_order = ["test", "train"]  # GSM8K only has test and train
+
+    # Find the first available split
+    selected_split = None
+    for split_name in fallback_order:
+        if split_name in available_splits:
+            selected_split = split_name
+            break
+
+    if selected_split is None:
+        raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+    
+    print(f"Loading GSM8K dataset (split={selected_split})...")
+    dataset = load_dataset(dataset_name, dataset_config, split=selected_split)
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

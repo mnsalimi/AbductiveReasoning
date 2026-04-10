@@ -422,7 +422,7 @@ def evaluate_on_strategyqa(
     """Evaluate model on voidful/StrategyQA dataset."""
     # split="validation"
     print(f"\n🔍 Evaluating {model_name} on StrategyQA...")
-    split = "train"
+    split = "test"
     print(f"   Split: {split}")
     print(f"   Batch size: {batch_size}")
 

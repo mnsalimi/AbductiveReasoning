@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import numpy as np
@@ -266,20 +266,50 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
     """Evaluate model on GoEmotions dataset with batch processing support."""
     print(f"\n🔍 Evaluating {model_name} on GoEmotions dataset (split: {split})...")
     print(f"   Batch size: {batch_size}")
-    
+
     # Load GoEmotions dataset from HuggingFace
     print("Loading GoEmotions dataset...")
-    
+
     try:
         # Load the simplified version of GoEmotions
-        dataset = load_dataset("google-research-datasets/go_emotions", "simplified", split=split)
-        print(f"Loaded {len(dataset)} samples from GoEmotions (simplified) dataset")
+        dataset_name = "google-research-datasets/go_emotions"
+        dataset_config = "simplified"
         
+        # Get available splits and find the first available one
+        available_splits = get_dataset_split_names(dataset_name, dataset_config)
+        fallback_order = ["test", "validation", "train"]
+
+        # Find the first available split
+        selected_split = None
+        for split_name in fallback_order:
+            if split_name in available_splits:
+                selected_split = split_name
+                break
+
+        if selected_split is None:
+            raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+        
+        dataset = load_dataset(dataset_name, dataset_config, split=selected_split)
+        print(f"Loaded {len(dataset)} samples from GoEmotions (simplified) dataset")
+
     except Exception as e1:
         print(f"Failed to load GoEmotions (simplified): {e1}")
         try:
             # Try raw version
-            dataset = load_dataset("google-research-datasets/go_emotions", "raw", split=split)
+            dataset_config = "raw"
+            available_splits = get_dataset_split_names(dataset_name, dataset_config)
+            fallback_order = ["test", "validation", "train"]
+
+            selected_split = None
+            for split_name in fallback_order:
+                if split_name in available_splits:
+                    selected_split = split_name
+                    break
+
+            if selected_split is None:
+                raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+            
+            dataset = load_dataset(dataset_name, dataset_config, split=selected_split)
             print(f"Loaded {len(dataset)} samples from GoEmotions (raw) dataset")
         except Exception as e2:
             print(f"❌ Error loading dataset: {e2}")

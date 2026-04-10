@@ -17,7 +17,7 @@ from datetime import datetime
 from tqdm import tqdm
 import torch
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import time
@@ -284,8 +284,24 @@ def evaluate_on_winogrande(
     print(f"   Batch size: {batch_size}")
 
     # 1. Load WinoGrande dataset
-    print(f"Loading allenai/winogrande (config={config}, split={split})...")
-    dataset = load_dataset("allenai/winogrande", config, split=split)
+    dataset_name = "allenai/winogrande"
+    
+    # Get available splits and find the first available one
+    available_splits = get_dataset_split_names(dataset_name, config)
+    fallback_order = ["test", "validation", "train"]
+
+    # Find the first available split
+    selected_split = None
+    for split_name in fallback_order:
+        if split_name in available_splits:
+            selected_split = split_name
+            break
+
+    if selected_split is None:
+        raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+    
+    print(f"Loading allenai/winogrande (config={config}, split={selected_split})...")
+    dataset = load_dataset(dataset_name, config, split=selected_split)
 
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

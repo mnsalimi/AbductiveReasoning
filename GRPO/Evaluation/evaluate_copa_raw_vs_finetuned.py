@@ -16,7 +16,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import numpy as np
@@ -267,14 +267,30 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
     print(f"\n🔍 Evaluating {model_name} on COPA dataset (split: {split})...")
     print(f"   Task: Identify the CAUSE given an EFFECT")
     print(f"   Batch size: {batch_size}")
-    
+
     # Load COPA dataset
     print("Loading COPA dataset...")
+
+    dataset_name = "pkavumba/balanced-copa"
     
     try:
-        dataset = load_dataset("pkavumba/balanced-copa", split="train")
-        print(f"Loaded {len(dataset)} samples from COPA dataset")
+        # Get available splits
+        available_splits = get_dataset_split_names(dataset_name)
+        fallback_order = ["test", "validation", "train"]
+
+        # Find the first available split
+        selected_split = None
+        for split_name in fallback_order:
+            if split_name in available_splits:
+                selected_split = split_name
+                break
+
+        if selected_split is None:
+            raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
         
+        dataset = load_dataset(dataset_name, split=selected_split)
+        print(f"✅ Loaded {len(dataset)} samples from COPA dataset")
+
     except Exception as e:
         print(f"❌ Error loading dataset: {e}")
         print("\n💡 Make sure you have internet connection and the dataset is accessible.")

@@ -16,7 +16,7 @@ import re
 from datetime import datetime
 from tqdm import tqdm
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import numpy as np
@@ -260,10 +260,24 @@ def evaluate_on_aime(model, tokenizer, max_samples=None, model_name="Model", bat
     print(f"\n🔍 Evaluating {model_name} on AIME 2025 dataset...")
     print(f"   Batch size: {batch_size}")
     print(f"   Split: {split}")
-    
+
+    dataset_name = "yentinglin/aime_2025"
+    available_splits = get_dataset_split_names(dataset_name)
+    fallback_order = ["test", "validation", "train"]
+
+    # Find the first available split
+    selected_split = None
+    for split in fallback_order:
+        if split in available_splits:
+            selected_split = split
+            break
+
+    if selected_split is None:
+        raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+
     # Load AIME 2025 dataset
     print(f"Loading AIME 2025 dataset (split={split})...")
-    dataset = load_dataset("yentinglin/aime_2025", split=split)
+    dataset = load_dataset("yentinglin/aime_2025", split=selected_split)
 
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

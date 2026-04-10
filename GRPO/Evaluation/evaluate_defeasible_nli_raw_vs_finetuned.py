@@ -17,7 +17,7 @@ from datetime import datetime
 from tqdm import tqdm
 import torch
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import time
@@ -275,11 +275,29 @@ def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="M
     """Evaluate model on Defeasible NLI dataset."""
     print(f"\n🔍 Evaluating {model_name} on Defeasible NLI (delta-NLI)...")
     print(f"   Batch size: {batch_size}")
-    
+    print(f"   Split: {split}")
+
     # 1. Load the dataset
     # We use 'tasksource/defeasible-nli' which aggregates the subsets cleanly
-    print(f"Loading tasksource/defeasible-nli dataset (split=social)...")
-    dataset = load_dataset("tasksource/defeasible-nli", "atomic")["test"]
+    dataset_name = "tasksource/defeasible-nli"
+    dataset_config = "atomic"
+    
+    # Get available splits and find the first available one
+    available_splits = get_dataset_split_names(dataset_name, dataset_config)
+    fallback_order = ["test", "validation", "train"]
+
+    # Find the first available split
+    selected_split = None
+    for split_name in fallback_order:
+        if split_name in available_splits:
+            selected_split = split_name
+            break
+
+    if selected_split is None:
+        raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+    
+    print(f"Loading tasksource/defeasible-nli dataset (config={dataset_config}, split={selected_split})...")
+    dataset = load_dataset(dataset_name, dataset_config, split=selected_split)
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

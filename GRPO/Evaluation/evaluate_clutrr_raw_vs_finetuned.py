@@ -17,7 +17,7 @@ from datetime import datetime
 from tqdm import tqdm
 import torch
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report, confusion_matrix
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_split_names
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 import time
@@ -265,17 +265,52 @@ def evaluate_on_clutrr(model, tokenizer, max_samples=None, model_name="Model", b
     """Evaluate model on CLUTRR dataset."""
     print(f"\n🔍 Evaluating {model_name} on CLUTRR...")
     print(f"   Batch size: {batch_size}")
-    
+    print(f"   Split: {split}")
+
     # 1. Load Dataset
     # We use a common HuggingFace version that contains 'clean_story'.
     # If you have a local file, change this to: load_dataset("json", data_files="path.json")
     print(f"Loading CLUTRR dataset (using 'CLUTRR/v1' as default source)...")
+    
+    dataset_name = "CLUTRR/v1"
+    dataset_config = "gen_train234_test2to10"
+    
     try:
-        dataset = load_dataset("CLUTRR/v1", "gen_train234_test2to10", split="test")
-    except:
+        # Get available splits for the config
+        available_splits = get_dataset_split_names(dataset_name, dataset_config)
+        fallback_order = ["test", "validation", "train"]
+
+        # Find the first available split
+        selected_split = None
+        for split_name in fallback_order:
+            if split_name in available_splits:
+                selected_split = split_name
+                break
+
+        if selected_split is None:
+            raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+        
+        dataset = load_dataset(dataset_name, dataset_config, split=selected_split)
+        print(f"✅ Loaded {len(dataset)} samples from CLUTRR dataset")
+    except Exception as e:
         # Fallback if specific config fails or using local
-        print("Warning: Could not load specific config, trying generic load...")
-        dataset = load_dataset("clutrr", split=split)
+        print(f"Warning: Could not load specific config: {e}")
+        print("Trying generic load with fallback splits...")
+        
+        dataset_name_generic = "clutrr"
+        available_splits = get_dataset_split_names(dataset_name_generic)
+        fallback_order = ["test", "validation", "train"]
+
+        selected_split = None
+        for split_name in fallback_order:
+            if split_name in available_splits:
+                selected_split = split_name
+                break
+
+        if selected_split is None:
+            raise ValueError(f"None of the fallback splits {fallback_order} were found in the dataset.")
+        
+        dataset = load_dataset(dataset_name_generic, split=selected_split)
 
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

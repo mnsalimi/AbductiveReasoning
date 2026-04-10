@@ -193,32 +193,48 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+
+SYSTEM_PROMPT_MEDQA = textwrap.dedent("""\
+    You are an expert medical clinician and diagnostician. Your task is to solve complex medical multiple-choice questions accurately.
+
+    You will be provided with:
+    1. A medical Problem, which typically includes a clinical vignette or medical question along with four candidate choices (A, B, C, D)
+
+    Your goal is to evaluate the clinical presentation and select the single most accurate answer.
+
+    ## Instructions:
+    1. Carefully read the medical problem, noting key patient demographics, symptoms, physical exam findings, and lab values where applicable
+    2. Identify the core medical question being asked (e.g., next best step in management, most likely diagnosis, underlying mechanism)
+    3. Evaluate all four candidate options (A, B, C, D) using evidence-based clinical reasoning
+    4. Select the letter corresponding to the correct medical answer
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Exactly one letter: A, B, C, or D]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the single uppercase letter of the correct choice (A, B, C, or D). Do not include parentheses, periods, or any textual explanation.
+""").strip()
+
 def create_MedQA_prompt(problem):
     """Create a prompt for a MedQA multiple-choice medical question."""
-    system_prompt = textwrap.dedent("""\
-        You are an expert medical clinician. Solve the following MedQA multiple-choice problem.
-
-        The final answer must be exactly one of the following letters: A, B, C, or D.
-
-        First, read the question carefully and analyze it step by step using clinical reasoning. Then select the correct option among A, B, C, or D.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning and intermediate steps]
-        </think>
-        <answer>
-        [here you output ONLY one letter: A, B, C, or D, with no extra words]
-        </answer>
-    """).strip()
+    
+    system_prompt = SYSTEM_PROMPT_MEDQA
 
     user_prompt = textwrap.dedent(f"""\
         Problem: {problem}
 
-        Solve this problem step by step, then provide your final answer.
+        Which option is the correct answer?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_reasoning(response):

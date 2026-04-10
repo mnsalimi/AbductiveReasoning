@@ -191,29 +191,47 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+SYSTEM_PROMPT_AIMO = textwrap.dedent("""\
+    You are an expert mathematician specializing in competition mathematics (such as AMC, AIME). Your task is to solve complex mathematical problems.
+
+    You will be provided with:
+    1. A mathematical Problem (which may contain LaTeX notation)
+
+    Your goal is to logically and rigorously solve the problem to find the correct final mathematical value.
+
+    ## Instructions:
+    1. Carefully read and analyze the problem, paying close attention to all mathematical conditions and LaTeX notation
+    2. Formulate a structured, mathematical approach to arrive at the solution
+    3. Execute your calculations, verifying your algebraic and logical steps along the way
+    4. Simplify your final result into a single number, decimal, or fraction (e.g., a/b)
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Output a single number, decimal, or fraction here]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the final numerical answer (a number, decimal, or fraction like a/b). Do not include variables, units, equations, or any other text.
+""").strip()
+
 def create_aimo_prompt(problem):
     """Create a prompt for AIMO problem - handles LaTeX properly."""
-    system_prompt = textwrap.dedent("""\
-        You are an expert mathematician specializing in competition mathematics (AMC, AIME, etc.).
-
-        First, read the problem carefully, including all LaTeX mathematical notation, and solve it step by step. Then give the final answer as a single number.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning and intermediate steps]
-        </think>
-        <answer>
-        [here you output ONLY the final answer as a number, decimal, or fraction a/b, with no extra words]
-        </answer>""").strip()
+    system_prompt = SYSTEM_PROMPT_AIMO
 
     user_prompt = textwrap.dedent(f"""\
         Problem:
         {problem}
 
-        Solve this problem and provide your final numerical answer.""").strip()
+        What is the final answer to this problem?
+    """).strip()
 
     return system_prompt, user_prompt
+
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

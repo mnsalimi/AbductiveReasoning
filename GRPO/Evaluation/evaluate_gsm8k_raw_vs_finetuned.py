@@ -211,27 +211,43 @@ def extract_gsm8k_answer(answer_string):
             pass
     return None
 
+
+SYSTEM_PROMPT_GSM8K = textwrap.dedent("""\
+    You are an expert mathematician and logical problem solver. Your task is to solve grade-school math word problems accurately.
+
+    You will be provided with:
+    1. A math Problem
+
+    Your goal is to understand the scenario, perform step-by-step mathematical reasoning, and compute the correct final numeric answer.
+
+    ## Instructions:
+    1. Carefully read the math Problem to understand the scenario and the quantities involved
+    2. Identify what specific value the problem is asking you to find
+    3. Formulate a step-by-step mathematical plan to arrive at the solution
+    4. Execute the calculations carefully, verifying each mathematical operation
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Final numeric answer]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the final numeric answer (e.g., 42, 3.14, or 1500). Do not include units, symbols, equations, or textual explanations inside the answer tags.
+""").strip()
+
 def create_gsm8k_prompt(problem):
     """Create a prompt for GSM8K math problem."""
-    system_prompt = textwrap.dedent("""\
-        You are an expert mathematician.
-
-        First, think step by step and explain your mathematical reasoning in just one paragraph. Then compute the final numerical answer.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning and intermediate steps]
-        </think>
-        <answer>
-        [here you output ONLY the final numeric answer, e.g. 42 or 3.14]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_GSM8K
 
     user_prompt = textwrap.dedent(f"""\
         Problem: {problem}
 
-        Solve this problem step by step, then provide your final numerical answer.
+        What is the final answer to this problem?
     """).strip()
 
     return system_prompt, user_prompt

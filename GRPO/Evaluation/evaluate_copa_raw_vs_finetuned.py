@@ -193,6 +193,37 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+import textwrap
+
+SYSTEM_PROMPT_COPA = textwrap.dedent("""\
+    You are an expert in logical reasoning and common-sense causal inference. Your task is to determine which of two given options represents the most plausible cause for a given effect.
+
+    You will be provided with:
+    1. An Effect describing a situation or event
+    2. Two Options (Option 1 and Option 2)
+
+    Your goal is to select the option that best describes the direct cause, logical predecessor, or most likely triggering action of the given effect.
+
+    ## Instructions:
+    1. Carefully read the provided effect
+    2. Evaluate both Option 1 and Option 2 as potential preceding causes
+    3. Consider common sense, real-world knowledge, and typical cause-and-effect relationships
+    4. Select the option that represents the most plausible direct cause
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Either "1" or "2" - just the number, nothing else]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
+""").strip()
+
 def create_copa_prompt(premise, choice1, choice2):
     """Create a prompt for COPA causal reasoning task.
     
@@ -204,33 +235,19 @@ def create_copa_prompt(premise, choice1, choice2):
     Returns:
         system_prompt, user_prompt
     """
-    system_prompt = textwrap.dedent("""\
-        You are an expert in causal reasoning. Given a cause and two possible effect options, select which option (1 or 2) is the most plausible direct effect.
-
-        First, think step by step and explain your causal reasoning in just one paragraph. Then decide which option (1 or 2) is better.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning about which effect is more plausible]
-        </think>
-        <answer>
-        [here you output ONLY the number 1 or 2]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_COPA
 
     user_prompt = textwrap.dedent(f"""\
-        Cause: {premise}
-
-        Which of the following is the most plausible EFFECT of this cause?
+        Effect: {premise}
 
         Option 1: {choice1}
         Option 2: {choice2}
 
-        Think step by step about which option is the most likely effect, then provide your answer in <answer></answer> tags.
+        Which of the following is the most plausible CAUSE of this effect?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

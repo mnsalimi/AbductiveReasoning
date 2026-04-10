@@ -200,21 +200,40 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+
+SYSTEM_PROMPT_ART = textwrap.dedent("""\
+    You are an expert in abductive reasoning and narrative comprehension. Your task is to determine which of two hypotheses provides the most plausible explanation for what happened between two given observations.
+
+    You will be provided with:
+    1. Observation 1 (the initial situation or event)
+    2. Observation 2 (the subsequent outcome or resulting event)
+    3. Two Hypotheses (Hypothesis 1 and Hypothesis 2)
+
+    Your goal is to select the hypothesis that logically and narratively bridges the gap between Observation 1 and Observation 2, explaining how the situation transitioned from the first observation to the second.
+
+    ## Instructions:
+    1. Carefully read Observation 1 and Observation 2 to understand the chronological and narrative context
+    2. Evaluate both Hypothesis 1 and Hypothesis 2 as potential bridging events
+    3. Consider common sense, cause-and-effect relationships, and everyday plausibility
+    4. Select the hypothesis that best explains the transition
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Either "1" or "2" - just the number, nothing else]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
+""").strip()
+
 def create_art_prompt(obs1, obs2, hyp1, hyp2):
     """Create prompt for ART task."""
-    system_prompt = textwrap.dedent("""\
-        You are an expert in abductive reasoning. Given two observations and two hypotheses, select which hypothesis (1 or 2) best explains what happened between the observations.
-
-        First, think step by step and explain your abductive reasoning in just one paragraph. Then decide which hypothesis (1 or 2) is better.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning about which hypothesis is better]
-        </think>
-        <answer>
-        [here you output ONLY the number 1 or 2]
-        </answer>""").strip()
+    system_prompt = SYSTEM_PROMPT_ART
 
     user_prompt = textwrap.dedent(f"""\
         Observation 1: {obs1}
@@ -223,9 +242,11 @@ def create_art_prompt(obs1, obs2, hyp1, hyp2):
         Hypothesis 1: {hyp1}
         Hypothesis 2: {hyp2}
 
-        Which hypothesis better explains the transition from Observation 1 to Observation 2? Answer with just the number 1 or 2.""").strip()
+        Which hypothesis better explains the transition from Observation 1 to Observation 2?
+    """).strip()
 
     return system_prompt, user_prompt
+
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

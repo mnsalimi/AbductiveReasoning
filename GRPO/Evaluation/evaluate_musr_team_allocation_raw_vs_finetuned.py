@@ -194,27 +194,44 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
     
 
+import textwrap
+
+SYSTEM_PROMPT_MUSR_TEAM = textwrap.dedent("""\
+    You are an expert logical reasoner specializing in evaluating team skills and assigning people to tasks optimally. Your task is to analyze a story describing people, their abilities, and their teamwork dynamics in order to determine the best assignment of people to tasks.
+
+    You will be provided with:
+    1. Context: A story describing several people, their abilities at different tasks, and how well they work with others
+    2. Problem: A question asking which assignment of people to tasks results in the most effective completion of the tasks, along with multiple-choice options indexed as 0, 1, 2, ...
+
+    Your goal is to determine which assignment best utilizes each person's skills while also considering teamwork effectiveness when two people must work together on a task.
+
+    ## Instructions:
+    1. Carefully read the Context and identify each person's skill level for the relevant tasks (e.g., great, acceptable, or bad)
+    2. Determine how well different pairs of people work together when assigned to the same task
+    3. Remember that one task will require two people working together
+    4. Consider that if one person is bad at a task, the other person's skill may not fully compensate unless they work well together
+    5. Evaluate the overall effectiveness of each assignment option
+    6. Select the option that results in the most effective overall completion of all tasks
+    7. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Exactly one integer representing the index of the correct choice]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the numeric index number of the correct choice. Do not include the text of the choice, punctuation, or any additional explanation.
+""").strip()
+
+
 def create_musr_team_prompt(problem, context):
-    """Create a prompt for a Team Allocation social and constraint reasoning question."""
+    """Create a prompt for a detective-style multiple-choice reasoning question."""
 
-    system_prompt = textwrap.dedent("""\
-        You are an expert manager skilled at allocating human resources based on individual skills and interpersonal team dynamics. 
-        You will be given a story context and a multiple-choice question.
-
-        Your task:
-        1. Carefully read the context and the question.
-        2. Perform step-by-step reasoning to evaluate skills and team compatibility.
-        3. Select the **index number** (0, 1, 2, ...) of the correct choice.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning and intermediate steps]
-        </think>
-        <answer>
-        [here you output ONLY the index number of the correct choice, with no extra words]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_MUSR_TEAM
 
     user_prompt = textwrap.dedent(f"""\
         Context:
@@ -223,18 +240,11 @@ def create_musr_team_prompt(problem, context):
         Problem:
         {problem}
 
-        The story should allow you to determine how good each person is at a skill. 
-        Roughly, each person is either great, acceptable, or bad at a task. 
-        We want to find an optimal assignment of people to tasks that uses their skills as well as possible. 
-        In addition, one task will have to have two people assigned to it. 
-        The effectiveness of their teamwork (great team, acceptable team, or bad team) also impacts the overall quality of the assignment. 
-        When two people need to work on a task and one is bad at it, they don’t necessarily benefit from the other person being good, unless they work well together. 
-        With different strengths, weaknesses, and interpersonal dynamics at play, you should allocate your team to find the single assignment to ensure that the tasks overall are completed as effectively as possible.
-
-        Solve this problem step by step using the rules above, then provide your final answer (the index number of the correct choice).
+        What is the index number of the correct choice?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_reasoning(response):

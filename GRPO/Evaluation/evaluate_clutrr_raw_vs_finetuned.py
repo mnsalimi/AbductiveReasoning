@@ -195,6 +195,35 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+SYSTEM_PROMPT_CLUTRR = textwrap.dedent("""\
+    You are a logic expert specializing in genealogy and family trees. Your task is to deduce the kinship relationship between two specific people based on a provided narrative.
+
+    You will be provided with:
+    1. A short Story describing various family relationships
+    2. A Query asking for the relationship between two specific people from the story
+
+    Your goal is to trace the family ties described in the story and identify the exact kinship relation connecting the first person to the second person in the query.
+
+    ## Instructions:
+    1. Carefully read the story to construct a mental or logical family tree
+    2. Identify the two specific individuals mentioned in the query
+    3. Trace the genealogical path between these two individuals using the facts established in the story
+    4. Determine the exact kinship relation (e.g., aunt, grandfather, son-in-law)
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [The exact kinship relation word]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the exact kinship relation word or short phrase (e.g., aunt, uncle, grandfather, son-in-law). Do not include any other text, explanation, or punctuation.
+""").strip()
+
 def create_clutrr_prompt(story, query):
     """
     Create a prompt for CLUTRR (Family Relation Reasoning).
@@ -212,34 +241,15 @@ def create_clutrr_prompt(story, query):
     else:
         formatted_query = query
 
-    system_prompt = textwrap.dedent("""\
-        You are a logic expert specializing in genealogy and family trees.
-        You will be given a short Story describing family relationships and a Query about the relationship between two specific people.
-
-        Your task:
-        1. Read the story carefully to build a mental family tree.
-        2. Trace the path from the first person to the second person in the Query.
-        3. Deduce the exact kinship relation (e.g., father, aunt, grandson, son-in-law).
-        4. Output ONLY the relation keyword.
-
-        Your entire output MUST use exactly the following format:
-
-        <think>
-        [Step-by-step deduction of the family tree path]
-        </think>
-        <answer>
-        [The exact kinship relation word, e.g., grandmother]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_CLUTRR
 
     user_prompt = textwrap.dedent(f"""\
         Story:
         {story}
-
         Query:
         {formatted_query}
-
-        Relation:
+        
+        Output the exact kinship relation.
     """).strip()
 
     return system_prompt, user_prompt

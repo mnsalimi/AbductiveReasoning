@@ -200,25 +200,47 @@ def load_finetuned_model(checkpoint_path, device="cuda:0"):
 # Prompting and Processing
 # ==================================================================
 
+SYSTEM_PROMPT_DEBUGGING = textwrap.dedent("""\
+    You are an expert Python developer and debugger. Your task is to identify and fix errors in Python code snippets.
+
+    You will be provided with:
+    1. Task Instructions: The intended behavior and requirements for the code
+    2. Buggy Code: The incorrect Python code snippet that is failing its tests
+    3. Runtime Error / Test Feedback: The execution logs, tracebacks, or failing test results
+
+    Your goal is to analyze the failure, correct the bug, and provide the complete, working Python code.
+
+    ## Instructions:
+    1. Carefully read the Task Instructions to understand the desired functionality
+    2. Analyze the Buggy Code in conjunction with the Runtime Error / Test Feedback to pinpoint the root cause of the failure
+    3. Determine the necessary corrections to fix the bug without breaking existing correct functionality
+    4. Provide the full, corrected, and self-contained Python code. Do NOT omit any part of the function or use placeholders (e.g., "# rest of the code")
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    ```python
+    [Your full, corrected Python code here]
+    ```
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the full, corrected Python code block. Do not include any other text, explanations, or formatting before or after the code block inside the answer tags.
+""").strip()
+
 def create_debugging_prompt(sample):
     """Create a prompt for code debugging task."""
     bug_code = sample.get('bug_code', '')
     runtime_feedback = sample.get('runtime_feedback', '')
     instruct_prompt = sample.get('instruct_prompt', '')
     
-    system_prompt = textwrap.dedent("""
-        You are an expert Python developer and debugger. 
-        Your task is to fix a buggy Python code snippet that is failing its tests.
-        You will be provided with the task instructions, the buggy code, and the runtime error/test feedback.
-        
-        First, read the task instructions, the buggy code, and the error feedback carefully.
-        Analyze the cause of the bug step-by-step and write your thought process inside <think>...</think> tags.
-        Then, provide the full, corrected, and self-contained Python code that passes the tests.
-        Your final code MUST be enclosed within a single ```python ... ``` code block.
-        Do not omit any part of the function; output the entire fixed code.
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_DEBUGGING
 
-    user_prompt = textwrap.dedent(f"""
+    user_prompt = textwrap.dedent(f"""\
         Task Instructions:
         {instruct_prompt}
 
@@ -230,7 +252,7 @@ def create_debugging_prompt(sample):
         Runtime Error / Test Feedback:
         {runtime_feedback}
 
-        Please provide the fully corrected code.
+        What is the fully corrected Python code?
     """).strip()
 
     return system_prompt, user_prompt
@@ -453,8 +475,8 @@ def evaluate_on_ml_debugging(model, tokenizer, max_samples=None, model_name="Mod
                 'problem_id': batch_data[i].get('ID', f"{start_idx + i}"),
                 'category': batch_data[i].get('category'),
                 'bug_code': batch_data[i].get('bug_code'),
-                'runtime_feedback': batch_data[i].get('runtime_feedback'),
-                'instruct_prompt': batch_data[i].get('instruct_prompt'),
+                'runtime_feedback' : batch_data[i].get('runtime_feedback'),
+                'instruct_prompt' : batch_data[i].get('instruct_prompt'),
                 'generated_code': generated_code,
                 'reasoning': reasoning,
                 'passed': passed,

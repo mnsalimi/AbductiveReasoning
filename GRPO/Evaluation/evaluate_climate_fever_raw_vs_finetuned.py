@@ -200,6 +200,7 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+
 SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
     You are an expert climate scientist and professional fact-checker. Your task is to determine whether a set of provided evidences supports, refutes, or is insufficient to evaluate a specific claim.
 
@@ -212,14 +213,15 @@ SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
     ## Instructions:
     1. Carefully read the Claim and all provided Evidences
     2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO
-    3. Provide step-by-step reasoning explaining which specific parts of the evidence support your decision
+    3. Think step by step about how the specific parts of the evidence relate to the claim
     4. Output the final label
+    5. Think step by step.
 
     ## Output Format:
     You MUST provide your answer in the following format:
 
     <think>
-    [Explain your thought process: step-by-step analysis of how the evidence relates to the claim]
+    [Think step by step here]
     </think>
 
     <answer>
@@ -248,7 +250,7 @@ def create_climate_fever_prompt(example: dict):
         Evidence:
         {evidence_text}
 
-        Based on the evidence provided, determine the veracity of the claim.
+        Does the provided evidence SUPPORT, REFUTE, or provide NOT ENOUGH INFO for the claim?
     """).strip()
 
     return system_prompt, user_prompt
@@ -565,6 +567,12 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     ckpt_name = os.path.basename(checkpoint_path.rstrip("/"))
     print(f"✅ Using checkpoint for per-case evaluation: {ckpt_name}")
+    
+    # Get cached (or newly computed) raw results
+    raw_results = ensure_raw_results_cached(args)
+    if raw_results is None:
+        print("❌ Cannot evaluate checkpoint without raw model results.")
+        return
 
     # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):
@@ -578,7 +586,6 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
             "all_cases_file": os.path.join(ckpt_output_dir, "all_cases.json"),
             "disagreement_file": os.path.join(ckpt_output_dir, "disagreement_cases.json")
         }
-        return
     
     # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):

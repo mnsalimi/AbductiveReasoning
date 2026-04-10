@@ -272,10 +272,11 @@ SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
     - Output: the result of applying the same hidden transformation rule to the input
 
     Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
+    Think step by step.
 
     Output format (MUST follow exactly):
     <think>
-    Briefly describe the rule you inferred and any edge cases you considered.
+    [Think step by step here]
     </think>
     <answer>
     def transform(lst):
@@ -292,11 +293,10 @@ SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
     - BE ROBUST: Handle edge cases like empty lists or lists with only 1 element.
 
     STRICT FORMATTING RULES:
-    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
+    - Do NOT use markdown code blocks (like```python) inside the <answer> tags. Just write raw code.
     - Do NOT repeat the code. Write the function exactly once.
     - Ensure you close the tag with </answer>.
     - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
-
 """).strip()
 
 
@@ -306,15 +306,15 @@ def create_list_functions_prompt(example):
     system_prompt = SYSTEM_PROMPT_LIST_FUNCTION
 
     train_prompt = "\n".join([
-        f"--- Example {i+1} ---\nInput: {ex['input']}\nOutput: {ex['output']}"
-        for i, ex in enumerate(example["train"])
+    f"--- Example {i+1} ---\nInput: {ex['input']}\nOutput: {ex['output']}"
+    for i, ex in enumerate(example["train"])
     ])
 
     user_prompt = textwrap.dedent(f"""\
-        Training examples:
-        {train_prompt}
+    Training examples:
+    {train_prompt}
 
-        Infer the underlying list transformation and provide the Python function implementation in the required format.
+    What is the Python function implementation of this transformation?
     """).strip()
 
     return system_prompt, user_prompt

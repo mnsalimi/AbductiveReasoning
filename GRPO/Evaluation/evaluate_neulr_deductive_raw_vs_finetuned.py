@@ -193,27 +193,43 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+import textwrap
+
+SYSTEM_PROMPT_NEULR_DEDUCTIVE = textwrap.dedent("""\
+    You are an expert logical reasoner specializing in symbolic logic and deductive pattern recognition. Your task is to analyze factual statements and logical rules to deduce specific relationships between entities.
+
+    You will be provided with:
+    1. Context: A set of logical rules and facts involving alphanumeric codes, defining properties (e.g., who belongs to what group) and relationships (e.g., who is afraid of whom).
+    2. Problem: A specific question asking you to determine the target of a relationship for a given subject.
+
+    Your goal is to use deductive reasoning to trace the logical connections from the subject to the correct target and identify the exact alphanumeric code representing the answer.
+
+    ## Instructions:
+    1. Carefully read the Context to parse all facts (identifying entities and their properties) and rules (defining conditional relationships).
+    2. Analyze the Problem to identify the starting subject and the specific relationship being queried.
+    3. Trace the logical chain-of-thought, explicitly linking the individual to their group, and the group to the object of their relationship (e.g., fear).
+    4. Apply the rules step by step to deduce the final, correct target.
+    5. Extract the exact alphanumeric code of the resulting entity from the text.
+    6. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Exactly one alphanumeric code]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the exact alphanumeric code answer. Do not include any extra words, punctuation, full sentences, or explanations inside the answer tags.
+""").strip()
+
+
 def create_neulr_deductive_prompt(problem, context):
     """Create a prompt for a detective-style multiple-choice reasoning question."""
 
-    system_prompt = textwrap.dedent("""\
-        You are a brilliant detective specializing in symbolic logic and pattern recognition.
-        You will be given a context containing logical rules regarding specific alphanumeric codes and a resulting question.
-
-        Your task:
-        1. Carefully parse the context to identify facts (who is what) and rules (who is afraid of whom).
-        2. Perform step-by-step deductive reasoning to trace the relationship from the subject in the question to the final answer.
-        3. Give the correct answer as the EXACT alphanumeric code from the text.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning, explicitly linking the individual to their group and the group to the object of their fear]
-        </think>
-        <answer>
-        [here you output ONLY the exact alphanumeric code answer]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_NEULR_DEDUCTIVE
 
     user_prompt = textwrap.dedent(f"""\
         Context:
@@ -222,10 +238,11 @@ def create_neulr_deductive_prompt(problem, context):
         Problem:
         {problem}
 
-        Solve this problem step by step using detective reasoning to find the logical connection, then provide your final answer in one word ONLY.
+        What is the exact alphanumeric code answer?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_reasoning(response):

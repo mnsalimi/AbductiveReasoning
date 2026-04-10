@@ -196,30 +196,40 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
+SYSTEM_PROMPT_WINOGRANDE = textwrap.dedent("""\
+    You are an expert in commonsense reasoning and pronoun resolution. Your task is to determine the correct word or phrase to complete a given sentence.
+
+    You will be provided with:
+    1. A Sentence: A statement containing a blank space represented by an underscore character (_).
+    2. Option 1: The first candidate to fill the blank.
+    3. Option 2: The second candidate to fill the blank.
+
+    Your goal is to decide which candidate option best fills the blank to make the sentence coherent, logically correct, and aligned with everyday commonsense.
+
+    ## Instructions:
+    1. Read the sentence carefully and analyze the context surrounding the blank.
+    2. Evaluate Option 1 and Option 2 as potential replacements for the blank.
+    3. Use commonsense reasoning to determine which option creates a logically sound sentence.
+    4. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Output exactly 1 or 2]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the number 1 or the number 2. Do not include the actual text of the option, any other text, punctuation, or explanations.
+""").strip()
+
+
 def create_winogrande_prompt(sentence, option1, option2):
     """Create a prompt for WinoGrande-style commonsense pronoun resolution."""
 
-    system_prompt = textwrap.dedent("""\
-        You are an expert in commonsense reasoning and pronoun resolution.
-
-        You will be given:
-        - A sentence containing a blank represented by an underscore character: _
-        - Two candidate options (Option 1 and Option 2)
-
-        Your task:
-        1. Decide which option best fills the blank to make the sentence coherent and logically correct.
-        2. Provide step-by-step reasoning.
-        3. Provide the final answer as the option number.
-
-        Your entire output MUST use exactly the following format and nothing else:
-
-        <think>
-        [Your step-by-step analysis of which option best completes the sentence]
-        </think>
-        <answer>
-        [Output exactly one of these two options: 1 or 2]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_WINOGRANDE
 
     user_prompt = textwrap.dedent(f"""\
         Sentence:
@@ -237,33 +247,15 @@ def create_winogrande_prompt(sentence, option1, option2):
     return system_prompt, user_prompt
 
 
+
 def extract_answer(response):
-    """
-    Extract the label from the <answer>...</answer> block.
-    Returns "1" or "2" (strings) or None.
-    """
-    if not response:
-        return None
-
-    match = re.search(r"<answer>(.*?)</answer>", response, re.IGNORECASE | re.DOTALL)
-    if not match:
-        return None
-
-    clean_answer = match.group(1).strip().upper()
-    clean_answer = clean_answer.rstrip(".")
-
-    # Accept a few common variants but normalize to "1"/"2"
-    if clean_answer in {"1", "OPTION1", "OPTION 1", "A"}:
-        return "1"
-    if clean_answer in {"2", "OPTION2", "OPTION 2", "B"}:
-        return "2"
-
-    # If the model outputs extra text like "1 (Option 1)", grab first 1/2 digit
-    m = re.search(r"([12])", clean_answer)
-    if m:
-        return m.group(1)
-
-    return None
+    """Extract the hypothesis number (1 or 2) from model response."""
+    # First try to extract <answer>...</answer> tags
+    tag_match = re.search(r'<answer>\s*([12])\s*</answer>', response, re.IGNORECASE | re.DOTALL)
+    if tag_match:
+        return int(tag_match.group(1))
+    
+    return None 
 
 
 def evaluate_on_winogrande(

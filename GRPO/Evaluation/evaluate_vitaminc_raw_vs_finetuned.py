@@ -195,31 +195,43 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+import textwrap
+
+SYSTEM_PROMPT_VITAMINC = textwrap.dedent("""\
+    You are an expert fact-checker. Your task is to verify a claim against a provided piece of evidence.
+
+    You will be provided with:
+    1. A Claim: A statement to be verified.
+    2. Evidence: A specific text snippet that may support, refute, or be neutral regarding the claim.
+
+    Note: The VitaminC dataset features "contrastive evidence" where small changes in wording, numbers, or negations can completely flip the label. Pay close attention to these nuances.
+
+    Your goal is to determine if the evidence SUPPORTS, REFUTES, or provides NOT ENOUGH INFO regarding the claim.
+
+    ## Instructions:
+    1. Carefully read the Claim and the Evidence.
+    2. Analyze the Evidence, paying special attention to negations, numbers, and specific entities to see how they align with or contradict the Claim.
+    3. Determine the logical relationship between the Evidence and the Claim.
+    4. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Output exactly one of: SUPPORTS, REFUTES, NOT ENOUGH INFO]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY "SUPPORTS", "REFUTES", or "NOT ENOUGH INFO". Do not include any other text, punctuation, or explanations.
+""").strip()
+
+
 def create_vitaminc_prompt(claim, evidence_text):
     """Create a prompt for VitaminC Fact Verification."""
 
-    system_prompt = textwrap.dedent("""\
-        You are an expert fact-checker.
-        You will be given a Claim and a specific piece of Evidence.
-
-        The VitaminC dataset focuses on "contrastive evidence"—small changes in evidence can flip the label.
-        Pay close attention to negations, numbers, and specific entities.
-
-        Your task:
-        1. Read the Claim and the Evidence carefully.
-        2. Determine if the Evidence SUPPORTS, REFUTES, or provides NOT ENOUGH INFO for the Claim.
-        3. Provide step-by-step reasoning.
-        4. Provide the final label.
-
-        Your entire output MUST use exactly the following format and nothing else:
-
-        <think>
-        [Your step-by-step analysis]
-        </think>
-        <answer>
-        [Output exactly one: SUPPORTS, REFUTES, NOT ENOUGH INFO]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_VITAMINC
 
     user_prompt = textwrap.dedent(f"""\
         Claim:
@@ -228,10 +240,11 @@ def create_vitaminc_prompt(claim, evidence_text):
         Evidence:
         {evidence_text}
 
-        Based on the evidence provided, determine the veracity of the claim.
+        Does the evidence SUPPORT, REFUTE, or provide NOT ENOUGH INFO for the claim?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_answer(response):

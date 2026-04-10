@@ -193,6 +193,40 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+import textwrap
+
+SYSTEM_PROMPT_NEULR_ABDUCTIVE = textwrap.dedent("""\
+    You are an expert Forensic Logic Analyst and deductive reasoning specialist. Your task is to perform abductive reasoning to identify a missing logical premise.
+
+    You will be provided with:
+    1. Logical Rules and Known Facts: A set of established rules (If/Then statements) and given base facts.
+    2. Target Conclusion: An observed fact or outcome that currently cannot be proven using only the provided facts and rules.
+
+    Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion logically true based on the Rules.
+
+    ## Instructions:
+    1. Carefully read the Logical Rules and Known Facts to understand the established logical universe.
+    2. Analyze the Target Conclusion that needs to be proven.
+    3. Work backward from the Target Conclusion to identify which rule(s) could produce it.
+    4. Check the conditions for those rule(s) against the Known Facts.
+    5. Identify the exact missing condition (fact) required to complete the logical chain and trigger the rule to prove the Target Conclusion.
+    6. Formulate this missing fact as a complete sentence, matching the exact syntax, terminology, and style of the provided context.
+    7. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [The exact missing fact written as a complete sentence]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the missing fact as a single complete sentence (e.g., "NPsw0v0k is ADP37scy8."). Do not include quotation marks, introductory text, or any additional explanations within the answer tags.
+""").strip()
+
+
 def create_neulr_abductive_prompt(problem, context):
     """
     Create a prompt for an abductive reasoning task.
@@ -210,25 +244,7 @@ def create_neulr_abductive_prompt(problem, context):
         # Fallback if the target is passed as 'problem' instead of in 'context'
         target_fact = problem.strip() if problem else ""
 
-    system_prompt = textwrap.dedent("""\
-        You are an expert Forensic Logic Analyst.
-
-        Task: Abductive Reasoning (Find the Missing Fact).
-        You are given:
-        1. A list of 'Logical Rules and Known Facts'.
-        2. A 'Target Conclusion' (Observed Fact).
-
-        The 'Target Conclusion' is currently unprovable with the provided facts alone.
-        Your goal is to identify the single MISSING FACT (premise) that, when added to the known facts, makes the Target Conclusion true based on the Rules.
-
-        Output Format:
-        <think>
-        [Step-by-step logic: Identify the rule triggered by the Conclusion, trace backwards to find what condition is missing.]
-        </think>
-        <answer>
-        [The missing fact as a complete sentence. Example: NPsw0v0k is ADP37scy8.]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_NEULR_ABDUCTIVE
 
     user_prompt = textwrap.dedent(f"""\
         Logical Rules and Known Facts:
@@ -237,10 +253,11 @@ def create_neulr_abductive_prompt(problem, context):
         Target Conclusion:
         {target_fact}
 
-        Question: What missing fact is required to conclude the Target Conclusion?
+        What missing fact is required to conclude the Target Conclusion?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_reasoning(response):

@@ -25,7 +25,8 @@ import numpy as np
 import warnings
 import textwrap
 import sys
-import os
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
 warnings.filterwarnings('ignore')
 
 # Add current directory to sys.path to ensure path_utils can be imported
@@ -202,15 +203,6 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-import os
-import re
-import time
-from pathlib import Path
-from typing import List, Optional, Tuple, Union
-
-import torch
-from tqdm import tqdm
-from datasets import load_dataset
 
 SYSTEM_PROMPT_CAUSELOGICS = textwrap.dedent("""\
     You are an expert logician and careful reasoning assistant. Your task is to identify whether a given Possible Cause, when added to the provided knowledge base, logically entails an observed Phenomenon.
@@ -230,15 +222,14 @@ SYSTEM_PROMPT_CAUSELOGICS = textwrap.dedent("""\
     4. Decide whether the Phenomenon can be logically inferred
        - If the Phenomenon can be inferred, the Possible Cause is TRUE
        - If the Phenomenon cannot be inferred, the Possible Cause is FALSE
-    5. Provide step-by-step reasoning referencing which premises/rules you used
+    5. Think step by step.
 
     ## Output Format:
     You MUST provide your answer in the following format:
 
     <think>
-    [Explain your thought process: step-by-step analysis referencing which premises/rules you used]
+    [Think step by step here]
     </think>
-
     <answer>
     [Output exactly one of these two options: TRUE, FALSE]
     </answer>
@@ -307,7 +298,7 @@ def create_causelogics_prompt(example: dict):
         Possible Cause:
         {str(possible_cause)}
 
-        Determine whether the Possible Cause is TRUE or FALSE.
+        Is the Possible Cause logically TRUE or FALSE?
     """).strip()
 
     return system_prompt, user_prompt
@@ -766,6 +757,12 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     
     ckpt_name = os.path.basename(checkpoint_path.rstrip("/"))
     print(f"✅ Using checkpoint for per-case evaluation: {ckpt_name}")
+    
+    # Get cached (or newly computed) raw results
+    raw_results = ensure_raw_results_cached(args)
+    if raw_results is None:
+        print("❌ Cannot evaluate checkpoint without raw model results.")
+        return
 
     # Get cached (or newly computed) fine-tuned results
     if ensure_finetuned_results_cached(args, ckpt_name):

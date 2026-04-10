@@ -201,6 +201,37 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+_emotions_list_str = ", ".join(GOEMOTION_LABELS)
+
+SYSTEM_PROMPT_GOEMOTION = textwrap.dedent(f"""\
+    You are an expert text analyst and emotion classifier. Your task is to identify all emotions expressed in a given text.
+
+    You will be provided with:
+    1. A short Text to analyze
+
+    Your goal is to detect the presence of specific emotions from the following predefined list:
+    [{_emotions_list_str}]
+
+    ## Instructions:
+    1. Carefully read the provided text
+    2. Analyze the context, tone, and nuance to understand the underlying feelings
+    3. Match the expressed feelings strictly against the predefined list of available emotions
+    4. Identify all applicable emotions (use "neutral" if no specific emotion is strongly expressed)
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Comma-separated list of applicable emotions]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the exact emotion names from the available list, separated by commas if there are multiple (e.g., joy, surprise). Do not include any other text, explanation, or capitalization.
+""").strip()
+
 def create_goemotion_prompt(text):
     """Create a prompt for GoEmotions emotion classification.
     
@@ -210,24 +241,7 @@ def create_goemotion_prompt(text):
     Returns:
         system_prompt, user_prompt
     """
-    emotions_list = ", ".join(GOEMOTION_LABELS)
-
-    system_prompt = textwrap.dedent(f"""\
-        You are an expert emotion classifier. Given a text and a list of possible emotions, identify all emotions expressed in the text.
-
-        Available emotions: {emotions_list}
-
-        First, think step by step and explain your reasoning about which emotions are present, considering context and nuance, in just one paragraph. Then list all and only the emotions that apply.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning about which emotions are present and why]
-        </think>
-        <answer>
-        [here you output ONLY the emotion names from the available list, separated by commas if there are multiple; e.g. "joy, surprise" or "anger"]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_GOEMOTION
 
     user_prompt = textwrap.dedent(f"""\
         Text: "{text}"

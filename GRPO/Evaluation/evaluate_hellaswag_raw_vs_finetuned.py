@@ -196,35 +196,40 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-import re
-import time
-import torch
-from tqdm import tqdm
-from datasets import load_dataset
 
+SYSTEM_PROMPT_HELLASWAG = textwrap.dedent("""\
+    You are an expert in commonsense reasoning and narrative comprehension. Your task is to determine the most logical and natural continuation of a given situation.
+
+    You will be provided with:
+    1. A short Context describing a scene, action, or event
+    2. Four candidate Endings (A, B, C, D)
+
+    Your goal is to evaluate the candidates and select the single most plausible Ending that best completes the Context.
+
+    ## Instructions:
+    1. Carefully read the provided Context to understand the current situation, actors, and actions
+    2. Evaluate all four candidate Endings (A, B, C, D)
+    3. Determine which ending represents the most natural, logical, and physically plausible continuation based on everyday commonsense
+    4. Select the letter corresponding to the best ending
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Exactly one letter: A, B, C, or D]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the single uppercase letter of the correct choice (A, B, C, or D). Do not include parentheses, punctuation, or any textual explanation.
+""").strip()
 
 def create_hellaswag_prompt(ctx, endings):
     """Create a prompt for HellaSwag (4-way multiple choice)."""
 
-    system_prompt = textwrap.dedent("""\
-        You are an expert at commonsense reasoning.
-        You will be given a short Context and four candidate Endings (A, B, C, D).
-
-        Your task:
-        1. Read the Context and the four Endings carefully.
-        2. Select the single most plausible Ending that best completes the Context.
-        3. Provide brief reasoning.
-        4. Provide the final choice letter.
-
-        Your entire output MUST use exactly the following format and nothing else:
-
-        <think>
-        [Brief explanation of why the chosen ending best fits the context]
-        </think>
-        <answer>
-        [Output exactly one of these four options: A, B, C, D]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_HELLASWAG
 
     user_prompt = textwrap.dedent(f"""\
         Context:
@@ -240,6 +245,7 @@ def create_hellaswag_prompt(ctx, endings):
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_answer(response):

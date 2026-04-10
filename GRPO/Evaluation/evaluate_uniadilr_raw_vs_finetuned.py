@@ -232,14 +232,14 @@ SYSTEM_PROMPT_UniADILR = textwrap.dedent("""\
     2. Analyze the hypothesis
     3. Identify which sentences, when combined, best explain or support the hypothesis
     4. Consider both direct evidence and logical connections
+    5. Think step by step.
 
     ## Output Format:
     You MUST provide your answer in the following format:
 
     <think>
-    [Explain your thought process: why you selected these particular sentences and how they support the hypothesis]
+    [Think step by step here]
     </think>
-
     <answer>
     [Sentence numbers only, comma-separated. For example: 5, 13 or 2, 7, 9]
     </answer>
@@ -273,7 +273,7 @@ def create_uniadilr_prompt(example):
         Hypothesis:
         {hypothesis}
 
-        Based on the context and hypothesis above, identify which sentence(s) provide the necessary evidence for the hypothesis.
+        Which sentence numbers provide the necessary evidence for the hypothesis?
     """).strip()
 
     system_prompt = SYSTEM_PROMPT_UniADILR

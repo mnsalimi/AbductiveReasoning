@@ -193,27 +193,41 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+import textwrap
+
+SYSTEM_PROMPT_MUSR_MURDER = textwrap.dedent("""\
+    You are a brilliant detective and an expert in deductive reasoning. Your task is to analyze clues to solve complex mysteries.
+
+    You will be provided with:
+    1. Context: A detailed detective story containing information about a crime, suspects, alibis, and clues
+    2. Problem: A question about the mystery, followed by a list of numbered multiple-choice options
+
+    Your goal is to logically deduce the truth from the context and identify the correct choice by its index number.
+
+    ## Instructions:
+    1. Carefully read the Context to identify timelines, motives, means, and logical inconsistencies among the suspects' statements
+    2. Evaluate the Problem and all the provided choices
+    3. Use deductive reasoning to eliminate impossible scenarios and identify the only logically sound answer
+    4. Note the index number (e.g., 0, 1, 2, ...) of the correct choice
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Exactly one integer representing the index of the correct choice]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the numeric index number of the correct choice. Do not include the text of the choice, punctuation, or any other explanations inside the answer tags.
+""").strip()
+
 def create_musr_murder_prompt(problem, context):
     """Create a prompt for a detective-style multiple-choice reasoning question."""
 
-    system_prompt = textwrap.dedent("""\
-        You are a brilliant detective analyzing clues to solve a mystery. 
-        You will be given context and a multiple-choice question.
-
-        Your task:
-        1. Carefully read the context and the question.
-        2. Perform step-by-step detective reasoning.
-        3. Select the **index number** (0, 1, 2, ...) of the correct choice.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning and intermediate steps]
-        </think>
-        <answer>
-        [here you output ONLY the index number of the correct choice, with no extra words]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_MUSR_MURDER
 
     user_prompt = textwrap.dedent(f"""\
         Context:
@@ -222,10 +236,11 @@ def create_musr_murder_prompt(problem, context):
         Problem:
         {problem}
 
-        Solve this problem step by step using detective reasoning, then provide your final answer (the index number of the correct choice).
+        What is the index number of the correct choice?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_reasoning(response):

@@ -196,11 +196,36 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-import re
-import time
-import torch
-from tqdm import tqdm
-from datasets import load_dataset
+import textwrap
+
+SYSTEM_PROMPT_ECARE = textwrap.dedent("""\
+    You are an expert in causal reasoning and multiple-choice evaluation. Your task is to determine the correct causal relationship based on a given premise and question type.
+
+    You will be provided with:
+    1. A Premise describing a specific situation or event
+    2. Additional context containing the Question Type (asking for either a cause or an effect) and two candidate choices
+
+    Your goal is to evaluate both choices and select the one that represents the most plausible cause or effect, depending on what the question asks.
+
+    ## Instructions:
+    1. Carefully read the Premise
+    2. Identify the Question Type from the provided text to determine if you are looking for a cause of the premise or an effect resulting from the premise
+    3. Evaluate both candidate choices against the premise
+    4. Select the choice that forms the most logical causal relationship
+    5. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Either CHOICE1 or CHOICE2]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the exact word CHOICE1 or CHOICE2. Do not include any other text, explanation, or punctuation.
+""").strip()
 
 def create_ecare_prompt(claim, evidence_text):
     """
@@ -212,27 +237,7 @@ def create_ecare_prompt(claim, evidence_text):
       - `evidence_text` == a formatted block containing question + choices
     """
 
-    system_prompt = textwrap.dedent("""\
-        You are an expert causal reasoner and careful multiple-choice evaluator.
-        You will be given a Premise, a Question Type (cause/effect), and two candidate Choices.
-
-        Your task:
-        1. Read the Premise and Question Type carefully.
-        2. Decide which choice (CHOICE1 or CHOICE2) is the more plausible answer to the question:
-           - If Question Type is "cause": pick the choice that best causes the Premise.
-           - If Question Type is "effect": pick the choice that is the most likely result of the Premise.
-        3. Provide step-by-step reasoning that compares both choices.
-        4. Provide the final label.
-
-        Your entire output MUST use exactly the following format and nothing else:
-
-        <think>
-        [Your step-by-step causal analysis comparing CHOICE1 vs CHOICE2]
-        </think>
-        <answer>
-        [Output exactly one of these two options: CHOICE1, CHOICE2]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_ECARE
 
     user_prompt = textwrap.dedent(f"""\
         Premise:
@@ -240,10 +245,11 @@ def create_ecare_prompt(claim, evidence_text):
 
         {evidence_text}
 
-        Choose the correct answer based on causal reasoning.
+        Which choice is the correct answer?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_answer(response):
@@ -264,15 +270,15 @@ def extract_answer(response):
 
     # Normalize common ways models might answer
     # e.g. "CHOICE 1", "OPTION1", "A", "1"
-    if raw in {"CHOICE1", "CHOICE 1", "OPTION1", "OPTION 1", "A", "1"}:
+    if raw in {"CHOICE1", "CHOICE 1"}:
         return "CHOICE1"
-    if raw in {"CHOICE2", "CHOICE 2", "OPTION2", "OPTION 2", "B", "2"}:
+    if raw in {"CHOICE2", "CHOICE 2"}:
         return "CHOICE2"
 
     # If the model writes something like "The answer is CHOICE1"
-    if "CHOICE1" in raw or "OPTION1" in raw:
+    if "CHOICE1" in raw:
         return "CHOICE1"
-    if "CHOICE2" in raw or "OPTION2" in raw:
+    if "CHOICE2" in raw:
         return "CHOICE2"
 
     return raw  # fall back (will likely count as wrong)

@@ -193,28 +193,44 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
+import textwrap
+
+SYSTEM_PROMPT_NEULR_INDUCTIVE = textwrap.dedent("""\
+    You are an expert logical reasoner and pattern recognition specialist. Your task is to perform inductive reasoning to identify properties of entities based on shared group characteristics.
+
+    You will be provided with:
+    1. Context: A set of facts containing entities, their group memberships, and their specific properties.
+    2. Problem: A specific question asking you to determine a missing property for a target entity.
+
+    Your goal is to use inductive reasoning to determine the correct property of the target entity by analyzing the properties of other members in its group, and output the exact alphanumeric code.
+
+    ## Instructions:
+    1. Carefully read the Context to identify all entities, their assigned groups, and their associated properties.
+    2. Analyze the Problem to identify the target entity in question.
+    3. Determine which group the target entity belongs to based on the Context.
+    4. Examine other entities within that same group to induce the shared property they possess.
+    5. Conclude the target entity's missing property based on this shared group characteristic.
+    6. Extract the exact alphanumeric code of the resulting property from the text.
+    7. Think step by step.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Exactly one alphanumeric code]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the exact alphanumeric code answer. Do not include any extra words, punctuation, full sentences, or explanations inside the answer tags.
+""").strip()
+
+
 def create_neulr_inductive_prompt(problem, context):
     """Create a prompt for a detective-style reasoning question involving shared properties."""
 
-    system_prompt = textwrap.dedent("""\
-        You are a brilliant detective specializing in symbolic logic and pattern recognition.
-        You will be given a context containing facts about entities, their group memberships, and their specific properties.
-
-        Your task:
-        1. Carefully parse the context to identify which group the target entity belongs to.
-        2. Look for other entities in that same group to see what properties they possess.
-        3. Perform step-by-step reasoning to deduce the property of the target entity based on these shared group characteristics.
-        4. Give the correct answer as the EXACT alphanumeric code from the text.
-
-        Your entire output MUST use exactly the following format and nothing else (no text before, between, or after these tags):
-
-        <think>
-        [here you write your chain-of-thought reasoning, explicitly linking the target entity to a group, finding a sibling entity in that group, and transferring the property]
-        </think>
-        <answer>
-        [here you output ONLY the exact alphanumeric code answer]
-        </answer>
-    """).strip()
+    system_prompt = SYSTEM_PROMPT_NEULR_INDUCTIVE
 
     user_prompt = textwrap.dedent(f"""\
         Context:
@@ -223,10 +239,11 @@ def create_neulr_inductive_prompt(problem, context):
         Problem:
         {problem}
 
-        Solve this problem step by step using detective reasoning to find the shared property, then provide your final answer in one word ONLY.
+        What is the exact alphanumeric code answer?
     """).strip()
 
     return system_prompt, user_prompt
+
 
 
 def extract_reasoning(response):

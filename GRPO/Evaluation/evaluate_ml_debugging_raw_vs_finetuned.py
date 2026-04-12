@@ -258,21 +258,32 @@ def create_debugging_prompt(sample):
     return system_prompt, user_prompt
 
 def extract_code(response):
-    """Extract Python code from the model's response."""
+    """Extract Python code from the model's response, strictly requiring <answer> tags."""
     if not response:
-        return ""
+        return None
 
-    # Look for standard ```python ... ```
-    match = re.search(r'```python\s*(.*?)\s*```', response, re.IGNORECASE | re.DOTALL)
+    # Step 1: Look for the <answer> tags
+    answer_match = re.search(r'<answer>\s*(.*?)\s*</answer>', response, re.IGNORECASE | re.DOTALL)
+    
+    # STRICT RULE: If the model forgot the tags, return None and don't extract anything!
+    if not answer_match:
+        return None
+        
+    target_text = answer_match.group(1)
+
+    # Step 2: Look for standard```python ... ``` INSIDE the <answer> tag
+    match = re.search(r'```python\s*(.*?)\s*```', target_text, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
     
-    # Fallback: look for generalized ``` ... ```
-    match = re.search(r'```\s*(.*?)\s*```', response, re.DOTALL)
+    # Step 3: Fallback: look for generalized``` ... ``` INSIDE the <answer> tag
+    match = re.search(r'```\s*(.*?)\s*```', target_text, re.DOTALL)
     if match:
         return match.group(1).strip()
         
-    return response.strip()
+    # Step 4: If no markdown is found inside the <answer> tag, 
+    # just return whatever raw text was inside the tag.
+    return target_text.strip()
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

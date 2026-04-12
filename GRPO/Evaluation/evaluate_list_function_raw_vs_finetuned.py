@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 import warnings
@@ -272,11 +272,10 @@ SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
     - Output: the result of applying the same hidden transformation rule to the input
 
     Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
-    Think step by step.
 
     Output format (MUST follow exactly):
     <think>
-    [Think step by step here]
+    [Explain your thought process: reason step by step about the possible rules, consider alternative hypotheses, and explain why your final rule best fits ALL training examples.]
     </think>
     <answer>
     def transform(lst):
@@ -293,10 +292,11 @@ SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
     - BE ROBUST: Handle edge cases like empty lists or lists with only 1 element.
 
     STRICT FORMATTING RULES:
-    - Do NOT use markdown code blocks (like```python) inside the <answer> tags. Just write raw code.
+    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
     - Do NOT repeat the code. Write the function exactly once.
     - Ensure you close the tag with </answer>.
     - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
+    - Do NOT write any text before <think> or after </answer>.
 """).strip()
 
 
@@ -306,15 +306,15 @@ def create_list_functions_prompt(example):
     system_prompt = SYSTEM_PROMPT_LIST_FUNCTION
 
     train_prompt = "\n".join([
-    f"--- Example {i+1} ---\nInput: {ex['input']}\nOutput: {ex['output']}"
-    for i, ex in enumerate(example["train"])
+        f"--- Example {i+1} ---\nInput: {ex['input']}\nOutput: {ex['output']}"
+        for i, ex in enumerate(example["train"])
     ])
 
     user_prompt = textwrap.dedent(f"""\
-    Training examples:
-    {train_prompt}
+        Training examples:
+        {train_prompt}
 
-    What is the Python function implementation of this transformation?
+        Infer the underlying list transformation and provide the Python function implementation in the required format.
     """).strip()
 
     return system_prompt, user_prompt
@@ -571,7 +571,7 @@ def evaluate_on_list_functions(model, tokenizer, max_samples=None, model_name="M
 
             # Process batch results
             for i in range(len(formatted_prompts)):
-                input_length = inputs['input_ids'][i].shape[0]
+                input_length = int(inputs['attention_mask'][i].sum().item())
                 response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
 
                 # 1. Extract Reasoning and Code

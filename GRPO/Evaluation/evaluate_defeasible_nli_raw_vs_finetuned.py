@@ -796,7 +796,9 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         all_cases.append({
             "problem_id": pid,
-            "problem": raw_r["question"],          
+            'premise': raw_r["premise"],
+            "hypothesis": raw_r["hypothesis"],  
+            "update": raw_r["update"],
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -820,7 +822,9 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         disagreement_cases.append({
             "problem_id": pid,
-            "problem": raw_r["question"],          
+            'premise': raw_r["premise"],
+            "hypothesis": raw_r["hypothesis"],  
+            "update": raw_r["update"],
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],

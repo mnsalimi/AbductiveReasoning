@@ -371,7 +371,7 @@ def evaluate_on_neulr_inductive(model, tokenizer, max_samples=None, model_name="
             formatted_prompts.append(formatted_prompt)
             true_answers.append(true_answer)
             batch_data.append({
-                'question': problem,
+                'question': f"Context:\n{context}\n\nProblem:\n{problem}",
                 'id': batch['id'][i] if 'id' in batch else start_idx + i
             })
         

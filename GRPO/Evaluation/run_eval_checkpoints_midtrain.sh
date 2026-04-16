@@ -27,6 +27,7 @@ scripts=(
     "evaluate_ml_debugging_raw_vs_finetuned.py"
     # "evaluate_list_function_raw_vs_finetuned.py"
     # "evaluate_miniarc_raw_vs_finetuned.py"
+    # "evaluate_pysstubs_raw_vs_finetuned.py"
 )
 
 declare -A BATCH_SIZES=(
@@ -51,6 +52,7 @@ declare -A BATCH_SIZES=(
     ["evaluate_miniarc_raw_vs_finetuned.py"]=2
     ["evaluate_ml_debugging_raw_vs_finetuned.py"]=16
     ["evaluate_uniadilr_raw_vs_finetuned"]=4
+    ["evaluate_pysstubs_raw_vs_finetuned.py"]=8
 )
 
 # CHECKPOINTS=(

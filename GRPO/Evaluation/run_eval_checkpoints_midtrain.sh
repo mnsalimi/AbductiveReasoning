@@ -130,7 +130,7 @@ for script in "${scripts[@]}"; do
         --split "test" \
         --raw_path "$RAW_MODEL_PATH" \
         --output_path "$OUTPUT_DIR" \
-        --max_samples 300
+        --max_samples 500
 
     echo "Finished $script"
     echo "-------------------------------------"

@@ -408,6 +408,7 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
             true_labels_batch.append(true_label)
             batch_data.append({
                 'premise': premise,
+                'user_prompt': user_prompt,
                 'choice1': choice1,
                 'choice2': choice2,
                 'true_label': true_label,
@@ -465,6 +466,7 @@ def evaluate_on_copa(model, tokenizer, max_samples=None, model_name="Model", bat
                 'choice1': batch_data[i]['choice1'],
                 'choice2': batch_data[i]['choice2'],
                 'true_label': true_label,
+                'user_prompt': batch_data[i]['user_prompt'],
                 'predicted_label': predicted_label,
                 'reasoning': reasoning,
                 'correct': is_correct
@@ -686,6 +688,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         
         case_entry = {
             "problem_id": pid,
+            "user_prompt": raw_r['user_prompt'],
             "premise": raw_r["premise"],          
             "choice1": raw_r["choice1"],
             "choice2": raw_r["choice2"],  
@@ -849,6 +852,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         all_cases.append({
             "problem_id": pid,
+            "user_prompt": raw_r['user_prompt'],
             "premise": raw_r["premise"],          
             "choice1": raw_r["choice1"],
             "choice2": raw_r["choice2"],  
@@ -875,6 +879,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         
         disagreement_cases.append({
             "problem_id": pid,
+            "user_prompt": raw_r['user_prompt'],
             "premise": raw_r["premise"],          
             "choice1": raw_r["choice1"],
             "choice2": raw_r["choice2"],

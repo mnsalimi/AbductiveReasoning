@@ -13,6 +13,35 @@ in only 2% of the population, even with these symptoms, the probability
 remains relatively low." The 2% base rate is a prior being considered.
 """
 
+DATASET_SPECIFIC_NOTES: dict[str, str] = {
+    "medqa": (
+        "Ignore priors stated only in the question stem; extract priors only when introduced in the model's reasoning."
+    ),
+    "art": (
+        "Do not count priors that merely restate provided hypotheses; count inferential base-rate/plausibility reasoning."
+    ),
+    "strategyqa": (
+        "Look for world-knowledge priors and typicality assumptions used to guide inference."
+    ),
+    "copa_guess_effect": (
+        "Look for priors about typical everyday cause-effect relationships."
+    ),
+    "defeasible_nli": (
+        "Look for priors about typical premise-hypothesis relations and default expectations."
+    ),
+    "goemotion": (
+        "Look for priors about emotions typically associated with contexts, when explicitly used."
+    ),
+    "musr": (
+        "Look for priors about typical narrative behavior, motives, or scenario patterns."
+    ),
+    "neulr_abductive": (
+        "Look for priors used to justify why one hypothesis is more plausible than another."
+    ),
+}
+
+DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+
 SYSTEM_PROMPT = """\
 You are an expert analyst evaluating AI-generated reasoning traces.
 
@@ -63,7 +92,7 @@ the prior with these observations...".
 ## Extraction rules
 
 - Extract **each distinct prior consideration** as a separate example.
-- The `excerpt` must be a **short, direct quote** from the text that shows
+- The `text` must be a **short, direct quote** from the text that shows
   the model referencing prior information (≤ 25 words of context).
 - The `explanation` must identify the type of prior (from the categories
   above) and briefly explain what prior probability or base rate is being
@@ -84,15 +113,26 @@ the prior with these observations...".
   those are captured by the `uncertainty_markers` metric.
 - Restatements of information given in the problem prompt.
 
-## Dataset-specific notes
+## Dataset-specific note (current dataset only)
 
-If the dataset is **MedQA**: The question stem may contain epidemiological
-information. Do NOT extract priors from the question itself — only from
-the model's own reasoning that brings in external prior knowledge.
+{dataset_specific_note}
 
-If the dataset is **ART** or similar: The hypotheses are given as input.
-Do NOT extract priors that merely restate the given hypotheses; only
-extract priors from the model's own inferential reasoning.
+## Few-shot demonstrations
+
+{dataset_few_shot_examples}
+
+## JSON output format
+
+Return ONLY valid JSON with this structure:
+{
+  "overall_analysis": "Brief analysis of prior probability usage in this reasoning trace",
+  "examples": [
+    {
+      "text": "Quote of the prior probability consideration from the reasoning trace",
+      "explanation": "Type of prior and what probability/frequency is being referenced"
+    }
+  ]
+}
 """
 
 USER_PROMPT_TEMPLATE = """\

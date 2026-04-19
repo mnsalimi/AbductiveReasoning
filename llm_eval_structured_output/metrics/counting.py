@@ -17,11 +17,13 @@ Examples:
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 import llm_client
 from metrics.base import BaseMetric, MetricResult
-
+from prompts import render_system_prompt
 
 # ---------------------------------------------------------------------------
 # Pydantic response schema for ALL counting metrics
@@ -93,6 +95,7 @@ class CountingMetric(BaseMetric):
         problem_id: str = "N/A",
         checkpoint: str = "N/A",
         run_id: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> MetricResult:
         if not isinstance(text, str) or not text.strip():
             return MetricResult(
@@ -100,11 +103,13 @@ class CountingMetric(BaseMetric):
                 error="Empty or invalid input text.",
             )
 
-        trimmed = text[:15_000] + "\n…(truncated)" if len(text) > 15_000 else text
+        user_prompt = (
+            self._user_prompt_template
+            .replace("{text}", text)
+            .replace("{dataset}", dataset)
+        )
 
-        user_prompt = self._user_prompt_template.format(text=trimmed, dataset=dataset)
-
-        system_prompt = self._system_prompt
+        system_prompt = render_system_prompt(self._system_prompt, self.name, dataset)
 
         payload = llm_client.ask_llm(
             system_prompt=system_prompt,
@@ -137,6 +142,3 @@ class CountingMetric(BaseMetric):
             tokens=tokens,
             raw=payload,
         )
-
-
-

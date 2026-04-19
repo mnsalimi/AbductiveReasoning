@@ -16,7 +16,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-
 # ---------------------------------------------------------------------------
 # Shared result container
 # ---------------------------------------------------------------------------
@@ -59,6 +58,10 @@ class MetricResult:
     # Raw payload returned by the LLM (for debugging / logging)
     raw: dict[str, Any] = field(default_factory=dict)
 
+    # Optional scalar outputs for custom metric types.
+    scalar_metrics: dict[str, float] = field(default_factory=dict)
+    normalized_scalar_metrics: dict[str, float] = field(default_factory=dict)
+
 
 # ---------------------------------------------------------------------------
 # Abstract base
@@ -91,6 +94,7 @@ class BaseMetric(ABC):
         problem_id: str = "N/A",
         checkpoint: str = "N/A",
         run_id: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> MetricResult:
         """Run the metric on ``text`` and return a :class:`MetricResult`."""
 

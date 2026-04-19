@@ -1,10 +1,10 @@
 # How to Add a New Metric
 
-There are two paths. Follow **Path A** if your metric fits the existing binary (yes/no), counting (example-extraction), or coverage (per-detail coverage + score) patterns. Follow **Path B** if you need fundamentally different LLM output structure or evaluation logic.
+There are two paths. Follow **Path A** if your metric fits the existing binary (yes/no), counting (example-extraction), coverage (per-detail coverage + score), or graph (rationale-graph extraction + scalar computation) patterns. Follow **Path B** if you need fundamentally different LLM output structure or evaluation logic.
 
 ---
 
-## Path A — Adding a Binary, Counting, or Coverage Metric
+## Path A — Adding a Binary, Counting, Coverage, or Graph Metric
 
 This is the normal path. You only touch two things: a new prompt file and one registration entry.
 
@@ -13,8 +13,9 @@ This is the normal path. You only touch two things: a new prompt file and one re
 | Type | What the LLM outputs | `detected` field | `examples` field |
 |---|---|---|---|
 | **Binary** | `detected` bool + `reasoning` + `evidence` quote | Direct from LLM | Empty (or one item if evidence exists) |
-| **Counting** | `overall_analysis` string + list of `{excerpt, explanation}` pairs | `true` when at least one example found | All extracted examples |
+| **Counting** | `overall_analysis` string + list of `{text, explanation}` pairs | `true` when at least one example found | All extracted examples |
 | **Coverage** | `observation_details` list + `overall_analysis` | Derived in code (true only when score = 1.0) | List of per-detail `{detail, addressed, evidence}` dicts |
+| **Graph** | `general_reasoning` + `vertices` + `edges` | Derived in code (`true` when at least one vertex exists) | Graph entities (vertices and edges) |
 
 ---
 
@@ -22,7 +23,8 @@ This is the normal path. You only touch two things: a new prompt file and one re
 
 **Binary** → create `prompts/binary/your_metric_name.py`  
 **Counting** → create `prompts/counting/your_metric_name.py`  
-**Coverage** → create `prompts/coverage/your_metric_name.py`
+**Coverage** → create `prompts/coverage/your_metric_name.py`  
+**Graph** → create `prompts/graph_structure/your_metric_name.py`
 
 Both files must export exactly these two names:
 
@@ -103,7 +105,7 @@ Analyze the following reasoning trace for <Your Metric> and extract concrete exa
 """
 ```
 
-The LLM response is validated against `CountingResponse` (defined in `metrics/counting.py`), which has two fields: `overall_analysis` (str) and `examples` (list of `{excerpt, explanation}` items).  The OpenAI Structured Outputs API enforces the schema automatically — no additional format instructions are needed.
+The LLM response is validated against `CountingResponse` (defined in `metrics/counting.py`), which has two fields: `overall_analysis` (str) and `examples` (list of `{text, explanation}` items).  The OpenAI Structured Outputs API enforces the schema automatically — no additional format instructions are needed.
 
 #### Coverage prompt template
 
@@ -162,6 +164,12 @@ from prompts.coverage.your_metric_name import (
     SYSTEM_PROMPT as YM_SYS,
     USER_PROMPT_TEMPLATE as YM_USR,
 )
+
+# OR Graph:
+from prompts.graph_structure.your_metric_name import (
+    SYSTEM_PROMPT as YM_SYS,
+    USER_PROMPT_TEMPLATE as YM_USR,
+)
 ```
 
 **2. Add an entry to the `METRICS` dict**:
@@ -185,6 +193,14 @@ from prompts.coverage.your_metric_name import (
 
 # OR Coverage:
 "your_metric_name": CoverageMetric(
+    name="your_metric_name",
+    description="One-line description shown in reports.",
+    system_prompt=YM_SYS,
+    user_prompt_template=YM_USR,
+),
+
+# OR Graph:
+"your_metric_name": RationaleGraphMetric(
     name="your_metric_name",
     description="One-line description shown in reports.",
     system_prompt=YM_SYS,
@@ -283,7 +299,7 @@ class YourTypeMetric(BaseMetric):
             metric_name  – always set to self.name
             detected     – bool: was the phenomenon present? (required)
             reasoning    – str: model's justification (required)
-            examples     – list[dict{"excerpt", "explanation"}]: evidence items
+            examples     – list[dict{"text", "explanation"}]: evidence items
             score        – float|None: optional numeric score (e.g. coverage proportion)
             tokens       – dict: token usage for this LLM call (input/output, etc)
             error        – str: non-empty only on failure
@@ -324,7 +340,7 @@ class YourTypeMetric(BaseMetric):
             metric_name=self.name,
             detected=detected,
             reasoning=reasoning,
-            examples=[],   # populate with {"excerpt": ..., "explanation": ...} dicts if relevant
+            examples=[],   # populate with {"text": ..., "explanation": ...} dicts if relevant
             raw=payload,
         )
 ```
@@ -375,17 +391,17 @@ Then make sure it is active in [`config.py`](../config.py) by adding it to `ACTI
 
 ## Summary Checklist
 
-| | Path A — Binary | Path A — Counting | Path B — New Type |
-|---|---|---|---|
-| New prompt file | `prompts/binary/name.py` | `prompts/counting/name.py` | `prompts/your_type/name.py` + `__init__.py` |
-| New `__init__.py` in prompt folder | Not needed | Not needed | **Required** |
-| New metric class file | Not needed | Not needed | `metrics/your_type.py` |
-| Pydantic response schema | `BinaryResponse` (already exists) | `CountingResponse` (already exists) | **You define `YourResponse`** |
-| Inherit `BaseMetric` | Done by `BinaryMetric` | Done by `CountingMetric` | **You must inherit it** |
-| Declare `metric_type` | Already `"binary"` | Already `"counting"` | **You must set a new string** |
-| Implement `schema` property | Already done | Already done | **You must implement it** |
-| Implement `evaluate()` | Already done | Already done | **You must implement it, always return `MetricResult`** |
-| Format instructions in system prompt | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) |
-| Import in `registry.py` | Prompts only | Prompts only | Class + prompts |
-| Add to `METRICS` dict | `BinaryMetric(...)` | `CountingMetric(...)` | `YourTypeMetric(...)` |
-| Enable in `config.py` | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) |
+| | Path A — Binary | Path A — Counting | Path A — Graph | Path B — New Type |
+|---|---|---|---|---|
+| New prompt file | `prompts/binary/name.py` | `prompts/counting/name.py` | `prompts/graph_structure/name.py` | `prompts/your_type/name.py` + `__init__.py` |
+| New `__init__.py` in prompt folder | Not needed | Not needed | Not needed | **Required** |
+| New metric class file | Not needed | Not needed | Not needed (`RationaleGraphMetric` exists) | `metrics/your_type.py` |
+| Pydantic response schema | `BinaryResponse` (already exists) | `CountingResponse` (already exists) | `RationaleGraphResponse` (already exists) | **You define `YourResponse`** |
+| Inherit `BaseMetric` | Done by `BinaryMetric` | Done by `CountingMetric` | Done by `RationaleGraphMetric` | **You must inherit it** |
+| Declare `metric_type` | Already `"binary"` | Already `"counting"` | Already `"graph"` | **You must set a new string** |
+| Implement `schema` property | Already done | Already done | Already done | **You must implement it** |
+| Implement `evaluate()` | Already done | Already done | Already done | **You must implement it, always return `MetricResult`** |
+| Format instructions in system prompt | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) | Not needed (SDK enforces schema) |
+| Import in `registry.py` | Prompts only | Prompts only | Prompts only | Class + prompts |
+| Add to `METRICS` dict | `BinaryMetric(...)` | `CountingMetric(...)` | `RationaleGraphMetric(...)` | `YourTypeMetric(...)` |
+| Enable in `config.py` | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) | Add to `ACTIVE_METRICS` (or set `ACTIVE_METRICS = []` for all) |

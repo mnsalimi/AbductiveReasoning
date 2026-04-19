@@ -1,11 +1,11 @@
 """
 llm_client.py
 -------------
-OpenAI API wrapper with:
+LLM API wrapper with:
   - Per-request structured logging to JSONL files
   - In-memory caching to avoid redundant API calls across restarts
   - Clean JSON-mode responses (no regex parsing)
-  - Support for OSS models that separate thinking vs. final content
+  - Support for OpenAI-compatible and Gemini structured output paths
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ import config
 # Module-level singletons
 # ---------------------------------------------------------------------------
 _client: OpenAI | None = None
+_gemini_client: Any | None = None
 _lock = threading.Lock()
 
 # Cache: request_key -> parsed dict (populated from disk + live calls)
@@ -55,6 +56,11 @@ def _is_modern_model(model: str) -> bool:
     return False
 
 
+def _is_gemini_model(model: str) -> bool:
+    """Return True when the configured model should use Gemini SDK routing."""
+    return model.strip().lower().startswith("gemini")
+
+
 def get_client() -> OpenAI:
     """Return (and lazily initialise) the shared OpenAI client."""
     global _client
@@ -68,11 +74,38 @@ def get_client() -> OpenAI:
     return _client
 
 
+def get_gemini_client() -> Any:
+    """Return (and lazily initialise) the shared Gemini client."""
+    global _gemini_client
+    if _gemini_client is None:
+        from google import genai
+
+        kwargs: dict[str, Any] = {"api_key": config.OPENAI_API_KEY}
+        if config.GEMINI_BASE_URL:
+            kwargs["http_options"] = {"base_url": config.GEMINI_BASE_URL}
+        _gemini_client = genai.Client(**kwargs)
+    return _gemini_client
+
+
 def test_connection() -> bool:
     """Ping the API with a minimal request; return True if reachable."""
     print("\n[Testing API connection …]")
     model = config.JUDGE_MODEL
     try:
+        if _is_gemini_model(model):
+            from google.genai import types
+
+            get_gemini_client().models.generate_content(
+                model=model,
+                contents="ping",
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=5,
+                ),
+            )
+            print(f"[OK] Connected – model '{model}' is accessible.")
+            return True
+
         modern = _is_modern_model(model)
         kwargs: dict = dict(
             model=model,
@@ -171,6 +204,92 @@ def _append_log(log_path: str, entry: dict) -> None:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def _openai_structured_call(
+    *,
+    model: str,
+    input_messages: list[dict[str, str]],
+    response_schema: type[BaseModel],
+) -> tuple[dict, str | None, str | None, dict[str, int | None], str | None]:
+    """Run one OpenAI structured-output call."""
+    modern = _is_modern_model(model)
+    call_kwargs: dict[str, Any] = dict(
+        model=model,
+        messages=input_messages,
+        response_format=response_schema,
+    )
+    if modern:
+        call_kwargs["max_completion_tokens"] = config.MAX_COMPLETION_TOKENS
+        call_kwargs["reasoning_effort"] = config.REASONING_EFFORT
+    else:
+        call_kwargs["max_tokens"] = config.MAX_COMPLETION_TOKENS
+        call_kwargs["temperature"] = 0.0
+
+    response = get_client().chat.completions.parse(**call_kwargs)
+    msg = response.choices[0].message
+    raw_content: str | None = getattr(msg, "content", None)
+    raw_reasoning: str | None = getattr(msg, "reasoning_content", None)
+    oss_thinking, _ = _split_oss_channels(raw_content)
+    thinking = raw_reasoning or oss_thinking
+
+    if msg.refusal:
+        return {}, raw_content, thinking, {}, msg.refusal
+    if not msg.parsed:
+        raise ValueError("Empty or unparsed response")
+
+    validated = msg.parsed.model_dump()
+    usage = response.usage
+    _details = getattr(usage, "completion_tokens_details", None)
+    _prompt_details = getattr(usage, "prompt_tokens_details", None)
+    tokens: dict[str, int | None] = {
+        "input": getattr(usage, "prompt_tokens", None),
+        "output": getattr(usage, "completion_tokens", None),
+        "reasoning": getattr(_details, "reasoning_tokens", None),
+        "cached_input": getattr(_prompt_details, "cached_tokens", None),
+    }
+    tokens = {k: v for k, v in tokens.items() if v is not None}
+    return validated, raw_content, thinking, tokens, None
+
+
+def _gemini_structured_call(
+    *,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    response_schema: type[BaseModel],
+) -> tuple[dict, str | None, str | None, dict[str, int | None], str | None]:
+    """Run one Gemini structured-output call."""
+    from google.genai import types
+
+    response = get_gemini_client().models.generate_content(
+        model=model,
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            temperature=0.0,
+            max_output_tokens=config.MAX_COMPLETION_TOKENS,
+        ),
+    )
+    raw_content: str | None = getattr(response, "text", None)
+    thinking: str | None = None
+    if not raw_content:
+        raise ValueError("Empty or unparsed response")
+
+    parsed_obj = json.loads(raw_content)
+    validated = response_schema.model_validate(parsed_obj).model_dump()
+    usage = getattr(response, "usage_metadata", None)
+    tokens: dict[str, int | None] = {
+        "input": getattr(usage, "prompt_token_count", None) if usage is not None else None,
+        "output": getattr(usage, "candidates_token_count", None) if usage is not None else None,
+    }
+    total_tokens = getattr(usage, "total_token_count", None) if usage is not None else None
+    if total_tokens is not None:
+        tokens["total"] = total_tokens
+    tokens = {k: v for k, v in tokens.items() if v is not None}
+    return validated, raw_content, thinking, tokens, None
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -179,6 +298,7 @@ def ask_llm(
     *,
     system_prompt: str,
     user_prompt: str,
+    source_full_input: str | None = None,
     response_schema: type[BaseModel],
     dataset: str = "unknown",
     problem_id: str = "N/A",
@@ -221,71 +341,44 @@ def ask_llm(
     max_tries = max(1, config.API_MAX_RETRIES)
 
     modern = _is_modern_model(model)
+    is_gemini = _is_gemini_model(model)
     system_role = "developer" if modern else "system"
+    input_messages = [
+        {"role": system_role, "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
 
     last_error: str = ""
+    raw_question = source_full_input if source_full_input is not None else ""
     for attempt in range(max_tries):
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         try:
-            call_kwargs: dict = dict(
-                model=model,
-                messages=[
-                    {"role": system_role, "content": system_prompt},
-                    {"role": "user",      "content": user_prompt},
-                ],
-                response_format=response_schema,
-            )
-            if modern:
-                call_kwargs["max_completion_tokens"] = config.MAX_COMPLETION_TOKENS
-                call_kwargs["reasoning_effort"] = config.REASONING_EFFORT
+            if is_gemini:
+                validated, raw_content, thinking, tokens, refusal = _gemini_structured_call(
+                    model=model,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    response_schema=response_schema,
+                )
             else:
-                call_kwargs["max_tokens"] = config.MAX_COMPLETION_TOKENS
-                call_kwargs["temperature"] = 0.0
+                validated, raw_content, thinking, tokens, refusal = _openai_structured_call(
+                    model=model,
+                    input_messages=input_messages,
+                    response_schema=response_schema,
+                )
 
-            response = get_client().chat.completions.parse(**call_kwargs)
-
-            msg = response.choices[0].message
-            raw_content: str | None = getattr(msg, "content", None)
-            raw_reasoning: str | None = getattr(msg, "reasoning_content", None)
-
-            oss_thinking, _ = _split_oss_channels(raw_content)
-            thinking = raw_reasoning or oss_thinking
-
-            if msg.refusal:
+            if refusal:
                 _append_log(log_path, {
                     "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
                     "dataset": dataset, "problem_id": problem_id,
                     "metric_type": metric_type, "model": model,
-                    "parse_status": "refusal", "error_message": msg.refusal,
+                    "parse_status": "refusal", "error_message": refusal,
+                    "raw_question": raw_question,
                     "raw_response": raw_content, "raw_reasoning": thinking,
+                    "user_prompt": user_prompt,
+                    "input_messages": input_messages,
                 })
                 return _default_payload(response_schema)
-
-            if not msg.parsed:
-                _append_log(log_path, {
-                    "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
-                    "dataset": dataset, "problem_id": problem_id,
-                    "metric_type": metric_type, "model": model,
-                    "parse_status": "empty_response", "error_message": "Empty or unparsed response",
-                    "raw_response": raw_content, "raw_reasoning": thinking,
-                })
-                return _default_payload(response_schema)
-
-            # Structured output parsed directly by the SDK
-            validated = msg.parsed.model_dump()
-
-            # ── Token usage ────────────────────────────────────────────────
-            usage = response.usage
-            _details = getattr(usage, "completion_tokens_details", None)
-            _prompt_details = getattr(usage, "prompt_tokens_details", None)
-            tokens: dict[str, int | None] = {
-                "input":     getattr(usage, "prompt_tokens",     None),
-                "output":    getattr(usage, "completion_tokens", None),
-                "reasoning": getattr(_details, "reasoning_tokens", None),
-                "cached_input": getattr(_prompt_details, "cached_tokens", None),
-            }
-            # Remove keys that are always None to keep logs clean
-            tokens = {k: v for k, v in tokens.items() if v is not None}
 
             _append_log(log_path, {
                 "timestamp": ts, "run_id": run_id, "checkpoint": checkpoint,
@@ -293,8 +386,11 @@ def ask_llm(
                 "metric_type": metric_type, "model": model,
                 "parse_status": "success",
                 "tokens": tokens,
+                "raw_question": raw_question,
                 "raw_response": raw_content,
                 "raw_reasoning": thinking,
+                "user_prompt": user_prompt,
+                "input_messages": input_messages,
                 "parsed_data": validated,
             })
             # Attach token info as a side-channel key so callers can read it
@@ -319,7 +415,10 @@ def ask_llm(
             if "timeout" in err_lower:
                 print("  [HINT] Increase API_TIMEOUT in config.py or check network.")
             elif "not found" in err_lower or "404" in err_lower:
-                print(f"  [HINT] Model '{model}' not found – check JUDGE_MODEL in config.py.")
+                if is_gemini:
+                    print(f"  [HINT] Model '{model}' not found – check JUDGE_MODEL and GEMINI_BASE_URL in config.py/.env.")
+                else:
+                    print(f"  [HINT] Model '{model}' not found – check JUDGE_MODEL in config.py.")
 
     _append_log(log_path, {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
@@ -327,7 +426,10 @@ def ask_llm(
         "dataset": dataset, "problem_id": problem_id,
         "metric_type": metric_type, "model": model,
         "parse_status": "failed", "error_message": last_error,
+        "raw_question": raw_question,
         "raw_response": None, "raw_reasoning": None,
+        "user_prompt": user_prompt,
+        "input_messages": input_messages,
     })
     print(f"  [LLM] FAILED {metric_type}/{problem_id} ckpt={checkpoint} after {max_tries} attempt(s): {last_error[:200]}")
     return _default_payload(response_schema)
@@ -338,14 +440,12 @@ def _default_payload(schema: type[BaseModel]) -> dict:
     """Return a zeroed-out dict for the given Pydantic schema."""
     defaults: dict[str, Any] = {}
     for name, field in schema.model_fields.items():
-        ann = field.annotation
-        if ann is bool:
+        # Simple type checking
+        if str(field.annotation) == "bool":
             defaults[name] = False
-        elif ann is str or (hasattr(ann, "__origin__") is False and ann is str):
+        elif str(field.annotation) == "str":
             defaults[name] = ""
-        elif ann is int:
-            defaults[name] = 0
-        elif hasattr(ann, "__origin__") and ann.__origin__ is list:
+        elif "list" in str(field.annotation).lower():
             defaults[name] = []
         else:
             defaults[name] = None

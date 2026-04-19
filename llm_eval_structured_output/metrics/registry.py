@@ -15,10 +15,11 @@ config.ACTIVE_METRICS.
 
 from __future__ import annotations
 
+from metrics.base import BaseMetric
 from metrics.binary import BinaryMetric
 from metrics.counting import CountingMetric
 from metrics.coverage import CoverageMetric
-from metrics.base import BaseMetric
+from metrics.graph_structure import RationaleGraphMetric
 
 # ---------------------------------------------------------------------------
 # Prompt imports – counting metrics
@@ -39,6 +40,10 @@ from prompts.counting.prior import (
     SYSTEM_PROMPT as PRIOR_SYS,
     USER_PROMPT_TEMPLATE as PRIOR_USR,
 )
+from prompts.counting.differential_elimination import (
+    SYSTEM_PROMPT as DELIM_SYS,
+    USER_PROMPT_TEMPLATE as DELIM_USR,
+)
 
 # ---------------------------------------------------------------------------
 # Prompt imports – coverage metrics
@@ -46,6 +51,15 @@ from prompts.counting.prior import (
 from prompts.coverage.observation_coverage import (
     SYSTEM_PROMPT as OC_SYS,
     USER_PROMPT_TEMPLATE as OC_USR,
+)
+
+# ---------------------------------------------------------------------------
+# Prompt imports – graph metrics
+# ---------------------------------------------------------------------------
+
+from prompts.graph_structure.rationale_graph import (
+    SYSTEM_PROMPT as RG_SYS,
+    USER_PROMPT_TEMPLATE as RG_USR,
 )
 
 # ---------------------------------------------------------------------------
@@ -58,6 +72,14 @@ from prompts.binary.uncertainty_language import (
 from prompts.binary.detail_coverage import (
     SYSTEM_PROMPT as DC_SYS,
     USER_PROMPT_TEMPLATE as DC_USR,
+)
+from prompts.binary.differential_evaluation import (
+    SYSTEM_PROMPT as DE_SYS,
+    USER_PROMPT_TEMPLATE as DE_USR,
+)
+from prompts.binary.evidence_explanation_directionality import (
+    SYSTEM_PROMPT as EED_SYS,
+    USER_PROMPT_TEMPLATE as EED_USR,
 )
 
 # ---------------------------------------------------------------------------
@@ -90,6 +112,12 @@ METRICS: dict[str, BaseMetric] = {
         system_prompt=PRIOR_SYS,
         user_prompt_template=PRIOR_USR,
     ),
+    "differential_elimination": CountingMetric(
+        name="differential_elimination",
+        description="Count of explicit eliminations/refutations of alternative hypotheses.",
+        system_prompt=DELIM_SYS,
+        user_prompt_template=DELIM_USR,
+    ),
     # ── Binary metrics ──────────────────────────────────────────────────────
     "uncertainty_language": BinaryMetric(
         name="uncertainty_language",
@@ -103,12 +131,31 @@ METRICS: dict[str, BaseMetric] = {
         system_prompt=DC_SYS,
         user_prompt_template=DC_USR,
     ),
+    "differential_evaluation": BinaryMetric(
+        name="differential_evaluation",
+        description="Active refutation of alternative hypotheses (Inference to the Best Explanation).",
+        system_prompt=DE_SYS,
+        user_prompt_template=DE_USR,
+    ),
+    "evidence_explanation_directionality": BinaryMetric(
+        name="evidence_explanation_directionality",
+        description="Awareness that abduction runs from evidence to explanation, not reverse.",
+        system_prompt=EED_SYS,
+        user_prompt_template=EED_USR,
+    ),
     # ── Coverage metrics ────────────────────────────────────────────────────
     "observation_coverage": CoverageMetric(
         name="observation_coverage",
         description="Proportion of specific observation details explicitly accounted for by the chosen hypothesis.",
         system_prompt=OC_SYS,
         user_prompt_template=OC_USR,
+    ),
+    # ── Graph metrics ─────────────────────────────────────────────────────
+    "rationale_graph": RationaleGraphMetric(
+        name="rationale_graph",
+        description="Text-grounded directed rationale graph and graph-structure statistics.",
+        system_prompt=RG_SYS,
+        user_prompt_template=RG_USR,
     ),
 }
 

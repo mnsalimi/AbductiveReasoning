@@ -18,9 +18,9 @@ A binary metric asks the judge LLM a single yes/no question about the reasoning 
 
 ### Counting Metric
 
-A counting metric asks the judge LLM to extract every individual occurrence of a phenomenon as a concrete example (an excerpt + explanation pair).
+A counting metric asks the judge LLM to extract every individual occurrence of a phenomenon as a concrete example (a text quote + explanation pair).
 
-- **Output:** An `overall_analysis` string and a list of `{excerpt, explanation}` items.
+- **Output:** An `overall_analysis` string and a list of `{text, explanation}` items.
 - **Count used in reports:** `len(examples)` — the raw number of extracted occurrences.  This can be normalized per 100 words in the `normalized/` results.
 - **Use when:** you want to measure the *density* or *frequency* of a phenomenon, not just its presence.
 
@@ -31,6 +31,14 @@ A coverage metric asks the judge LLM to enumerate **all specific details** prese
 - **Output:** `observation_details` as a list of `{detail, addressed, evidence}` and an `overall_analysis` synthesis.
 - **Score used in reports:** `addressed_count / total_details` (a float in 0.0–1.0). Aggregations typically use the mean score per dataset.
 - **Use when:** you want to measure *how completely* a hypothesis accounts for the full set of observation details, not just whether it mentions them.
+
+### Graph Metric
+
+A graph metric asks the judge LLM to extract a directed, text-grounded rationale graph, then computes structural statistics from that graph.
+
+- **Output:** `vertices`, `edges`, and `general_reasoning` from the LLM, plus computed scalar metrics (for example degree/depth/cycle/centrality statistics).
+- **Score used in reports:** graph scalar metrics and normalized scalar metrics (per 100 words for selected keys).
+- **Use when:** you want to analyze reasoning structure and connectivity patterns, not only presence/count/coverage of specific phenomena.
 
 ---
 
@@ -97,6 +105,17 @@ Captures deliberate self-correction: the model realises something it said or com
 
 ---
 
+### `differential_elimination` — Counting
+
+> **How many explicit elimination/refutation moves against alternatives appear in the reasoning trace?**
+
+Extracts each distinct case where the model rules out an alternative hypothesis, answer option, or interpretation with an explicit reason grounded in the trace.
+
+**Positive examples:** "We can rule out A because it contradicts symptom X", "If B were true we'd see Y, but we don't"  
+**Does not count:** listing options without refuting them, pure support for the chosen option without alternative elimination
+
+---
+
 ### `observation_coverage` — Coverage
 
 > **What fraction of specific observation details are explicitly accounted for by the chosen hypothesis?**
@@ -118,6 +137,21 @@ $$
 
 ---
 
+### `rationale_graph` — Graph
+
+> **What directed rationale graph structure is explicitly present in the reasoning trace?**
+
+This metric extracts graph vertices and edges grounded in exact text spans, then computes structural statistics including out-degree, in-degree, depth, cycle count, weakly connected components, and betweenness centrality summaries.
+
+- **Core extraction fields:**
+	- `vertices` — list of `{vertex_id, label, description, text_correspondence}`
+	- `edges` — list of `{source_vertex_label, target_vertex_label, edge_label, description, text_correspondence}`
+	- `general_reasoning` — short explanation of the extracted graph
+- **Computed scalar metrics:** degree/depth/cycle/component/centrality metrics in `scalar_metrics`
+- **Computed normalized metrics:** selected metrics in `normalized_scalar_metrics` (per 100 words)
+
+---
+
 ## Relationship Between Metrics
 
 ```
@@ -129,11 +163,15 @@ Reasoning trace phenomenon
 │
 ├── What fraction of details are addressed?        → observation_coverage  (coverage)
 │
+├── What graph structure does reasoning express?   → rationale_graph       (graph)
+│
 ├── How densely does it hedge?                     → uncertainty_markers   (counting)
 │
 ├── Does it explore multiple paths in parallel?    → branchiness           (counting)
 │
-└── Does it catch and fix its own mistakes?        → backtracking          (counting)
+├── Does it catch and fix its own mistakes?        → backtracking          (counting)
+│
+└── How many alternatives are explicitly ruled out? → differential_elimination (counting)
 ```
 
 Note that `uncertainty_language` and `uncertainty_markers` measure the **same underlying phenomenon** at different granularities — binary presence vs. raw occurrence count.  They are designed to complement rather than replace each other.

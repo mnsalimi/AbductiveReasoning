@@ -11,6 +11,35 @@ known facts from the explanatory goal and explicitly addresses each particular
 detail rather than only the high-level scenario.
 """
 
+DATASET_SPECIFIC_NOTES: dict[str, str] = {
+    "medqa": (
+        "Treat the question stem as observation; verify reasoning addresses all salient clinical details."
+    ),
+    "art": (
+        "Verify the chosen hypothesis accounts for details in both observations, not only one."
+    ),
+    "strategyqa": (
+        "Observations are often implicit; assess whether reasoning addresses all key aspects of the question/evidence."
+    ),
+    "copa_guess_effect": (
+        "Treat the premise scenario as observation and check coverage of all relevant details."
+    ),
+    "defeasible_nli": (
+        "Treat the premise as observation and verify reasoning addresses all relevant premise details."
+    ),
+    "goemotion": (
+        "This is classification-oriented; assess whether reasoning accounts for all salient input-text cues."
+    ),
+    "musr": (
+        "Treat scenario text as observation; ensure important narrative details are all addressed."
+    ),
+    "neulr_abductive": (
+        "As in ART, verify both observations are covered by the chosen hypothesis."
+    ),
+}
+
+DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+
 SYSTEM_PROMPT = """\
 You are an expert evaluator of abductive reasoning traces.
 
@@ -52,6 +81,31 @@ Focus on **structural completeness**, not on whether the final answer is
 correct. Even a wrong answer can show full detail coverage if it methodically
 accounts for every stated detail. Conversely, a correct answer can still fail
 this metric if peripheral details are silently skipped.
+
+## Dataset-specific note (current dataset only)
+
+{dataset_specific_note}
+
+## Few-shot demonstrations
+
+{dataset_few_shot_examples}
+
+## Extraction rules
+
+- Set `detected` to true only if the reasoning explicitly addresses all salient observation details.
+- Set `detected` to false when key details are ignored, untested, or only partially addressed.
+- Keep `reasoning` focused on completeness of detail-to-hypothesis matching.
+- Set `evidence` to one direct quote that best supports the decision.
+- Use an empty `evidence` string only when no supporting quote exists for a false decision.
+
+## JSON output format
+
+Return ONLY valid JSON with this structure:
+{
+  "detected": true,
+  "reasoning": "Step-by-step explanation of why detail coverage is present/absent",
+  "evidence": "Direct quote from the text supporting the decision (leave empty if detected is false)"
+}
 """
 
 USER_PROMPT_TEMPLATE = """\

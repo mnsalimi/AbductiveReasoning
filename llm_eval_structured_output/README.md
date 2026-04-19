@@ -26,19 +26,25 @@ llm_eval/
 │   ├── binary.py               ← BinaryMetric class (yes/no + reasoning)
 │   ├── counting.py             ← CountingMetric class (list of examples)
 │   ├── coverage.py             ← CoverageMetric class (per-detail coverage + score)
+│   ├── graph_structure.py      ← Graph metric class (directed rationale graph + scalars)
 │   └── registry.py             ← METRICS dict – add new metrics here
 │
 ├── prompts/
 │   ├── binary/
 │   │   ├── uncertainty_language.py      ← binary: presence of hedging language
+│   │   ├── differential_evaluation.py   ← binary: explicit evaluation/refutation of alternatives
+│   │   ├── evidence_explanation_directionality.py ← binary: evidence → explanation direction awareness
 │   │   └── detail_coverage.py           ← binary: hypothesis covers all observation details
 │   ├── coverage/
 │   │   └── observation_coverage.py      ← coverage: per-detail observation coverage + score
+│   ├── graph_structure/
+│   │   └── rationale_graph.py           ← graph: text-grounded directed rationale graph extraction
 │   └── counting/
 │       ├── branchiness.py               ← counting: parallel hypothesis exploration
 │       ├── backtracking.py              ← counting: explicit self-correction moments
 │       ├── uncertainty_markers.py       ← counting: individual hedging word occurrences
-│       └── prior.py                     ← counting: prior probability / base-rate reasoning
+│       ├── prior.py                     ← counting: prior probability / base-rate reasoning
+│       └── differential_elimination.py  ← counting: explicit elimination of alternatives
 │
 ├── scripts/
 │   ├── generate_latex_slides.py ← generate Beamer .tex comparing one item across 2 checkpoints
@@ -71,17 +77,22 @@ See **[docs/metric_definitions.md](docs/metric_definitions.md)** for full defini
 ### Binary metrics
 The LLM reasons about whether a phenomenon is present (`detected: true/false`) and explains why.  It also quotes the strongest piece of supporting evidence.
 
-**Metrics:** `uncertainty_language`, `detail_coverage`
+**Metrics:** `uncertainty_language`, `detail_coverage`, `differential_evaluation`, `evidence_explanation_directionality`
 
 ### Counting metrics
 The LLM does **not** produce a number.  Instead it returns a list of concrete **examples** (excerpt + explanation) of the phenomenon.  The pipeline derives a count as `len(examples)` for plotting.
 
-**Metrics:** `branchiness`, `backtracking`, `uncertainty_markers`, `prior`
+**Metrics:** `branchiness`, `backtracking`, `uncertainty_markers`, `prior`, `differential_elimination`
 
 ### Coverage metrics
 The LLM extracts an exhaustive list of observation details, marks whether each one is explicitly addressed by the chosen hypothesis, and the pipeline computes a coverage score.
 
 **Metrics:** `observation_coverage`
+
+### Graph metrics
+The LLM extracts a text-grounded directed rationale graph (vertices + edges), then the pipeline computes graph-structure scalar metrics and normalized scalar metrics.
+
+**Metrics:** `rationale_graph`
 
 ## Quick start
 
@@ -92,7 +103,8 @@ pip install -e .
 
 # Set up credentials – add your API key to .env
 # OPENAI_API_KEY=your_key_here
-# OPENAI_BASE_URL=https://api.hyperbolic.xyz/v1   (optional)
+# OPENAI_BASE_URL=https://api.hyperbolic.xyz/v1   (OpenAI-compatible models)
+# GEMINI_BASE_URL=https://api.metisai.ir          (Gemini models, no /openai/v1 suffix)
 
 # Edit config.py to set your model, sampling, and paths
 python main.py
@@ -100,7 +112,11 @@ python main.py
 
 ## LLM output format
 
-The judge LLM is called via the **OpenAI Structured Outputs** API (`client.chat.completions.parse`).  Responses are validated and deserialized directly into Pydantic models — no regex or XML parsing.
+The judge LLM is called via structured-output APIs:
+- **OpenAI-compatible models**: `client.chat.completions.parse`
+- **Gemini models (`gemini*`)**: `google.genai.Client(...).models.generate_content(...)` with `response_schema`
+
+Both paths validate into Pydantic models — no regex or XML parsing.
 
 **Binary metrics** use `BinaryResponse`:
 ```python
@@ -232,17 +248,17 @@ results/
 
 | Variable | Default | Description |
 |---|---|---|
-| `JUDGE_MODEL` | `gpt-5-nano` | LLM used for judging |
+| `JUDGE_MODEL` | `gpt-4o-mini` | LLM used for judging |
 | `REASONING_EFFORT` | `"low"` | Reasoning token budget for GPT-5+ models (`"low"` / `"medium"` / `"high"`). Ignored for older models. |
-| `N_SAMPLES` | `3` | Items per dataset per checkpoint |
-| `MAX_WORKERS` | `5` | Parallel threads |
+| `N_SAMPLES` | `10` | Items per dataset per checkpoint |
+| `MAX_WORKERS` | `1` | Parallel threads |
 | `SAMPLE_CORRECT_RATIO` | `None` | Fraction of correct items in sample. `1.0` = all correct, `0.0` = all incorrect, `None` = pure random. |
 | `RANDOM_SEED` | `42` | Reproducibility seed (used only when no pinned sample file is found) |
 | `RANDOM_SAMPLES_DIR` | `"random_samples"` | Directory of pre-generated sample index files (see [Pinned samples](#pinned-samples-random_samples)). Set to `None` or `""` to always use random sampling. |
-| `ACTIVE_METRICS` | `["prior", "uncertainty_markers", "observation_coverage"]` | Names of metrics to run. Empty list activates **all** registered metrics. |
-| `ACTIVE_DATASETS` | `["medqa", "copa_guess_effect"]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
+| `ACTIVE_METRICS` | `[]` | Names of metrics to run. Empty list activates **all** registered metrics. |
+| `ACTIVE_DATASETS` | `[]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
 | `EXCLUDED_CHECKPOINTS` | `[]` | Checkpoint directory basenames to skip entirely (e.g. `["raw_model", "checkpoint-500"]`). |
-| `CLEAR_PREVIOUS_OUTPUTS` | `False` | Delete existing JSONL logs on start |
+| `CLEAR_PREVIOUS_OUTPUTS` | `True` | Delete existing JSONL logs on start |
 
 ## Pinned samples (`random_samples/`)
 
@@ -253,7 +269,9 @@ random_samples/
 ├── samples_3.json     # [7, 29, 71]
 ├── samples_5.json     # [7, 29, 32, 71, 130]
 ├── samples_10.json    # [7, 14, 18, 29, 32, 71, 87, 95, 124, 130]
-└── samples_50.json    # 50 indices drawn from [1, 130]
+├── samples_50.json    # 50 indices drawn from [1, 130]
+├── samples_100.json   # 100 indices
+└── samples_200.json   # 200 indices
 ```
 
 ### How it works
@@ -266,7 +284,7 @@ When `compute_sampled_pids()` is called it checks `{RANDOM_SAMPLES_DIR}/samples_
 | File found, **no overlap** with dataset | Falls back to seeded random sampling with a warning |
 | File **not found** | Falls back to seeded random sampling (controlled by `RANDOM_SEED`) |
 
-This guarantees that runs with `N_SAMPLES = 3 / 5 / 10 / 50` always evaluate exactly the same problem IDs across experiments, making results directly comparable without relying on seed reproducibility.
+This guarantees that runs with `N_SAMPLES = 3 / 5 / 10 / 50 / 100 / 200` always evaluate exactly the same problem IDs across experiments, making results directly comparable without relying on seed reproducibility.
 
 ### Adding more sizes
 
@@ -308,5 +326,6 @@ The pipeline auto-detects the judge model family and adjusts the API call accord
 |---|---|---|---|
 | GPT-5 and newer (`gpt-5*`) | `developer` | `max_completion_tokens` | `reasoning_effort` |
 | Older / OSS models | `system` | `max_tokens` | `temperature=0.0` |
+| Gemini (`gemini*`) | SDK `system_instruction` | `max_output_tokens` | `response_schema` via `google-genai` |
 
 Detection is name-based: any model matching `gpt-N` where N ≥ 5 uses the modern path. Everything else uses the legacy path. To change the reasoning budget for GPT-5+ models, adjust `REASONING_EFFORT` in `config.py`.

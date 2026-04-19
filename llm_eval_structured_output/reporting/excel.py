@@ -13,13 +13,31 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
 
+def _metric_columns(df: pd.DataFrame) -> list[str]:
+    excluded = {"Checkpoint", "Dataset", "Status", "Word Count"}
+    cols: list[str] = []
+    for c in df.columns:
+        if c in excluded:
+            continue
+        if c.endswith("_analysis") or c.endswith("_examples"):
+            continue
+        if pd.api.types.is_numeric_dtype(df[c]):
+            cols.append(c)
+    return cols
+
+
+def _status_slug(status: str) -> str:
+    normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in status).strip("_")
+    return normalized or "status"
+
+
 def build_excel_workbook(combined: pd.DataFrame, base_dir: str) -> None:
     """
     Create ``checkpoint_comparison.xlsx`` in *base_dir* with one sheet per
     (metric_col × status) combination showing absolute values and delta vs
     checkpoint-0.
     """
-    metric_cols = [c for c in combined.columns if c.endswith("_count")]
+    metric_cols = _metric_columns(combined)
 
     wb = Workbook()
     wb.remove(wb.active)
@@ -27,7 +45,12 @@ def build_excel_workbook(combined: pd.DataFrame, base_dir: str) -> None:
     for col in metric_cols:
         if "Status" in combined.columns:
             for status in combined["Status"].unique():
-                _build_sheet(wb, combined[combined["Status"] == status], col, f"{col[:25]}_{status[:4]}")
+                _build_sheet(
+                    wb,
+                    combined[combined["Status"] == status],
+                    col,
+                    f"{col[:20]}_{_status_slug(str(status))[:10]}",
+                )
         else:
             _build_sheet(wb, combined, col, col[:31])
 

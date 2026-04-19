@@ -13,10 +13,9 @@ import datetime
 from typing import Any
 
 import config
-from data_loader import get_labels, extract_reasoning
+from data_loader import extract_full_input
 from metrics.base import MetricResult
 from metrics.registry import get_active_metrics
-
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -44,25 +43,18 @@ def process_single_item(
     run_id = config.RUN_ID
 
     # ── Item metadata ──────────────────────────────────────────────────────
-    true_label, pred_label = get_labels(item) if isinstance(item, dict) else (None, None)
-    is_correct = str(true_label) == str(pred_label) if (true_label is not None and pred_label is not None) else None
-    status = ("Correct" if is_correct else "Incorrect") if is_correct is not None else "Unknown"
-
-    # ART-specific fields
-    obs1 = item.get("observation_1", "") if isinstance(item, dict) else ""
-    obs2 = item.get("observation_2", "") if isinstance(item, dict) else ""
-    hyp1 = item.get("hypothesis_1", "") if isinstance(item, dict) else ""
-    hyp2 = item.get("hypothesis_2", "") if isinstance(item, dict) else ""
-    question = item.get("question", "") if isinstance(item, dict) else ""
-
-    # MedQA / fallback problem text
-    problem_text = question or f"{obs1} | {obs2}".strip(" |")
-
-    true_text = item.get(f"hypothesis_{true_label}", "") if true_label in (1, 2) and isinstance(item, dict) else ""
-    pred_text = item.get(f"hypothesis_{pred_label}", "") if pred_label in (1, 2) and isinstance(item, dict) else ""
+    # Since there's no ground truth, we don't classify as correct/incorrect
+    status = "No Ground Truth"
 
     # Word count (no regex – just whitespace split)
     word_count = len(reasoning.split()) if reasoning else 0
+
+    raw_question = extract_full_input(item) if isinstance(item, dict) else ""
+
+    # Build context for metrics that need source input info
+    metric_context = {
+        "full_input": raw_question,
+    }
 
     # ── Metric evaluation ─────────────────────────────────────────────────
     active_metrics = get_active_metrics(config.ACTIVE_METRICS)
@@ -75,6 +67,7 @@ def process_single_item(
             problem_id=str(pid),
             checkpoint=str(checkpoint),
             run_id=run_id,
+            context=metric_context,
         )
         metric_results[metric_name] = result
         status_icon = "OK" if not result.error else "FAIL"
@@ -82,6 +75,11 @@ def process_single_item(
             detail = f"count={len(result.examples)}"
         elif metric.metric_type == "coverage":
             detail = f"score={result.score:.2%}  ({sum(1 for e in result.examples if e.get('addressed'))}/{len(result.examples)} details)"
+        elif metric.metric_type == "graph":
+            detail = (
+                f"nodes={sum(1 for e in result.examples if e.get('kind') == 'vertex')}  "
+                f"edges={sum(1 for e in result.examples if e.get('kind') == 'edge')}"
+            )
         else:
             detail = f"detected={result.detected}"
         err_suffix = f"  ERR: {result.error[:80]}" if result.error else ""
@@ -95,23 +93,14 @@ def process_single_item(
     )
 
     # ── Assemble output ───────────────────────────────────────────────────
-    return {
+    output = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
         "run_id": run_id,
         "dataset": dataset_name,
         "checkpoint": checkpoint,
         "pid": pid,
         "status": status,
-        "true_label": true_label,
-        "pred_label": pred_label,
-        "problem_text": problem_text,
-        "question": question,
-        "obs1": obs1,
-        "obs2": obs2,
-        "hyp1": hyp1,
-        "hyp2": hyp2,
-        "true_text": true_text,
-        "pred_text": pred_text,
+        "raw_question": raw_question,
         "reasoning": reasoning,
         "word_count": word_count,        # Full raw item – used by write_debug_logs to emit all source fields
         # regardless of dataset schema (ART, copa_guess_effect, etc.)
@@ -124,9 +113,24 @@ def process_single_item(
                 "examples": r.examples,
                 "example_count": len(r.examples),
                 "score": r.score,
+                "scalar_metrics": r.scalar_metrics,
+                "normalized_scalar_metrics": r.normalized_scalar_metrics,
                 "tokens": r.tokens,   # {input, output, reasoning?, cached_input?}
                 "error": r.error,
             }
             for name, r in metric_results.items()
         },
     }
+    
+    # Debug: Print the output structure
+    # Only print debug if we actually have metrics
+    if output['metrics']:
+        print(f"DEBUG: Output keys: {list(output.keys())}")
+        print(f"DEBUG: Metrics keys: {list(output['metrics'].keys())}")
+        for name, metric_data in output['metrics'].items():
+            print(f"DEBUG: {name} - type: {metric_data['type']}, detected: {metric_data['detected']}, error: {metric_data['error']}")
+    else:
+        print("DEBUG: No metrics in output!")
+        print(f"DEBUG: Full output: {output}")
+    
+    return output

@@ -23,6 +23,19 @@ import config
 matplotlib.use("Agg")
 
 
+def _metric_columns(df: pd.DataFrame) -> list[str]:
+    excluded = {"Checkpoint", "Dataset", "Status", "Word Count"}
+    cols: list[str] = []
+    for c in df.columns:
+        if c in excluded:
+            continue
+        if c.endswith("_analysis") or c.endswith("_examples"):
+            continue
+        if pd.api.types.is_numeric_dtype(df[c]):
+            cols.append(c)
+    return cols
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -47,7 +60,8 @@ def _evolution_plot(df: pd.DataFrame, metric_col: str, base_dir: str, suffix: st
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
     fname = f"evolution_{metric_col}{'_' + suffix if suffix else ''}.png"
-    plt.savefig(os.path.join(base_dir, fname), dpi=150)
+    os.makedirs(os.path.join(base_dir, suffix if suffix else "None"), exist_ok=True)
+    plt.savefig(os.path.join(os.path.join(base_dir, suffix if suffix else "None"), fname), dpi=150)
     plt.close(fig)
 
 
@@ -63,7 +77,7 @@ def build_evolution_plots(combined: pd.DataFrame, base_dir: str) -> None:
     * anything else →  three plots: "correct", "incorrect", and "mix"
                        where "mix" averages over all statuses
     """
-    metric_cols = [c for c in combined.columns if c.endswith("_count")]
+    metric_cols = _metric_columns(combined)
     ratio = config.SAMPLE_CORRECT_RATIO
 
     has_status = "Status" in combined.columns

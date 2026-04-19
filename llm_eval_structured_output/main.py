@@ -41,7 +41,13 @@ from reporting.comparison_logs import write_comparison_logs, COMPARISON_LOG_DIR
 # ---------------------------------------------------------------------------
 
 def _setup_dirs() -> None:
-    for d in (config.BASE_OUTPUT_DIR, config.LOG_DIR, config.UNNORM_DIR, config.NORM_DIR, COMPARISON_LOG_DIR):
+    for d in (
+        config.BASE_OUTPUT_DIR,
+        config.LOG_DIR,
+        config.UNNORM_DIR,
+        config.NORM_DIR,
+        COMPARISON_LOG_DIR
+    ):
         os.makedirs(d, exist_ok=True)
 
 
@@ -86,8 +92,15 @@ def run() -> None:
 
     # ── 2. API connectivity check ─────────────────────────────────────────
     if not llm_client.test_connection():
-        answer = input("\n[!] API unreachable. Continue anyway? (yes/no): ").strip().lower()
-        if answer not in ("yes", "y"):
+        if config.CONTINUE_ON_API_FAILURE:
+            print("[WARN] API unreachable; continuing because CONTINUE_ON_API_FAILURE is set.")
+        elif sys.stdin.isatty():
+            answer = input("\n[!] API unreachable. Continue anyway? (yes/no): ").strip().lower()
+            if answer not in ("yes", "y"):
+                sys.exit(1)
+        else:
+            print("[ERROR] API unreachable and no TTY available for prompt.")
+            print("        Set CONTINUE_ON_API_FAILURE=1 to force continuation.")
             sys.exit(1)
 
     # ── 3. Pre-compute stable shared sample set ───────────────────────────
@@ -148,10 +161,14 @@ def run() -> None:
             futures = {pool.submit(process_single_item, t): t for t in tasks}
             for future in as_completed(futures):
                 try:
-                    ckpt_results.append(future.result())
+                    result = future.result()
+                    ckpt_results.append(result)
                 except Exception as exc:
                     task = futures[future]
                     print(f"  [ERROR] Task {task[0]}/{task[2]}: {exc}")
+                    print(f"  ERROR TYPE: {type(exc)}")
+                    import traceback
+                    print(f"  TRACEBACK: {traceback.format_exc()}")
 
         all_results.extend(ckpt_results)
 

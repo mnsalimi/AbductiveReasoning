@@ -15,7 +15,6 @@ import pandas as pd
 
 import config
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -31,6 +30,11 @@ def _ensure(*dirs: str) -> None:
     import os
     for d in dirs:
         os.makedirs(d, exist_ok=True)
+
+
+def _raw_question(rec: dict[str, Any]) -> str:
+    """Return the normalized raw-question value with backward-compatible fallback."""
+    return rec.get("raw_question", rec.get("full_input", ""))
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +67,7 @@ def save_checkpoint_csvs(
             "Dataset": row["dataset"],
             "Status": row["status"],
             "Problem ID": row["pid"],
+            "raw_question": _raw_question(row),
             "Word Count": wc,
         }
 
@@ -76,6 +81,8 @@ def save_checkpoint_csvs(
             detected = mdata.get("detected", False)
             analysis = mdata.get("reasoning", "")
             score = mdata.get("score")  # float | None
+            scalar_metrics = mdata.get("scalar_metrics") or {}
+            normalized_scalar_metrics = mdata.get("normalized_scalar_metrics") or {}
 
             # For coverage metrics, detail_str lists each observation detail + addressed flag
             if mtype == "coverage":
@@ -102,6 +109,14 @@ def save_checkpoint_csvs(
             if score is not None:
                 norm_item[f"{mname}_score"] = score
 
+            for scalar_name, scalar_value in scalar_metrics.items():
+                unnorm_item[f"{mname}__{scalar_name}"] = scalar_value
+
+            for scalar_name, scalar_value in scalar_metrics.items():
+                norm_item[f"{mname}__{scalar_name}"] = scalar_value * norm_factor
+            for scalar_name, scalar_value in normalized_scalar_metrics.items():
+                norm_item[f"{mname}__{scalar_name}"] = scalar_value
+
         unnorm_rows.append(unnorm_item)
         norm_rows.append(norm_item)
 
@@ -113,9 +128,20 @@ def save_checkpoint_csvs(
     score_cols = [f"{m}_score" for m in active_metric_names if f"{m}_score" in unnorm_df.columns]
 
     def _summarise(df: pd.DataFrame) -> pd.DataFrame:
+        # Check if required columns exist
+        if "Dataset" not in df.columns:
+            print("ERROR: Dataset column missing from DataFrame")
+            print("Available columns:", df.columns.tolist())
+            print("First few rows:")
+            print(df.head())
+            raise KeyError("Dataset column missing")
+        
+        scalar_cols = [c for c in df.columns if "__" in c]
+
         agg: dict[str, str] = {c: "mean" for c in count_cols if c in df.columns}
         agg.update({c: "mean" for c in detected_cols if c in df.columns})
         agg.update({c: "mean" for c in score_cols if c in df.columns})
+        agg.update({c: "mean" for c in scalar_cols if c in df.columns})
         if "Word Count" in df.columns:
             agg["Word Count"] = "mean"
         summary = df.groupby(["Dataset", "Status"]).agg(agg).reset_index()
@@ -177,6 +203,7 @@ def write_debug_logs(all_results: list[dict]) -> None:
             # ── JSONL record ───────────────────────────────────────────────
             jsonl_obj: dict = {
                 **raw_item,          # all source fields first
+                "raw_question": _raw_question(rec),
                 "checkpoint":  rec.get("checkpoint"),
                 "dataset":     rec.get("dataset"),
                 "problem_id":  rec.get("pid"),
@@ -188,6 +215,8 @@ def write_debug_logs(all_results: list[dict]) -> None:
                         "example_count": mdata.get("example_count"),
                         "analysis":      mdata.get("reasoning"),
                         "examples":      mdata.get("examples", []),
+                        "scalar_metrics": mdata.get("scalar_metrics") or {},
+                        "normalized_scalar_metrics": mdata.get("normalized_scalar_metrics") or {},
                         "tokens":        mdata.get("tokens") or {},
                         "error":         mdata.get("error") or "",
                     }
@@ -203,6 +232,7 @@ def write_debug_logs(all_results: list[dict]) -> None:
                 "problem_id": rec.get("pid"),
                 "status":     status,
                 **raw_item,          # all source fields
+                "raw_question": _raw_question(rec),
                 "word_count": rec.get("word_count"),
             }
             for mname, mdata in (rec.get("metrics") or {}).items():
@@ -212,6 +242,8 @@ def write_debug_logs(all_results: list[dict]) -> None:
                 row[f"{mname}_example_count"]    = mdata.get("example_count")
                 row[f"{mname}_analysis"]         = mdata.get("reasoning")
                 row[f"{mname}_examples"]         = _safe_json(mdata.get("examples", []))
+                row[f"{mname}_scalar_metrics"]   = _safe_json(mdata.get("scalar_metrics") or {})
+                row[f"{mname}_normalized_scalar_metrics"] = _safe_json(mdata.get("normalized_scalar_metrics") or {})
                 row[f"{mname}_tokens_input"]     = tok.get("input")
                 row[f"{mname}_tokens_output"]    = tok.get("output")
                 # Only written when the model separates reasoning tokens
@@ -266,7 +298,7 @@ def write_config_snapshot(
         # ── Judge model ───────────────────────────────────────────────────
         "judge_model": config.JUDGE_MODEL,
         "reasoning_effort": config.REASONING_EFFORT,
-        "api_base_url": config.OPENAI_BASE_URL,
+        "api_base_url": config.GEMINI_BASE_URL if config.JUDGE_MODEL.lower().startswith("gemini") else config.OPENAI_BASE_URL,
         "api_timeout_s": config.API_TIMEOUT,
         "api_max_retries": config.API_MAX_RETRIES,
         # ── Sampling ─────────────────────────────────────────────────────

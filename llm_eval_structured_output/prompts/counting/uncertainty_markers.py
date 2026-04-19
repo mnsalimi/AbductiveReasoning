@@ -9,6 +9,35 @@ word or phrase* as a separate example.  The count of examples is then used as a
 quantitative measure of how densely hedged the reasoning trace is.
 """
 
+DATASET_SPECIFIC_NOTES: dict[str, str] = {
+    "medqa": (
+        "Extract markers from reasoning only, not from the question stem's given medical facts."
+    ),
+    "art": (
+        "Focus on uncertainty while reasoning about which hypothesis better explains observations."
+    ),
+    "strategyqa": (
+        "Look for uncertainty in multi-step reasoning and evidence-to-conclusion transitions."
+    ),
+    "copa_guess_effect": (
+        "Focus on uncertainty in causal reasoning and option comparison."
+    ),
+    "defeasible_nli": (
+        "Look for uncertainty indicating potentially defeasible or non-certain inference relations."
+    ),
+    "goemotion": (
+        "Look for uncertainty in label selection; avoid counting task-domain terms that are not hedging."
+    ),
+    "musr": (
+        "Look for uncertainty in narrative interpretation and conclusion drawing."
+    ),
+    "neulr_abductive": (
+        "Focus on uncertainty while weighing competing abductive explanations."
+    ),
+}
+
+DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+
 SYSTEM_PROMPT = """\
 You are an expert linguistic analyst evaluating AI-generated reasoning traces.
 
@@ -66,7 +95,7 @@ Do **NOT** extract the following linguistic constructs, as they do not represent
 
 - Extract **each individual marker occurrence** as a separate example, even if
   the same word appears multiple times. Every occurrence is its own entry.
-- The `excerpt` must be a **short, direct quote** from the text — ideally the
+- The `text` must be a **short, direct quote** from the text — ideally the
   single word or short phrase itself, plus just enough surrounding context
   (≤ 15 words) to make it readable.
 - The `explanation` must name the marker category (from the list above) and
@@ -74,6 +103,27 @@ Do **NOT** extract the following linguistic constructs, as they do not represent
 - If the same sentence contains two distinct markers, extract them as two
   separate entries.
 - Do **not** paraphrase or alter the quoted text.
+
+## Dataset-specific note (current dataset only)
+
+{dataset_specific_note}
+
+## Few-shot demonstrations
+
+{dataset_few_shot_examples}
+
+## JSON output format
+
+Return ONLY valid JSON with this structure:
+{
+  "overall_analysis": "Brief analysis of uncertainty markers density in this reasoning trace",
+  "examples": [
+    {
+      "text": "Quote of the uncertainty marker from the reasoning trace",
+      "explanation": "Category and meaning of this uncertainty marker"
+    }
+  ]
+}
 """
 
 USER_PROMPT_TEMPLATE = """\

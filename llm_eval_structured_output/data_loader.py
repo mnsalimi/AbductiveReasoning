@@ -35,6 +35,7 @@ _CKPT_PATTERNS = [
     "raw_model",
     "checkpoints/checkpoint-*",
     "checkpoints/raw_model",
+    "checkpoints/*",
     "evaluation-llm/checkpoints/checkpoint-*",
     "evaluation-llm/checkpoints/raw_model",
     "../checkpoint-*",
@@ -49,17 +50,45 @@ def find_checkpoint_dirs() -> list[str]:
     ``config.EXCLUDED_CHECKPOINTS`` are silently dropped.
     """
     found: list[str] = []
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     for pattern in _CKPT_PATTERNS:
+        # Search relative to CWD and to the package directory so runs from
+        # repo root or from this folder both work.
         found.extend(glob.glob(pattern))
+        if not os.path.isabs(pattern):
+            found.extend(glob.glob(os.path.join(base_dir, pattern)))
 
     excluded = {e.strip() for e in (config.EXCLUDED_CHECKPOINTS or [])}
+    canonical_paths: dict[str, str] = {}
+    for path in found:
+        abs_path = os.path.abspath(path)
+        norm_path = os.path.normpath(abs_path)
+        key = os.path.normcase(norm_path)
+        canonical_paths[key] = norm_path
+
     result: list[str] = []
-    for path in sorted(set(found)):
-        basename = os.path.basename(os.path.normpath(path))
+    for path in sorted(canonical_paths.values()):
+        basename = os.path.basename(path)
         if basename in excluded:
             print(f"[INFO] Skipping excluded checkpoint: {path}")
             continue
         result.append(path)
+
+    if len(result) > 2 and os.stdin.isatty():
+        print("\n[INFO] More than 2 checkpoints found.")
+        print("Select one checkpoint to evaluate:")
+        for idx, path in enumerate(result, start=1):
+            print(f"  {idx}. {path}")
+
+        while True:
+            choice = input("Enter checkpoint number: ").strip()
+            if choice.isdigit():
+                i = int(choice)
+                if 1 <= i <= len(result):
+                    result = [result[i - 1]]
+                    break
+            print("[WARN] Invalid selection. Please enter a valid number.")
+
     return result
 
 
@@ -135,6 +164,9 @@ def load_items(path: str) -> list[Item]:
     return items
 
 
+# get_labels function removed since there's no ground truth
+
+
 def extract_reasoning(item: Item) -> str | None:
     """
     Pull the reasoning text from an item regardless of the schema variant.
@@ -152,7 +184,40 @@ def extract_reasoning(item: Item) -> str | None:
     r = item.get("reasoning")
     if r:
         return r
+    # Schema variant 3: Extract reasoning from full_response
+    full_response = item.get("full_response", "")
+    if full_response:
+        # Try to extract reasoning text between <reasoning> tags
+        import re
+        reasoning_match = re.search(r'<reasoning>(.*?)</reasoning>', full_response, re.DOTALL)
+        if reasoning_match:
+            return reasoning_match.group(1).strip()
     return None
+
+
+def _coerce_text(value: Any) -> str:
+    """Convert a value into a display-safe text block (possibly empty)."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (dict, list)):
+        try:
+            return json.dumps(value, ensure_ascii=False).strip()
+        except Exception:
+            return str(value).strip()
+    return str(value).strip()
+
+
+def extract_full_input(item: Item) -> str:
+    """
+    Extract source question/input text from ``item["user_input"]``.
+
+    If missing, return an empty string.
+    """
+    if not isinstance(item, dict):
+        return ""
+    return _coerce_text(item.get("user_input"))
 
 
 def _is_placeholder(text: str) -> bool:
@@ -160,11 +225,7 @@ def _is_placeholder(text: str) -> bool:
     return "here you write your chain-of-thought" in text.lower()
 
 
-def get_labels(item: Item) -> tuple[Any, Any]:
-    """Return (true_label, predicted_label), supporting ART and MedQA schemas."""
-    t = item.get("true_label") or item.get("true_answer")
-    p = item.get("predicted_label") or item.get("predicted_answer")
-    return t, p
+# get_labels function removed since there's no ground truth
 
 
 def build_pid_map(items: list[Item]) -> PidMap:
@@ -262,12 +323,9 @@ def compute_sampled_pids(
                 continue
 
             valid_pids = set(pid_map)
+            # Since there's no ground truth, all items are considered valid
             correct_pids: set = set()
             incorrect_pids: set = set()
-            for pid, (_r, itm) in pid_map.items():
-                t, p = get_labels(itm)
-                if t is not None and p is not None:
-                    (correct_pids if str(t) == str(p) else incorrect_pids).add(pid)
 
             dataset_ckpt_count[ds] = dataset_ckpt_count.get(ds, 0) + 1
 

@@ -21,11 +21,13 @@ A score of 1.0 means the chosen hypothesis accounts for every observation detail
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 import llm_client
 from metrics.base import BaseMetric, MetricResult
-
+from prompts import render_system_prompt
 
 # ---------------------------------------------------------------------------
 # Pydantic response schema
@@ -114,6 +116,7 @@ class CoverageMetric(BaseMetric):
         problem_id: str = "N/A",
         checkpoint: str = "N/A",
         run_id: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> MetricResult:
         if not isinstance(text, str) or not text.strip():
             return MetricResult(
@@ -121,13 +124,23 @@ class CoverageMetric(BaseMetric):
                 error="Empty or invalid input text.",
             )
 
-        trimmed = text[:15_000] + "\n…(truncated)" if len(text) > 15_000 else text
+        full_input = ""
+        if context and isinstance(context, dict):
+            value = context.get("full_input")
+            if value is not None:
+                full_input = value if isinstance(value, str) else str(value)
 
-        user_prompt = self._user_prompt_template.format(text=trimmed, dataset=dataset)
+        user_prompt = (
+            self._user_prompt_template
+            .replace("{text}", text)
+            .replace("{dataset}", dataset)
+            .replace("{full_input}", full_input)
+        )
 
         payload = llm_client.ask_llm(
-            system_prompt=self._system_prompt,
+            system_prompt=render_system_prompt(self._system_prompt, self.name, dataset),
             user_prompt=user_prompt,
+            source_full_input=full_input,
             response_schema=ObservationCoverageResponse,
             dataset=dataset,
             problem_id=problem_id,

@@ -12,11 +12,13 @@ Example metric: "Uncertainty Language"
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 import llm_client
 from metrics.base import BaseMetric, MetricResult
-
+from prompts import render_system_prompt
 
 # ---------------------------------------------------------------------------
 # Pydantic response schema for ALL binary metrics
@@ -87,6 +89,7 @@ class BinaryMetric(BaseMetric):
         problem_id: str = "N/A",
         checkpoint: str = "N/A",
         run_id: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> MetricResult:
         if not isinstance(text, str) or not text.strip():
             return MetricResult(
@@ -94,12 +97,13 @@ class BinaryMetric(BaseMetric):
                 error="Empty or invalid input text.",
             )
 
-        # Truncate very long traces to stay within context limits
-        trimmed = text[:15_000] + "\n…(truncated)" if len(text) > 15_000 else text
+        user_prompt = (
+            self._user_prompt_template
+            .replace("{text}", text)
+            .replace("{dataset}", dataset)
+        )
 
-        user_prompt = self._user_prompt_template.format(text=trimmed, dataset=dataset)
-
-        system_prompt = self._system_prompt
+        system_prompt = render_system_prompt(self._system_prompt, self.name, dataset)
 
         payload = llm_client.ask_llm(
             system_prompt=system_prompt,
@@ -127,6 +131,3 @@ class BinaryMetric(BaseMetric):
             tokens=tokens,
             raw=payload,
         )
-
-
-

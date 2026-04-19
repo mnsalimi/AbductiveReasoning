@@ -57,6 +57,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
+from data_loader import extract_full_input  # noqa: E402
 
 # ============================================================
 # LaTeX escaping
@@ -222,117 +223,14 @@ def _parse_medqa_options(question_str: str) -> tuple[str, dict | None]:
 
 def _format_question_slide(item: dict, pid: Any, dataset: str) -> str:
     """Return the LaTeX body content for the Question slide."""
-    lines: list[str] = []
-
-    ds_lower = dataset.lower()
-
-    # ── ART-style ─────────────────────────────────────────────────────────
-    if "observation_1" in item:
-        obs1 = wrap(item.get("observation_1", ""))
-        obs2 = wrap(item.get("observation_2", ""))
-        h1   = wrap(item.get("hypothesis_1", ""))
-        h2   = wrap(item.get("hypothesis_2", ""))
-        true_lbl = esc(str(item.get("true_label", item.get("true_answer", "?"))))
-        pred_lbl = esc(str(item.get("predicted_label", item.get("predicted_answer", "?"))))
-
-        lines += [
-            r"\textbf{Observations:}\\[4pt]",
-            r"\begin{itemize}",
-            f"  \\item {obs1}",
-            f"  \\item {obs2}",
-            r"\end{itemize}",
-            r"\vspace{6pt}\textbf{Hypotheses:}\\[4pt]",
-            r"\begin{enumerate}",
-            f"  \\item {h1}",
-            f"  \\item {h2}",
-            r"\end{enumerate}",
-            r"\vspace{6pt}",
-            f"\\textbf{{True answer:}} Hypothesis {true_lbl}"
-            + (r" \quad" + f"\\textbf{{Model answer:}} Hypothesis {pred_lbl}"
-               + (r" \quad \cmark" if true_lbl == pred_lbl else r" \quad \xmark")),
+    raw_question = item.get("raw_question", "") or extract_full_input(item)
+    full_input = wrap(raw_question)
+    return "\n    ".join(
+        [
+            r"\textbf{Raw question:}\\[4pt]",
+            rf"\small {full_input}",
         ]
-
-    # ── COPA-style ─────────────────────────────────────────────────────────
-    elif "premise" in item and "choice1" in item:
-        premise = wrap(item.get("premise", ""))
-        c1 = wrap(item.get("choice1", ""))
-        c2 = wrap(item.get("choice2", ""))
-        true_lbl = esc(str(item.get("true_label", "?")))
-        pred_lbl = esc(str(item.get("predicted_label", "?")))
-        question = wrap(item.get("question", "What happened as a result?"))
-
-        lines += [
-            rf"\textbf{{Premise:}} {premise}\\[4pt]",
-            rf"\textbf{{Question:}} {question}\\[4pt]",
-            r"\begin{enumerate}",
-            f"  \\item {c1}",
-            f"  \\item {c2}",
-            r"\end{enumerate}",
-            r"\vspace{6pt}",
-            f"\\textbf{{True:}} {esc(str(int(true_lbl)+1))}"
-            + r" \quad "
-            + f"\\textbf{{Predicted:}} {esc(str(int(pred_lbl)+1))}"
-            + (r" \quad \cmark" if true_lbl == pred_lbl else r" \quad \xmark"),
-        ]
-
-    # ── GoEmotion-style ────────────────────────────────────────────────────
-    elif "text" in item and "true_emotions" in item:
-        text = wrap(item.get("text", ""))
-        true_e = esc(", ".join(item.get("true_emotions", [])))
-        pred_e = esc(", ".join(item.get("predicted_emotions", [])))
-        match = item.get("exact_match", str(item.get("correct", "?")))
-
-        lines += [
-            rf"\textbf{{Text:}} {text}\\[8pt]",
-            rf"\textbf{{True emotions:}} {true_e}\\[4pt]",
-            rf"\textbf{{Predicted emotions:}} {pred_e}\\[4pt]",
-            r"\textbf{Exact match:} " + (r"\cmark" if match else r"\xmark"),
-        ]
-
-    # ── MedQA / musr_murder / neulr / strategyqa (question + answer) ──────
-    elif "question" in item:
-        q_raw = item.get("question", "")
-        true_ans = esc(str(item.get("true_answer", item.get("true_label", "?"))))
-        pred_ans = esc(str(item.get("predicted_answer", item.get("predicted_label", "?"))))
-
-        stem, opts = _parse_medqa_options(q_raw)
-        stem_tex = wrap(stem)
-
-        lines.append(rf"\textbf{{Question:}}\\[4pt]")
-        lines.append(rf"\small {stem_tex}\\[6pt]")
-
-        if opts:
-            lines.append(r"\vspace{2pt}\textbf{Options:}\\[2pt]")
-            lines.append(r"\begin{description}")
-            for key in sorted(opts.keys()):
-                lines.append(f"  \\item[{esc(key)}.] {wrap(opts[key])}")
-            lines.append(r"\end{description}")
-            lines.append(r"\vspace{6pt}")
-            lines.append(
-                f"\\textbf{{True:}} {true_ans}"
-                + r" \quad "
-                + f"\\textbf{{Predicted:}} {pred_ans}"
-                + (r" \quad \cmark" if true_ans == pred_ans else r" \quad \xmark")
-            )
-        else:
-            lines.append(r"\vspace{6pt}")
-            lines.append(
-                f"\\textbf{{True answer:}} {true_ans}"
-                + r" \quad "
-                + f"\\textbf{{Predicted:}} {pred_ans}"
-                + (r" \quad \cmark" if true_ans == pred_ans else r" \quad \xmark")
-            )
-
-    # ── Generic fallback ───────────────────────────────────────────────────
-    else:
-        skip = {"reasoning", "finetuned", "correct", "exact_match", "_seq_id", "problem_id",
-                "sample_id", "qid"}
-        for key, val in item.items():
-            if key in skip:
-                continue
-            lines.append(rf"\textbf{{{esc(key)}:}} {wrap(str(val))}\\[4pt]")
-
-    return "\n    ".join(lines)
+    )
 
 
 # ============================================================

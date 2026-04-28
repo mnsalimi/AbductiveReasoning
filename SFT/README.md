@@ -61,30 +61,30 @@ This keeps output formatting fully aligned with your evaluation scripts.
 - Learning rate: `1e-5`
 - Batch size: `4`
 - Gradient accumulation: `1`
-- Epochs: `1` (test default, same spirit as current GRPO notebook defaults)
+- Epochs: `1` (test default)
+- `NUM_SAMPLES = 50` (currently capped for quick testing, set to `None` in the script to train on the full dataset)
+- Uses `DataCollatorForCompletionOnlyLM` to only calculate loss on the assistant's generation, masking out the system and user prompts.
 
 All key constants are at the top of `train_abductive_sft.py`.
 
 ## How to run training
 
-From repository root:
+From the repository root:
 
 ```bash
-cd /home/runner/work/SFT-abduction-training/SFT-abduction-training/SFT
+cd SFT
 python train_abductive_sft.py
 ```
 
 Outputs are saved under:
 
-- `SFT/results/<run_name>/checkpoint/`
-- final model: `SFT/results/<run_name>/checkpoint/final_model`
+- `results/<run_name>/` (checkpoints, metrics, and logs)
 
 ## How to run `visualize.ipynb` for SFT results
 
-From repository root:
+From the `SFT` directory:
 
 ```bash
-cd /home/runner/work/SFT-abduction-training/SFT-abduction-training/SFT
 jupyter notebook visualize.ipynb
 ```
 

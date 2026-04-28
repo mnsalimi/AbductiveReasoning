@@ -354,13 +354,23 @@ def load_and_prepare_data(tokenizer) -> tuple[Dataset, Dataset]:
         # Since our datasets contain no written rationales, we use a minimal placeholder
         # inside <think> so the model learns the tag format while still being trained on
         # the correct answer. Datasets that DO carry a 'rationale' field will use it directly.
+        # Parse the raw ground_truth into the canonical form that extract_prediction also returns,
+        # so the training target is consistent with how the model will be evaluated.
+        parsed_gt = parse_ground_truth(example["ground_truth"], example["dataset_name"])
+        # Convert to a plain string for the <answer> tag.
+        # Sets (UniADILR) become sorted comma-separated numbers to match the system prompt format.
+        if isinstance(parsed_gt, set):
+            gt_for_answer = ", ".join(str(n) for n in sorted(parsed_gt))
+        else:
+            gt_for_answer = str(parsed_gt) if not isinstance(parsed_gt, str) else parsed_gt
+
         rationale = example.get("rationale") or example.get("explanation") or example.get("proof_text")
         if rationale:
             think_content = str(rationale).strip()
         else:
-            think_content = f"Based on careful analysis of the question, the answer is {example['ground_truth']}."
+            think_content = f"Based on careful analysis of the question, the answer is {gt_for_answer}."
 
-        assistant_content = f"<think>\n{think_content}\n</think>\n<answer>{example['ground_truth']}</answer>"
+        assistant_content = f"<think>\n{think_content}\n</think>\n<answer>{gt_for_answer}</answer>"
 
         messages = [
             {"role": "system", "content": example["prompt"][0]["content"]},
@@ -383,11 +393,14 @@ def load_and_prepare_data(tokenizer) -> tuple[Dataset, Dataset]:
             )
             raise
 
-        return {**example, "text": text}
+        return {**example, "text": text, "target_content": assistant_content}
 
     logging.info(f"[DATA] Building text rows for {len(train_transformed)} train examples (applying chat template)...")
     train_ds = Dataset.from_list(train_transformed).map(build_text_row)
     logging.info(f"[DATA] Train dataset ready: {len(train_ds)} rows")
+    if len(train_ds) > 0:
+        logging.info("📝 --- SAMPLE FORMATTED TRAINING TEXT (First 1500 chars) ---")
+        logging.info(train_ds[0]["text"][:1500] + "\n---------------------------------------------------------")
 
     logging.info(f"[DATA] Building text rows for {len(val_transformed)} val examples (applying chat template)...")
     val_ds = Dataset.from_list(val_transformed).map(build_text_row)
@@ -747,11 +760,11 @@ def shutdown_evaluation_worker() -> None:
 
 class SFTTrainingLogCallback(TrainerCallback):
     """
-    Records per-step training losses to training_log.json.
-    SFT equivalent of the GRPO reward function's training log.
+    Records per-step training losses and samples of trainer data to training_log.json.
     """
 
-    def __init__(self, output_path: str, log_every: int = LOG_TRAIN_EVERY) -> None:
+    def __init__(self, train_ds: Dataset, output_path: str, log_every: int = LOG_TRAIN_EVERY) -> None:
+        self.train_ds = train_ds
         self.output_path = output_path
         self.log_every = log_every
         self.training_log: List[Dict[str, Any]] = []
@@ -767,6 +780,16 @@ class SFTTrainingLogCallback(TrainerCallback):
             "loss": loss,
             "epoch": state.epoch,
         }
+
+        # Pull EXACTLY the pre-built assistant target block from our original train_ds
+        # (SFTTrainer internally tokenizes and drops string columns, so we keep a ref to
+        #  the original dataset which still has 'target_content'.)
+        try:
+            idx = (state.global_step - 1) % len(self.train_ds)
+            entry["trained_on_sample"] = self.train_ds[idx]["target_content"]
+        except Exception as e:
+            logging.warning(f"[TRAIN LOG] Could not fetch target_content at step {state.global_step}: {e}")
+
         self.training_log.append(entry)
 
         if len(self.training_log) % self.log_every == 0:
@@ -880,7 +903,13 @@ class EnhancedEpochCallback(TrainerCallback):
                     else:
                         old_padding_side = tokenizer.padding_side
                         tokenizer.padding_side = "left"
-                        batch_encodings = tokenizer(batch, return_tensors="pt", padding=True).to(model.device)
+                        batch_encodings = tokenizer(
+                            batch,
+                            return_tensors="pt",
+                            padding=True,
+                            truncation=True,
+                            max_length=MAX_PROMPT_LENGTH,
+                        ).to(model.device)
                         outputs = model.generate(
                             **batch_encodings,
                             do_sample=True,
@@ -920,6 +949,15 @@ class EnhancedEpochCallback(TrainerCallback):
 
             if val_rewards:
                 avg_val_reward = sum(val_rewards) / len(val_rewards)
+                
+                # 🔍 --- SHOW ONE SAMPLE PREDICTION LOG ---
+                if validation_log:
+                    sample = validation_log[0]
+                    print(f"\n[EVAL SAMPLE] Dataset: {sample.get('dataset_name')} | Reward: {sample.get('reward')}")
+                    print(f"[EVAL TRUTH]:  {sample.get('ground_truth')}")
+                    print(f"[EVAL PREDICT]:{sample.get('predicted')}")
+                    print(f"[EVAL EXTRACTION / COMPLETION]:\n{sample.get('completion')[:800]}...\n------------------")
+
                 print(f"   📊 Validation reward: {avg_val_reward:.4f} (n={len(val_rewards)})")
 
                 # Use float epoch key to avoid overwriting mid-epoch evaluations
@@ -1198,9 +1236,15 @@ def main() -> None:
         dataset_text_field="text",
         dataset_num_proc=1,
         packing=False,
+        max_steps=-1,
+        # --- FIX for Unsloth + transformers v4.57+ compatibility ---
+        # Prevents the new default behavior that scales loss in-place (loss *= factor)
+        # which breaks with Unsloth's fused loss tensor and can turn it into a Python int.
+        average_tokens_across_devices=False,
     )
 
     training_log_callback = SFTTrainingLogCallback(
+        train_ds=train_ds,
         output_path=os.path.join(results_dir, TRAINING_LOG_PATH),
         log_every=LOG_TRAIN_EVERY,
     )

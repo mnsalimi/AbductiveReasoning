@@ -14,7 +14,7 @@ import logging
 import multiprocessing
 import queue
 import random
-import reZ
+import re
 import signal
 import subprocess
 import threading

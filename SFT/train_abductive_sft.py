@@ -14,7 +14,7 @@ import logging
 import multiprocessing
 import queue
 import random
-import re
+import reZ
 import signal
 import subprocess
 import threading
@@ -212,6 +212,7 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
     dataset_name = example.get("datasetName", "")
     rule_test_input = None
     rule_train_examples = None
+    rationale = example.get("rationale")
 
     if dataset_name == "UniADILR":
         system_prompt, user_prompt = create_uniadilr_prompt(example)
@@ -270,7 +271,9 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+    
 
+    
     return {
         "prompt": prompt,
         "record_id": record_id,
@@ -279,6 +282,8 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
         "dataset_name": dataset_name,
         "rule_test_input": rule_test_input,
         "rule_train_examples": rule_train_examples,
+        # Forward rationale fields so build_text_row can use them as <think> content.
+        "rationale": rationale
     }
 
 
@@ -364,7 +369,7 @@ def load_and_prepare_data(tokenizer) -> tuple[Dataset, Dataset]:
         else:
             gt_for_answer = str(parsed_gt) if not isinstance(parsed_gt, str) else parsed_gt
 
-        rationale = example.get("rationale") or example.get("explanation") or example.get("proof_text")
+        rationale = example.get("rationale")
         if rationale:
             think_content = str(rationale).strip()
         else:

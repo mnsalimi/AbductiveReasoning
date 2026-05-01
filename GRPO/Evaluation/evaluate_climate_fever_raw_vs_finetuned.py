@@ -202,17 +202,17 @@ def load_finetuned_model(checkpoint_path, device):
 
 
 SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
-    You are an expert climate scientist and professional fact-checker. Your task is to determine whether a set of provided evidences supports, refutes, or is insufficient to evaluate a specific claim.
+    You are an expert climate scientist and professional fact-checker. Your task is to determine whether a set of provided evidences supports, refutes, disputed or is insufficient to evaluate a specific claim.
 
     You will be provided with:
     1. A specific Claim
     2. A list of Evidences
 
-    Your goal is to decide whether the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO, and to justify that decision by citing specific parts of the evidence.
+    Your goal is to decide whether the Evidence SUPPORTS or REFUTES or DISPUTED the Claim, or if there is NOT ENOUGH INFO, and to justify that decision by citing specific parts of the evidence.
 
     ## Instructions:
     1. Carefully read the Claim and all provided Evidences
-    2. Determine if the Evidence SUPPORTS or REFUTES the Claim, or if there is NOT ENOUGH INFO
+    2. Determine if the Evidence SUPPORTS or REFUTES or DISPUTED the Claim, or if there is NOT ENOUGH INFO
     3. Think step by step about how the specific parts of the evidence relate to the claim
     4. Output the final label
     5. Think step by step.
@@ -225,10 +225,10 @@ SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
     </think>
 
     <answer>
-    [Output exactly one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO]
+    [Output exactly one of these four options: SUPPORTS, REFUTES, DISPUTED, NOT ENOUGH INFO]
     </answer>
 
-    CRITICAL: The answer section must contain ONLY one of these three options: SUPPORTS, REFUTES, NOT ENOUGH INFO. Do not include any other text.
+    CRITICAL: The answer section must contain ONLY one of these four options: SUPPORTS, REFUTES, DISPUTED, NOT ENOUGH INFO. Do not include any other text.
 """).strip()
 
 def create_climate_fever_prompt(example: dict):
@@ -250,7 +250,7 @@ def create_climate_fever_prompt(example: dict):
         Evidence:
         {evidence_text}
 
-        Does the provided evidence SUPPORT, REFUTE, or provide NOT ENOUGH INFO for the claim?
+        Does the provided evidence SUPPORT, REFUTE, DISPUTED or provide NOT ENOUGH INFO for the claim?
     """).strip()
 
     return system_prompt, user_prompt

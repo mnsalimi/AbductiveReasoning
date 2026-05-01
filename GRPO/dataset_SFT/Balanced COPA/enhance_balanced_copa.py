@@ -3,7 +3,7 @@
 Generate rationale-enhanced Balanced COPA cause-only JSON files using OpenRouter.
 
 Usage:
-  for linux:
+  for linux/mac:
   export OPENROUTER_API_KEY="your_openrouter_key"
 
   for windows:
@@ -17,8 +17,8 @@ Usage:
     --resume
 
 Outputs:
-  ./enhanced_copa/balanced_copa_train_enhanced.json
-  ./enhanced_copa/balanced_copa_val_enhanced.json
+  ./balanced_copa_train_enhanced.json
+  ./balanced_copa_val_enhanced.json
 
 Each output sample keeps the original fields and adds:
   "rationale": "...inner text from <think>...</think>..."

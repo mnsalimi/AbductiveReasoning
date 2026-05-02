@@ -132,7 +132,8 @@
     ],
     "index": 87,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This mapping is applied independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For instance, in Example 1, 'Z' maps to 'A' and 'i' maps to 'r', resulting in 'Arlmrhn'. The rule consistently accounts for all examples by reversing the position of each character within its respective case-sensitive alphabet."
   },
   {
     "train": {
@@ -267,7 +268,8 @@
     ],
     "index": 89,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 3\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 3\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +3. Each alphabetic character in the input string is shifted three positions forward in the alphabet, wrapping around from 'z' to 'a' or 'Z' to 'A'. For example, 'f' becomes 'i', 'u' becomes 'x', and 'y' becomes 'b'. Non-alphabetic characters remain unchanged, and the case of each letter is preserved."
   },
   {
     "train": {
@@ -402,7 +404,8 @@
     ],
     "index": 46,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the character immediately following it in the alphabet (e.g., 'm' becomes 'n', 'a' becomes 'b'). The rule applies to both lowercase and uppercase letters, wrapping from 'z' to 'a' and 'Z' to 'A', while non-alphabetic characters remain unchanged. This consistent shift accounts for all changes observed across the provided examples."
   },
   {
     "train": {
@@ -537,7 +540,8 @@
     ],
     "index": 83,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, a specific character mapping where the alphabet is reversed. Each letter is replaced by its symmetric counterpart: 'a' becomes 'z', 'b' becomes 'y', and so on. This rule applies independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For example, in 'falbala', 'f' (6th letter) maps to 'u' (6th from the end), and in 'Etamin', the uppercase 'E' maps to 'V'."
   },
   {
     "train": {
@@ -672,7 +676,8 @@
     ],
     "index": 84,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its mirror opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y', and 'C' becomes 'X'). This rule is applied consistently across all examples, preserving the case of the original character. Non-alphabetic characters, if present, would remain unchanged. The pattern accounts for all outputs, such as 'indoors' becoming 'rmwllih' and 'Simonian' becoming 'Hrnlmrzm'."
   },
   {
     "train": {
@@ -807,7 +812,8 @@
     ],
     "index": 52,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the next letter in the alphabet (e.g., 'a' becomes 'b', 'z' becomes 'a'). The rule preserves the case of the characters, as seen in 'Holstein' becoming 'Ipmtufjo', and non-alphabetic characters remain unchanged."
   },
   {
     "train": {
@@ -942,7 +948,8 @@
     ],
     "index": 28,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). In Example 1, 'n' (14th letter) maps to 'm' (13th from the end), and 'e' (5th letter) maps to 'v' (5th from the end). This mapping is applied consistently across all examples, preserving the case of the characters while leaving non-alphabetic characters unchanged. The rule generalizes by calculating the distance of a character from one end of the alphabet and applying that same distance from the opposite end."
   },
   {
     "train": {
@@ -1077,7 +1084,8 @@
     ],
     "index": 21,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This mapping is applied independently to both lowercase and uppercase letters, as seen in Example 3 ('S' to 'H') and Example 10 ('K' to 'P'). Non-alphabetic characters remain unchanged. The rule consistently accounts for all examples by mirroring the position of each character relative to the start and end of its respective case range."
   },
   {
     "train": {
@@ -1212,7 +1220,8 @@
     ],
     "index": 41,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y', 'A' becomes 'Z'). This is evident in Example 1, where 'b' maps to 'y' and 'u' maps to 'f', and in Example 3, where 'A' maps to 'Z'. The rule applies independently to lowercase and uppercase letters while preserving non-alphabetic characters. This mapping accounts for all character substitutions across the provided examples and generalizes to any string input."
   },
   {
     "train": {
@@ -1347,7 +1356,8 @@
     ],
     "index": 79,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the character immediately following it in the alphabet (e.g., 's' becomes 't', 'e' becomes 'f'). This rule applies consistently across all examples, maintaining the case of the original character while leaving non-alphabetic characters unchanged. The shift wraps around from 'z' to 'a' and 'Z' to 'A' to ensure the output remains within the same case-specific alphabet."
   },
   {
     "train": {
@@ -1482,7 +1492,8 @@
     ],
     "index": 79,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, a specific type of monoalphabetic substitution where the alphabet is reversed. Each letter is mapped to its opposite position: 'a' becomes 'z', 'b' becomes 'y', and so on. This rule applies independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For example, in 'assarion', 'a' maps to 'z', 's' to 'h', and 'n' to 'm', resulting in 'zhhzirlm'."
   },
   {
     "train": {
@@ -1617,7 +1628,8 @@
     ],
     "index": 66,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 2\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 2\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +2. For every character in the input string, if it is a lowercase or uppercase letter, it is shifted forward by two positions in the alphabet (e.g., 'a' becomes 'c', 'o' becomes 'q', 'z' becomes 'b'). Non-alphabetic characters remain unchanged. This rule consistently explains all examples, such as 'diagonal' becoming 'fkciqpcn' and 'carving' becoming 'ectxkpi'."
   },
   {
     "train": {
@@ -1752,7 +1764,8 @@
     ],
     "index": 94,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its symmetric counterpart in the alphabet (A maps to Z, B to Y, etc.). This rule is applied consistently across all examples, preserving the case of the original characters. For instance, in 'restretch', 'r' (18th letter) becomes 'i' (9th letter from the end), and in 'Alpheratz', the uppercase 'A' becomes 'Z'. Non-alphabetic characters, if present, would remain unchanged."
   },
   {
     "train": {
@@ -1887,7 +1900,8 @@
     ],
     "index": 3,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This mapping is applied consistently across all examples, such as 's' (19th letter) becoming 'h' (8th letter from the end) and 't' (20th letter) becoming 'g' (7th letter from the end). The rule preserves the case of the characters, as seen in 'Insessores' becoming 'Rmhvhhlivh', while non-alphabetic characters remain unchanged."
   },
   {
     "train": {
@@ -2022,7 +2036,8 @@
     ],
     "index": 87,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 5 positions forward in the alphabet. For each character in the input string, the rule maps lowercase letters to their counterparts 5 places ahead (e.g., 'a' becomes 'f', 'm' becomes 'r') and uppercase letters similarly (e.g., 'R' becomes 'W'). Non-alphabetic characters remain unchanged. This rule consistently explains all examples, such as 'fence' becoming 'kjshj' and 'ambition' becoming 'frgnynts'."
   },
   {
     "train": {
@@ -2157,7 +2172,8 @@
     ],
     "index": 12,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the character immediately following it in the alphabet (e.g., 'a' becomes 'b', 'p' becomes 'q'). The rule preserves the case of the letters, while non-alphabetic characters remain unchanged. This accounts for all examples, such as 'pupil' becoming 'qvqjm' and 'Katrine' becoming 'Lbusjof'."
   },
   {
     "train": {
@@ -2292,7 +2308,8 @@
     ],
     "index": 8,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, a monoalphabetic substitution where the alphabet is reversed. Each letter is replaced by its symmetric counterpart: 'a' becomes 'z', 'b' becomes 'y', and so on. This rule applies independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For example, in 'artha', 'a' maps to 'z', 'r' to 'i', 't' to 'g', and 'h' to 's', resulting in 'zigsz'."
   },
   {
     "train": {
@@ -2427,7 +2444,8 @@
     ],
     "index": 45,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, a specific character mapping where the alphabet is reversed. Each letter is replaced by its mirror opposite in the alphabet: 'a' becomes 'z', 'b' becomes 'y', and so on. This rule applies independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For example, in 'overspend', 'o' maps to 'l' and 'v' maps to 'e', resulting in 'levihkvmw', which perfectly matches the provided training examples."
   },
   {
     "train": {
@@ -2562,7 +2580,8 @@
     ],
     "index": 45,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 4\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 4\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 4 positions forward in the alphabet. By examining the examples, we see that 'g' (7th letter) becomes 'k' (11th letter), and 'i' (9th letter) becomes 'm' (13th letter), confirming the +4 shift. This rule applies consistently to both lowercase and uppercase letters while preserving the case of the original character. Non-alphabetic characters, if present, would remain unchanged according to the standard Caesar shift logic."
   },
   {
     "train": {
@@ -2697,7 +2716,8 @@
     ],
     "index": 13,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 4\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 4\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 4 positions forward in the alphabet. For each character in the input string, lowercase letters are shifted within the 'a'-'z' range and uppercase letters within the 'A'-'Z' range, while non-alphabetic characters remain unchanged. For example, in 'allegretto', 'a' becomes 'e' (1+4=5th letter) and 'l' becomes 'p' (12+4=16th letter), confirming the +4 shift across all examples."
   },
   {
     "train": {
@@ -2832,7 +2852,8 @@
     ],
     "index": 27,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 3\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 3\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 3 positions forward in the alphabet. For each character in the input string, lowercase letters are shifted within the 'a'-'z' range and uppercase letters are shifted within the 'A'-'Z' range. Non-alphabetic characters remain unchanged. This rule consistently explains the examples, such as 's' becoming 'v' and 'D' becoming 'G', while maintaining the case of the original character."
   },
   {
     "train": {
@@ -2967,7 +2988,8 @@
     ],
     "index": 99,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its symmetric counterpart in the alphabet (A maps to Z, B to Y, etc.). This rule is applied consistently across all examples, preserving the case of the characters while leaving non-alphabetic characters unchanged. For instance, in 'beta', 'b' (2nd letter) becomes 'y' (25th letter), and in 'Greekess', the uppercase 'G' becomes 'T'. The transformation is a direct character-level mapping that reverses the position of each letter within the 26-character English alphabet."
   },
   {
     "train": {
@@ -3102,7 +3124,8 @@
     ],
     "index": 97,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 5 positions forward in the alphabet. For each character in the input string, lowercase letters are shifted within the 'a'-'z' range and uppercase letters within the 'A'-'Z' range, while non-alphabetic characters remain unchanged. For example, in 'nemoricole', 'n' (14th letter) becomes 's' (19th letter), and in 'Louie', 'L' becomes 'Q', confirming the shift is consistent across both cases."
   },
   {
     "train": {
@@ -3237,7 +3260,8 @@
     ],
     "index": 42,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This is evident in Example 8, where 'message' becomes 'nvhhztv' ('m' maps to 'n', 'e' to 'v', 's' to 'h', etc.). The rule applies independently to lowercase and uppercase letters while preserving non-alphabetic characters. This mapping consistently accounts for all provided examples, such as 'atokous' becoming 'zglplfh' and 'afterend' becoming 'zugvivmw'."
   },
   {
     "train": {
@@ -3372,7 +3396,8 @@
     ],
     "index": 39,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a classic Atbash cipher, where each letter is mapped to its opposite in the alphabet (A to Z, B to Y, etc.). This is achieved by subtracting the character's position in the alphabet from the end of the alphabet range. The rule preserves case, mapping lowercase letters to lowercase and uppercase letters to uppercase, while leaving non-alphabetic characters unchanged. For example, 'p' (16th letter) becomes 'k' (11th letter from the end), and 'E' becomes 'V'."
   },
   {
     "train": {
@@ -3507,7 +3532,8 @@
     ],
     "index": 29,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the next letter in the alphabet (e.g., 'a' becomes 'b', 'p' becomes 'q', 'G' becomes 'H'). The rule preserves the case of the characters and leaves non-alphabetic characters unchanged. This pattern is consistent across all examples, such as 'pointmaker' becoming 'qpjounblfs' and 'Goodenia' becoming 'Hppefojb'."
   },
   {
     "train": {
@@ -3642,7 +3668,8 @@
     ],
     "index": 14,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the character immediately following it in the alphabet (e.g., 'a' becomes 'b', 'z' becomes 'a'). This rule consistently explains all examples, such as 'draft' becoming 'esbgu' and 'yeggman' becoming 'zfhhnbo'. The implementation preserves the case of letters and leaves non-alphabetic characters unchanged."
   },
   {
     "train": {
@@ -3777,7 +3804,8 @@
     ],
     "index": 40,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 2\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 2\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +2. Each lowercase letter is replaced by the letter two positions ahead in the alphabet (e.g., 'f' becomes 'h', 'a' becomes 'c'), and each uppercase letter follows the same rule (e.g., 'C' becomes 'E'). Non-alphabetic characters remain unchanged, and the shift wraps around the end of the alphabet (e.g., 'y' would become 'a'). This rule consistently explains all provided examples, such as 'falsidical' mapping to 'hcnukfkecn'."
   },
   {
     "train": {
@@ -3912,7 +3940,8 @@
     ],
     "index": 69,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This mapping is applied consistently across all examples, such as 's' becoming 'h' and 'c' becoming 'x' in 'schemist'. The rule preserves the case of the characters and leaves non-alphabetic characters unchanged. This character-level mapping accounts for all outputs and generalizes to any string input."
   },
   {
     "train": {
@@ -4047,7 +4076,8 @@
     ],
     "index": 23,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the character immediately following it in the alphabet (e.g., 'a' becomes 'b', 'n' becomes 'o', 'z' becomes 'a'). This rule applies consistently across all examples, maintaining the case of the original character while leaving non-alphabetic characters unchanged."
   },
   {
     "train": {
@@ -4182,7 +4212,8 @@
     ],
     "index": 56,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This mapping is applied independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For instance, in 'storeroom', 's' maps to 'h' and 't' maps to 'g', while in 'Scanian', the uppercase 'S' maps to 'H'. The rule consistently accounts for all character shifts across the provided examples and generalizes to any string input."
   },
   {
     "train": {
@@ -4317,7 +4348,8 @@
     ],
     "index": 96,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, a monoalphabetic substitution where the alphabet is reversed. Each letter is mapped to its symmetric counterpart: 'a' becomes 'z', 'b' becomes 'y', and so on. This rule applies independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For example, in 'rooter', 'r' (18th letter) maps to 'i' (9th letter from the end), and in 'Limosi', the capital 'L' maps to 'O'."
   },
   {
     "train": {
@@ -4452,7 +4484,8 @@
     ],
     "index": 31,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +5. For each character in the input string, if it is a lowercase or uppercase letter, it is shifted forward by 5 positions in the alphabet, wrapping around from 'z' to 'a' or 'Z' to 'A'. For example, in 'loca', 'l' becomes 'q' (12+5=17), 'o' becomes 't' (15+5=20), 'c' becomes 'h' (3+5=8), and 'a' becomes 'f' (1+5=6). Non-alphabetic characters remain unchanged."
   },
   {
     "train": {
@@ -4587,7 +4620,8 @@
     ],
     "index": 56,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 4\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 4\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 4 positions forward in the alphabet. For each character in the input string, lowercase letters are shifted within the 'a'-'z' range and uppercase letters within the 'A'-'Z' range, while non-alphabetic characters remain unchanged. For example, 'u' becomes 'y' (u+4), 'n' becomes 'r' (n+4), and 'T' becomes 'X' (T+4), consistently across all provided examples."
   },
   {
     "train": {
@@ -4722,7 +4756,8 @@
     ],
     "index": 88,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 2\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 2\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +2. Each letter in the input string is replaced by the letter two positions ahead in the alphabet (e.g., 'p' becomes 'r', 'a' becomes 'c', and 'y' becomes 'a'). The rule preserves the case of the characters, while non-alphabetic characters remain unchanged. This pattern is consistent across all examples, such as 'sloe' becoming 'unqg' and 'Eudora' becoming 'Gwfqtc'."
   },
   {
     "train": {
@@ -4857,7 +4892,8 @@
     ],
     "index": 39,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the next letter in the alphabet, with 'z' wrapping around to 'a' and 'Z' wrapping around to 'A'. Non-alphabetic characters remain unchanged. This rule consistently explains all examples, such as 'ghostfish' becoming 'hiptugjti' and 'zoanthid' becoming 'apbouije'."
   },
   {
     "train": {
@@ -4992,7 +5028,8 @@
     ],
     "index": 98,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 1\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of +1. Each letter in the input string is replaced by the next letter in the alphabet (e.g., 'a' becomes 'b', 'g' becomes 'h', and 'Z' becomes 'A'). Non-alphabetic characters remain unchanged, and the case of each letter is preserved. This rule consistently explains all examples, such as 'glaiket' becoming 'hmbjlfu' and 'Icelandic' becoming 'Jdfmboejd'."
   },
   {
     "train": {
@@ -5127,7 +5164,8 @@
     ],
     "index": 20,
     "split": "caesar",
-    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    shift = 5\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr((ord(ch) - ord(\"a\") + shift) % 26 + ord(\"a\"))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr((ord(ch) - ord(\"A\") + shift) % 26 + ord(\"A\"))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation is a Caesar cipher with a fixed shift of 5 positions forward in the alphabet. For each character in the input string, lowercase letters are shifted within the 'a'-'z' range and uppercase letters within the 'A'-'Z' range, while non-alphabetic characters remain unchanged. For example, in 'skunktop', 's' (19th letter) becomes 'x' (24th letter), and 'k' (11th letter) becomes 'p' (16th letter), confirming the +5 shift across all examples."
   },
   {
     "train": {
@@ -5262,7 +5300,8 @@
     ],
     "index": 89,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, a specific character mapping where each letter is replaced by its mirror image in the alphabet. For lowercase letters, 'a' maps to 'z', 'b' to 'y', and so on; for uppercase letters, 'A' maps to 'Z', 'B' to 'Y', etc. Non-alphabetic characters remain unchanged. This rule consistently explains all examples, such as 'biflorate' becoming 'yruolizgv' and 'Tracy' becoming 'Gizxb'."
   },
   {
     "train": {
@@ -5397,6 +5436,7 @@
     ],
     "index": 49,
     "split": "atbash",
-    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result"
+    "function": "def transform(s):\n    result = \"\"\n    for ch in s:\n        if \"a\" <= ch <= \"z\":\n            result += chr(ord(\"z\") - (ord(ch) - ord(\"a\")))\n        elif \"A\" <= ch <= \"Z\":\n            result += chr(ord(\"Z\") - (ord(ch) - ord(\"A\")))\n        else:\n            result += ch\n    return result",
+    "rationale": "The transformation follows the Atbash cipher, where each letter is replaced by its opposite in the alphabet (e.g., 'a' becomes 'z', 'b' becomes 'y'). This mapping is applied independently to both lowercase and uppercase letters, while non-alphabetic characters remain unchanged. For instance, in 'apace', 'a' maps to 'z', 'p' to 'k', and 'e' to 'v', resulting in 'zkzxv'. The rule consistently accounts for all examples, including the capitalization in 'Austrogaea' becoming 'Zfhgiltzvz'."
   }
 ]

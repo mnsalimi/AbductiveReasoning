@@ -380,7 +380,8 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
                 'obs1': obs1,
                 'obs2': obs2,
                 'hyp1': hyp1,
-                'hyp2': hyp2
+                'hyp2': hyp2,
+                'user_input': user_prompt
             })
         
         # Tokenize batch with padding
@@ -434,6 +435,7 @@ def evaluate_on_art(model, tokenizer, max_samples=None, model_name="Model", batc
                 'observation_2': batch_data[i]['obs2'],
                 'hypothesis_1': batch_data[i]['hyp1'],
                 'hypothesis_2': batch_data[i]['hyp2'],
+                'user_input': batch_data[i]['user_input'],
                 'true_label': true_label,
                 'predicted_label': predicted_label,
                 'reasoning': reasoning,
@@ -670,6 +672,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
             "observation_2": raw_r["observation_2"],  
             "hypothesis_1": raw_r["hypothesis_1"],  
             "hypothesis_2": raw_r["hypothesis_2"],
+            "user_input": raw_r["user_input"],
             "true_label": raw_r["true_label"],  
             "raw": {
                 "predicted_label": raw_r["predicted_label"],
@@ -867,6 +870,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "observation_2": raw_r["observation_2"],  
             "hypothesis_1": raw_r["hypothesis_1"],  
             "hypothesis_2": raw_r["hypothesis_2"],
+            "user_input": raw_r["user_input"],
             "true_label": raw_r["true_label"],  
             "raw": {
                 "predicted_label": raw_r["predicted_label"],
@@ -894,6 +898,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "observation_2": raw_r["observation_2"],  
             "hypothesis_1": raw_r["hypothesis_1"],  
             "hypothesis_2": raw_r["hypothesis_2"],
+            "user_input": raw_r["user_input"],
             "true_label": raw_r["true_label"],  
             "raw": {
                 "predicted_label": raw_r["predicted_label"],

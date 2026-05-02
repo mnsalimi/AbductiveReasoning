@@ -422,6 +422,7 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
             true_labels_batch.append(true_emotions)
             batch_data.append({
                 'text': text,
+                'user_input': user_prompt,
                 'true_emotions': true_emotions,
                 'id': start_idx + i
             })
@@ -482,6 +483,7 @@ def evaluate_on_goemotion(model, tokenizer, max_samples=None, model_name="Model"
             results.append({
                 'sample_id': batch_data[i]['id'],
                 'text': batch_data[i]['text'],
+                'user_input': batch_data[i]['user_input'],
                 'true_emotions': true_emotions,
                 'predicted_emotions': predicted_emotions,
                 'reasoning': reasoning,
@@ -705,6 +707,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         case_entry = {
             "problem_id": pid,
             "text": raw_r["text"],  
+            "user_input": raw_r["user_input"],  
             "true_emotions": raw_r["true_emotions"],
             "raw": {
                 "predicted_emotions": raw_r["predicted_emotions"],
@@ -867,6 +870,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         all_cases.append({
             "problem_id": pid,
             "text": raw_r["text"],  
+            "user_input": raw_r["user_input"],  
             "true_emotions": raw_r["true_emotions"],
             "raw": {
                 "predicted_emotions": raw_r["predicted_emotions"],
@@ -892,6 +896,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         disagreement_cases.append({
             "problem_id": pid,
             "text": raw_r["text"],  
+            "user_input": raw_r["user_input"],  
             "true_emotions": raw_r["true_emotions"],
             "raw": {
                 "predicted_emotions": raw_r["predicted_emotions"],

@@ -408,6 +408,7 @@ def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="M
                 'premise': premise,
                 'hypothesis': hypothesis,
                 'update': update,
+                'user_input': user_prompt,
                 'id': start_idx + i
             })
         
@@ -448,6 +449,7 @@ def evaluate_on_defeasible_nli(model, tokenizer, max_samples=None, model_name="M
                 'premise': batch_data[i]['premise'],
                 'hypothesis': batch_data[i]['hypothesis'],
                 'update': batch_data[i]['update'],
+                'user_input': batch_data[i]['user_input'],
                 'true_answer': true_answers[i],
                 'predicted_answer': predicted_answer,
                 'full_response': response,
@@ -641,6 +643,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
             'premise': raw_r["premise"],
             "hypothesis": raw_r["hypothesis"],  
             "update": raw_r["update"],
+            "user_input": raw_r["user_input"],
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -799,6 +802,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             'premise': raw_r["premise"],
             "hypothesis": raw_r["hypothesis"],  
             "update": raw_r["update"],
+            "user_input": raw_r["user_input"],
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -825,6 +829,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             'premise': raw_r["premise"],
             "hypothesis": raw_r["hypothesis"],  
             "update": raw_r["update"],
+            "user_input": raw_r["user_input"],
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],

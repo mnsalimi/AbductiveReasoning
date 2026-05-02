@@ -375,6 +375,7 @@ def evaluate_on_musr_team(model, tokenizer, max_samples=None, model_name="Model"
             true_answers.append(true_answer)
             batch_data.append({
                 'question': f"Context:\n{context}\n\nProblem:\n{problem}",
+                'user_input': user_prompt,
                 'id': batch['id'][i] if 'id' in batch else start_idx + i
             })
         
@@ -427,6 +428,7 @@ def evaluate_on_musr_team(model, tokenizer, max_samples=None, model_name="Model"
             results.append({
                 'problem_id': batch_data[i]['id'],
                 'question': batch_data[i]['question'],
+                'user_input': batch_data[i]['user_input'],
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
                 'reasoning': reasoning,
@@ -652,6 +654,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
         case_entry = {
             "problem_id": pid,
             "problem": raw_r["question"],          
+            "user_input": raw_r["user_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -808,6 +811,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         all_cases.append({
             "problem_id": pid,
             "problem": raw_r["question"],          
+            "user_input": raw_r["user_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -832,6 +836,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
         disagreement_cases.append({
             "problem_id": pid,
             "problem": raw_r["question"],          
+            "user_input": raw_r["user_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],

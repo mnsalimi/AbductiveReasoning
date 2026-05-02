@@ -385,6 +385,7 @@ def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="
             batch_data.append({
                 'question': problem,
                 'context': context,
+                'user_input': user_prompt,
                 'id': batch['id'][i] if 'id' in batch else start_idx + i
             })
         
@@ -444,6 +445,7 @@ def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="
                 'problem_id': batch_data[i]['id'],
                 'question': batch_data[i]['question'],
                 'context': batch_data[i]['context'],
+                'user_input': batch_data[i]['user_input'],
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
                 'reasoning': reasoning,
@@ -639,6 +641,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
             "problem_id": pid,
             "problem": raw_r["question"],   
             "context": raw_r["context"],       
+            "user_input": raw_r["user_input"],       
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -796,6 +799,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "problem_id": pid,
             "problem": raw_r["question"],    
             "context": raw_r["context"],             
+            "user_input": raw_r["user_input"],             
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -821,6 +825,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "problem_id": pid,
             "problem": raw_r["question"],       
             "context": raw_r["context"],          
+            "user_input": raw_r["user_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],

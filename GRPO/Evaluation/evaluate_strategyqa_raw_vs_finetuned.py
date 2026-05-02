@@ -560,7 +560,7 @@ def evaluate_on_strategyqa(
 
             formatted_prompts.append(formatted_prompt)
             true_answers.append(true_answer)
-            batch_data.append({"qid": qid, "question": question, "evidence_text": evidence_text})
+            batch_data.append({"qid": qid, "question": question, "evidence_text": evidence_text, "user_input": user_prompt})
 
         inputs = tokenizer(
             formatted_prompts,
@@ -600,6 +600,7 @@ def evaluate_on_strategyqa(
                 "qid": batch_data[i]["qid"],
                 "question": batch_data[i]["question"],
                 "evidence_text": batch_data[i]["evidence_text"],
+                "user_input": batch_data[i]["user_input"],
                 "true_answer": true_answers[i],
                 "predicted_answer": predicted_answer,
                 "full_response": response,
@@ -801,6 +802,7 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
             "problem_id": pid,
             "problem": raw_r["question"],          
             "evidence_text": raw_r["evidence_text"],          
+            "user_input": raw_r["user_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],
@@ -958,6 +960,7 @@ def save_results(raw_results, finetuned_results, best_checkpoint_info, output_di
             "problem_id": pid,
             "problem": raw_r["question"],          
             "evidence_text": raw_r["evidence_text"],          
+            "user_input": raw_r["user_input"],          
             "true_answer": raw_r["true_answer"],  
             "raw": {
                 "predicted_answer": raw_r["predicted_answer"],

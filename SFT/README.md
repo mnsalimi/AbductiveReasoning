@@ -5,10 +5,10 @@ This folder shares the GRPO pipeline assets (**model family, datasets, and evalu
 ## What is included
 
 - `train_abductive_sft.py`
-  - New SFT training pipeline.
+  - Main SFT training pipeline.
   - Keeps the same default model setup used in GRPO (`unsloth/Meta-Llama-3.1-8B-Instruct-unsloth-bnb-4bit`).
   - Uses the same prompt-construction logic per dataset.
-  - Reads data directly from `GRPO/dataset/` (no local copy).
+  - Reads data directly from `GRPO/dataset_SFT/` (no local copy).
   - Imports evaluation helpers directly from `GRPO/Evaluation/` (no local copy).
 
 ## Folder structure
@@ -20,7 +20,7 @@ SFT/
 └── visualize.ipynb          # Training curve / log visualisation
 
 GRPO/                        # shared assets (read by SFT, not copied)
-├── dataset/
+├── dataset_SFT/
 │   ├── train_split.json
 │   ├── val_split.json
 │   └── ...
@@ -59,11 +59,16 @@ This keeps output formatting fully aligned with your evaluation scripts.
 - LoRA rank/alpha: 64 / 64
 - Max sequence length: 4096
 - Learning rate: `1e-5`
-- Batch size: `4`
+- LR scheduler: cosine with 2 warmup steps
+- Optimizer: `adamw_torch` (β1=0.9, β2=0.99, weight decay=0.1)
+- Batch size: `4` (train and eval)
 - Gradient accumulation: `1`
+- Max grad norm: `0.1`
 - Epochs: `1` (test default)
+- Eval / save every `25` steps; keep last `20` checkpoints
 - `NUM_SAMPLES = 50` (currently capped for quick testing, set to `None` in the script to train on the full dataset)
 - Uses `DataCollatorForCompletionOnlyLM` to only calculate loss on the assistant's generation, masking out the system and user prompts.
+- Response template is derived dynamically from the tokenizer's chat template (works for Llama-3, Qwen-2.5, etc.).
 
 All key constants are at the top of `train_abductive_sft.py`.
 
@@ -113,4 +118,4 @@ Typical flow:
 
 - `SFT/` is intentionally lightweight — it contains only the training script and notebook.
 - Dataset splits and evaluation scripts are shared with GRPO; no duplication.
-- Any changes to `GRPO/dataset/` or `GRPO/Evaluation/` are automatically picked up by SFT training.
+- Any changes to `GRPO/dataset_SFT/` or `GRPO/Evaluation/` are automatically picked up by SFT training.

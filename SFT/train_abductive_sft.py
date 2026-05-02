@@ -208,9 +208,26 @@ def get_model_size(model_name: str) -> int | None:
         return None
 
 
+def _normalize_list_function_code(code: str) -> str:
+    """Normalize a ListFunction code snippet to training requirements.
+
+    1. Remove standalone comment lines.
+    2. Rename the function signature to 'def transform(lst):'.
+    3. Replace all remaining standalone 'x' identifiers with 'lst'.
+    """
+    # Remove standalone comment lines (including EOF comments without trailing newline)
+    code = re.sub(r'^[ \t]*#.*(?:\n|$)', '', code, flags=re.MULTILINE)
+    # Rename function: def c[num](x): -> def transform(lst):
+    code = re.sub(r'def\s+[a-zA-Z0-9_]+\(x\):', 'def transform(lst):', code)
+    # Replace remaining standalone 'x' with 'lst' (word-boundary safe)
+    code = re.sub(r'\bx\b', 'lst', code)
+    return code.strip()
+
+
 def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[str, Any]:
     dataset_name = example.get("datasetName", "")
     rule_test_input = None
+    rule_test_output = None
     rule_train_examples = None
     rationale = example.get("rationale")
 
@@ -228,13 +245,24 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
 
     elif dataset_name == "ListFunction":
         system_prompt, user_prompt = create_list_functions_prompt(example)
-        raw_output = example["test"][0]["output"]
-        output_obj = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-        ground_truth = json.dumps(output_obj, ensure_ascii=False)
 
-        raw_input = example["test"][0]["input"]
-        input_obj = json.loads(raw_input) if isinstance(raw_input, str) else raw_input
-        rule_test_input = json.dumps(input_obj, ensure_ascii=False)
+        # Ground truth is the normalized function code (goes into <answer> tags)
+        ground_truth = _normalize_list_function_code(example["function"])
+
+        # Test inputs/outputs kept separately for validation evaluation.
+        # Keep all tests, not only index 0, to avoid inflated validation reward.
+        test_inputs = []
+        test_outputs = []
+        for t in example["test"]:
+            raw_input = t["input"]
+            input_obj = json.loads(raw_input) if isinstance(raw_input, str) else raw_input
+            test_inputs.append(input_obj)
+
+            raw_output = t["output"]
+            output_obj = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+            test_outputs.append(output_obj)
+        rule_test_input = json.dumps(test_inputs, ensure_ascii=False)
+        rule_test_output = json.dumps(test_outputs, ensure_ascii=False)
 
         rule_train_examples = []
         for ex in example["train"]:
@@ -254,10 +282,15 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
 
     elif dataset_name == "Crypto":
         system_prompt, user_prompt = create_crypto_functions_prompt(example)
+
+        # Ground truth is the function code (goes into <answer> tags)
+        ground_truth = example["function"].strip()
+
+        # Test inputs/outputs kept separately for validation evaluation
         test_inputs = [t["input"] for t in example["test"]]
         test_outputs = [t["output"] for t in example["test"]]
-        ground_truth = json.dumps(test_outputs, ensure_ascii=False)
         rule_test_input = json.dumps(test_inputs, ensure_ascii=False)
+        rule_test_output = json.dumps(test_outputs, ensure_ascii=False)
 
         train_examples = example.get("train", {})
         if isinstance(train_examples, dict):
@@ -281,6 +314,7 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
         "reasoning_type": example.get("reasoning_type", "abduction"),
         "dataset_name": dataset_name,
         "rule_test_input": rule_test_input,
+        "rule_test_output": rule_test_output,
         "rule_train_examples": rule_train_examples,
         # Forward rationale fields so build_text_row can use them as <think> content.
         "rationale": rationale
@@ -290,13 +324,16 @@ def transform_to_prompt_format(example: Dict[str, Any], record_id: int) -> Dict[
 def load_and_prepare_data(tokenizer) -> tuple[Dataset, Dataset]:
     logging.info("[DATA] Starting data loading and preparation...")
 
-    with open(os.path.join(_GRPO_DIR, "dataset", "train_split.json"), "r", encoding="utf-8") as f:
-        train_data = json.load(f)
-    logging.info(f"[DATA] Loaded {len(train_data)} raw training examples from train_split.json")
+    train_path = os.path.join(_GRPO_DIR, "dataset_SFT", "train_split.json")
+    val_path = os.path.join(_GRPO_DIR, "dataset_SFT", "val_split.json")
 
-    with open(os.path.join(_GRPO_DIR, "dataset", "val_split.json"), "r", encoding="utf-8") as f:
+    with open(train_path, "r", encoding="utf-8") as f:
+        train_data = json.load(f)
+    logging.info(f"[DATA] Loaded {len(train_data)} raw training examples from {train_path}")
+
+    with open(val_path, "r", encoding="utf-8") as f:
         val_data = json.load(f)
-    logging.info(f"[DATA] Loaded {len(val_data)} raw validation examples from val_split.json")
+    logging.info(f"[DATA] Loaded {len(val_data)} raw validation examples from {val_path}")
 
     train_skipped = 0
     train_transformed = []
@@ -566,31 +603,30 @@ def _calculate_code_reward(code, dataset_name, test_input, ground_truth_raw, tra
         return 0.0, "No code found", "No code found"
 
     all_examples = []
-    if dataset_name == "Crypto":
-        try:
-            test_inputs = json.loads(test_input) if isinstance(test_input, str) else test_input
-        except Exception:
-            test_inputs = test_input
-        try:
-            gt_outputs = json.loads(ground_truth_raw) if isinstance(ground_truth_raw, str) else ground_truth_raw
-        except Exception:
-            gt_outputs = ground_truth_raw
-        if not isinstance(test_inputs, list):
+    try:
+        test_inputs = json.loads(test_input) if isinstance(test_input, str) else test_input
+    except Exception:
+        test_inputs = test_input
+    try:
+        gt_outputs = json.loads(ground_truth_raw) if isinstance(ground_truth_raw, str) else ground_truth_raw
+    except Exception:
+        gt_outputs = ground_truth_raw
+
+    # Backward-compatible normalization for both old (single test) and new (all tests) storage.
+    if not isinstance(test_inputs, list):
+        test_inputs = [test_inputs]
+    if not isinstance(gt_outputs, list):
+        gt_outputs = [gt_outputs]
+
+    if dataset_name == "ListFunction":
+        # If old format accidentally yields a plain list of ints, wrap it as one test case.
+        if test_inputs and all(isinstance(v, int) for v in test_inputs):
             test_inputs = [test_inputs]
-        if not isinstance(gt_outputs, list):
+        if gt_outputs and all(isinstance(v, int) for v in gt_outputs):
             gt_outputs = [gt_outputs]
-        for inp, out in zip(test_inputs, gt_outputs):
-            all_examples.append({"input": inp, "output": out})
-    else:
-        try:
-            test_input_obj = json.loads(test_input) if isinstance(test_input, str) else test_input
-        except Exception:
-            test_input_obj = string_to_list(test_input) if dataset_name == "ListFunction" else test_input
-        try:
-            gt_obj = json.loads(ground_truth_raw) if isinstance(ground_truth_raw, str) else ground_truth_raw
-        except Exception:
-            gt_obj = string_to_list(ground_truth_raw) if dataset_name == "ListFunction" else ground_truth_raw
-        all_examples.append({"input": test_input_obj, "output": gt_obj})
+
+    for inp, out in zip(test_inputs, gt_outputs):
+        all_examples.append({"input": inp, "output": out})
 
     passed_count = 0
     test_predictions = []
@@ -912,8 +948,7 @@ class EnhancedEpochCallback(TrainerCallback):
                             batch,
                             return_tensors="pt",
                             padding=True,
-                            truncation=True,
-                            max_length=MAX_PROMPT_LENGTH,
+                            truncation=False,
                         ).to(model.device)
                         outputs = model.generate(
                             **batch_encodings,
@@ -1013,39 +1048,31 @@ class EnhancedEpochCallback(TrainerCallback):
 
             try:
                 if dataset_name in ("ListFunction", "Crypto"):
-                    if isinstance(ground_truth_raw, str):
-                        try:
-                            ground_truth_raw = json.loads(ground_truth_raw)
-                        except Exception:
-                            if dataset_name == "ListFunction":
-                                ground_truth_raw = string_to_list(ground_truth_raw)
+                    # ground_truth_raw is now function code; use rule_test_output for expected outputs
+                    rule_test_output = record.get("rule_test_output")
+                    try:
+                        eval_gt = json.loads(rule_test_output) if isinstance(rule_test_output, str) else rule_test_output
+                    except Exception:
+                        eval_gt = string_to_list(rule_test_output) if dataset_name == "ListFunction" else rule_test_output
+
                     extracted_code = extract_code(completion)
-                    # If the model generated a callable transform function (GRPO-style),
-                    # execute it. Otherwise fall back to direct answer comparison (SFT-style
-                    # where the model outputs the expected value directly in <answer>).
+                    # Enforce function-only validation for code tasks.
                     if extracted_code and "def transform" in extracted_code:
                         reward, predicted, execution_error = _calculate_code_reward(
                             extracted_code,
                             dataset_name,
                             record.get("rule_test_input"),
-                            ground_truth_raw,
+                            eval_gt,
                             record.get("rule_train_examples"),
                         )
                     else:
-                        # SFT direct-output path: compare <answer> content to expected output
-                        raw_answer = extract_prediction(completion, dataset_name)
-                        try:
-                            parsed = json.loads(raw_answer) if isinstance(raw_answer, str) else raw_answer
-                        except Exception:
-                            parsed = raw_answer
-                        predicted = parsed
+                        reward = 0.0
+                        predicted = None
                         execution_error = None
-                        if dataset_name == "ListFunction":
-                            reward = 1.0 if lists_match(parsed, ground_truth_raw) else 0.0
-                        else:  # Crypto
-                            gt_list = ground_truth_raw if isinstance(ground_truth_raw, list) else [ground_truth_raw]
-                            pred_list = parsed if isinstance(parsed, list) else [parsed]
-                            reward = 1.0 if pred_list == gt_list else 0.0
+                        if extracted_code is None:
+                            execution_error = "Missing <answer>...</answer> code block"
+                        else:
+                            execution_error = "Code answer must define 'def transform(...)'"
                 else:
                     ground_truth = parse_ground_truth(ground_truth_raw, dataset_name)
                     predicted = extract_prediction(completion, dataset_name)

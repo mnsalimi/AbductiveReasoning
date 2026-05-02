@@ -86,7 +86,8 @@
         "input": "[5, 7, 8, 10, 8, 1, 8, 7, 8, 8, 7]",
         "output": "[2]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the number of unique elements in the input list that appear more than once. For each example, the output is a single-element list containing the count of these repeated values. For instance, in Example 5, only the number 5 repeats, resulting in [1], while in Example 9, the numbers 5, 9, 3, and 2 repeat, resulting in [4]."
   },
   {
     "idx": 1,
@@ -175,7 +176,8 @@
         "input": "[52, 82, 8, 62, 53]",
         "output": "[8]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies a specific position within the input list to generate the output. By examining the examples, the output is consistently a single-element list containing the value at index 2 (the third element) of the input list. For instance, in Example 1, the third element is 97, and in Example 9, it is 17. This rule applies regardless of the values or the length of the list, provided the list has at least three elements."
   },
   {
     "idx": 2,
@@ -264,7 +266,8 @@
         "input": "[80, 58, 63, 33, 62, 92, 52, 52]",
         "output": "[80, 58, 63, 33, 62, 92, 52]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the number of unique elements in the input list and truncates the list to that length. For example, in Example 1, there are 5 unique elements (80, 23, 17, 82, 97), so the output contains the first 5 elements of the input. In Example 7, all 5 elements are unique, so the entire list is returned. This rule consistently accounts for all examples by using the count of distinct values as the index for slicing the original sequence."
   },
   {
     "idx": 3,
@@ -353,7 +356,8 @@
         "input": "[66, 43, 65, 7, 75, 34]",
         "output": "[34, 43, 65, 7, 75, 34]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves modifying the input list by replacing its first element with its last element. In each example, the output list is identical to the input list except for the value at index 0, which now matches the value at the final index. This rule consistently explains all provided examples, such as Example 1 where 5 is replaced by 70, and Example 4 where 57 is replaced by 4. The length of the list and the values of the intermediate elements remain unchanged."
   },
   {
     "idx": 4,
@@ -442,7 +446,8 @@
         "input": "[94, 22, 3, 77, 25]",
         "output": "[3, 77, 25]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule for these examples is to remove the first two elements of the input list. In each case, the output list starts from the third element (index 2) and includes all subsequent elements. For instance, in Example 1, the first two elements [3, 91] are discarded, leaving [95, 26, 26, 8, 7]. This pattern holds consistently across all provided examples regardless of the list length or the values of the integers."
   },
   {
     "idx": 5,
@@ -531,7 +536,8 @@
         "input": "[95, 72, 80, 32, 3]",
         "output": "[95, 72, 32, 3]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule focuses on the beginning of the input list to determine which single element should be removed. If the first two elements (indices 0 and 1) are identical, the element at index 1 is removed. Otherwise, if the first two elements are different, the element at index 2 is removed. This logic consistently accounts for all examples, such as Example 1 where [22, 22...] results in the removal of the second 22, and Example 3 where [52, 76, 73...] results in the removal of 73."
   },
   {
     "idx": 6,
@@ -620,7 +626,8 @@
         "input": "[36, 61, 80, 88, 76, 53, 37]",
         "output": "[80, 80, 80, 88, 76, 53, 37]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves modifying the first two elements of the input list. By comparing the input and output lists across all examples, it is evident that the values at index 0 and index 1 are replaced by the value originally located at index 2. The rest of the list remains unchanged. This rule consistently accounts for all provided examples regardless of the list length or the specific integers involved."
   },
   {
     "idx": 7,
@@ -709,7 +716,8 @@
         "input": "[72, 51, 93, 82]",
         "output": "[82]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that regardless of the length of the input list or the values of the integers within it, the output is always a single-element list containing the final element of the input. For instance, in Example 1, the input [83, 71, 17] results in [17], and in Example 10, the input [34, 83, 35, 53, 48, 95] results in [95]. This transformation isolates the last item of the sequence while maintaining the list structure."
   },
   {
     "idx": 8,
@@ -798,7 +806,8 @@
         "input": "[41, 15, 29, 38]",
         "output": "[79, 44, 44, 79]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves a symmetric operation where each element in the output list is the sum of the element at the corresponding index in the input list and the element at the mirrored index from the end of the list. Specifically, for an input list of length $N$, the output at index $i$ is calculated as $input[i] + input[N - 1 - i]$. This results in a palindromic output list where the first and last elements are equal, the second and second-to-last are equal, and so on. This rule consistently accounts for all provided examples, including those with both even and odd lengths."
   },
   {
     "idx": 9,
@@ -887,7 +896,8 @@
         "input": "[84, 15, 69, 49, 96, 11]",
         "output": "[84, 69, 15, 49, 96, 11]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule depends on a conditional check of the elements at indices 1 and 2. If the values at index 1 and index 2 are equal, the elements at index 0 and index 3 are swapped. Otherwise, if index 1 and index 2 are not equal, those two elements (at index 1 and index 2) are swapped with each other. This logic consistently explains why Example 1 (where 65 == 65) swaps 14 and 4, while Example 2 (where 45 != 56) swaps 45 and 56."
   },
   {
     "idx": 10,
@@ -976,7 +986,8 @@
         "input": "[27, 69, 40, 32, 30, 31]",
         "output": "[6, 6, 6, 6, 6, 6]"
       }
-    ]
+    ],
+    "rationale": "The training examples show that for every input list, the output is a list of the same length where every element is identical. By comparing the input list lengths to the values in the output lists, we observe that the output value always equals the number of elements in the input list. For instance, Example 1 has 7 elements and outputs [7, 7, 7, 7, 7, 7, 7], while Example 7 has 3 elements and outputs [3, 3, 3]. The rule is to replace every element in the list with the total count of elements in that list."
   },
   {
     "idx": 11,
@@ -1065,7 +1076,8 @@
         "input": "[52, 92, 83]",
         "output": "[52, 52, 83]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where the second element of the input list (index 1) is replaced by the value of the first element (index 0). All other elements in the list remain unchanged. This pattern holds regardless of the list's length or the specific integer values involved, indicating a positional replacement rule rather than a value-based one."
   },
   {
     "idx": 12,
@@ -1154,7 +1166,8 @@
         "input": "[97, 6, 47, 69, 97]",
         "output": "[97, 6, 47, 69]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where the output list is identical to the input list except for the removal of the final element. In Example 1, the trailing 41 is removed; in Example 3, the trailing 81 is removed; and in Example 10, the trailing 1 is removed. This pattern of truncating the last item holds regardless of the list's length or the values of the integers. The rule is a simple slice that excludes the last index to ensure generalization to any list of at least one element."
   },
   {
     "idx": 13,
@@ -1243,7 +1256,8 @@
         "input": "[1, 5, 3, 7, 3, 3]",
         "output": "[1, 5, 3, 1, 3, 3]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the maximum and minimum values within the input list. It then replaces every occurrence of the maximum value with the minimum value, while leaving all other elements unchanged. For instance, in Example 1, the maximum value 10 is replaced by the minimum value 0, and in Example 5, the maximum value 6 is replaced by the minimum value 1. This rule consistently accounts for all provided examples by mapping the global peak to the global floor of the dataset."
   },
   {
     "idx": 14,
@@ -1332,7 +1346,8 @@
         "input": "[14, 23, 63, 80, 14, 86]",
         "output": "[86, 14, 80, 63, 23, 14, 23, 63, 80, 14, 86]"
       }
-    ]
+    ],
+    "rationale": "The transformation takes the input list and creates a palindromic sequence by concatenating the reversed version of the list with the original list, excluding the first element of the original list to avoid duplicating the middle element. For example, in Example 4, [41, 79, 53] becomes [53, 79, 41] + [79, 53], resulting in [53, 79, 41, 79, 53]. This rule consistently accounts for the output length being (2 * n) - 1, where n is the input length. The pattern is a reflection of the input list centered on its first element (when viewed from the perspective of the reversed prefix)."
   },
   {
     "idx": 15,
@@ -1421,7 +1436,8 @@
         "input": "[25, 26, 25, 8, 4, 28]",
         "output": "[25, 78, 25, 24, 12, 84]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves identifying even integers within the input list and multiplying them by three. Odd integers remain unchanged. For example, in the first case, 30 and 32 are even and become 90 and 96, while 23, 1, and 17 remain the same. This logic consistently applies across all examples, including cases with zero, which is treated as even (0 * 3 = 0)."
   },
   {
     "idx": 16,
@@ -1510,7 +1526,8 @@
         "input": "[3, 13, 2, 7, 3, 6, 3, 3]",
         "output": "[4, 6, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies all indices in the input list where the element is equal to the very first element of the list (the element at index 0). The search for these matches begins from the second element (index 1) onwards. The output is a list of these indices in ascending order. For example, in Example 1, the first element is 10, and 10 appears again at indices 1, 3, 4, 6, and 7. If no subsequent elements match the first element, as seen in Example 2, the result is an empty list."
   },
   {
     "idx": 17,
@@ -1599,7 +1616,8 @@
         "input": "[80, 5, 56, 49]",
         "output": "[80, 56, 49]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the three largest integers in the input list and returns them in descending order. In Example 1, the values 92, 91, and 78 are the three highest values, and they are returned sorted from largest to smallest. This pattern holds across all examples, including cases with duplicate maximum values like Example 8, where the two 99s and the 85 are selected. The rule generalizes to any list of integers by extracting the top three values based on magnitude."
   },
   {
     "idx": 18,
@@ -1688,7 +1706,8 @@
         "input": "[0, 0, 1, 1, 1, 2, 2, 3, 4, 5]",
         "output": "[3, 4, 5]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies elements in the input list based on their frequency. By comparing the input and output lists across all examples, it is evident that only elements that appear exactly once in the input are preserved in the output, maintaining their original relative order. For instance, in Example 2, the number 8 and 7 appear multiple times and are removed, leaving only 19. This rule consistently explains the filtering of duplicates and triplicates seen in all provided examples."
   },
   {
     "idx": 19,
@@ -1777,7 +1796,8 @@
         "input": "[91, 77, 23]",
         "output": "[23, 77, 91]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list is the exact reverse of the input list. In Example 1, [96, 40, 21] becomes [21, 40, 96], and in Example 5, the seven-element list is completely inverted. This pattern holds across all examples regardless of list length or element values, indicating a simple reversal transformation."
   },
   {
     "idx": 20,
@@ -1866,7 +1886,8 @@
         "input": "[31, 8, 73, 89]",
         "output": "[3, 1, 8, 7, 3, 8, 9]"
       }
-    ]
+    ],
+    "rationale": "The transformation decomposes each integer in the input list into its individual decimal digits while maintaining their original order. For each element in the input, the rule iterates through its digits from left to right and appends them as separate integers to the output list. This accounts for both single-digit and multi-digit numbers (e.g., 84 becomes 8, 4; 9 remains 9). The rule generalizes by treating every number as a sequence of digits to be flattened into the final result."
   },
   {
     "idx": 21,
@@ -1955,7 +1976,8 @@
         "input": "[4, 44, 9, 75, 29, 43, 3, 42]",
         "output": "[42, 3, 43, 29]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule uses the first element of the input list as a count (N) to determine how many elements to include in the output. Specifically, the input list is reversed, and then only the first N elements of this reversed list are kept. For example, if the first element is 5, the output consists of the last 5 elements of the input in reverse order; if the first element is 0, the output is an empty list."
   },
   {
     "idx": 22,
@@ -2044,7 +2066,8 @@
         "input": "[19, 10, 11, 17, 13, 27, 26]",
         "output": "[19, 10, 11, 17, 13, 27, 27, 26, 26]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the tens digit of each integer in the input list and repeats that integer a number of times equal to its tens digit. If an integer is a single digit (less than 10), it has no tens digit and is omitted from the output. For example, in Example 1, 16 has a tens digit of 1 (appears once), 40 has a tens digit of 4 (appears four times), and 12 has a tens digit of 1 (appears once). This rule consistently explains why certain numbers are repeated and why single-digit numbers like 0, 4, 3, 1, 6, and 4 are excluded from the output lists."
   },
   {
     "idx": 23,
@@ -2133,7 +2156,8 @@
         "input": "[80, 62, 58, 34]",
         "output": "[34, 59, 64, 83]"
       }
-    ]
+    ],
+    "rationale": "The transformation reverses the input list and then increments each element by its new zero-based index. For instance, in Example 1, [63, 97, 42] is reversed to [42, 97, 63], and adding indices [0, 1, 2] results in [42, 98, 65]. This pattern consistently accounts for all examples, including cases with repeated values or varying lengths. The rule generalizes by applying a positional offset to a reversed sequence."
   },
   {
     "idx": 24,
@@ -2222,7 +2246,8 @@
         "input": "[39, 69, 8, 29, 98]",
         "output": "[39, 39, 39, 39, 39, 69, 8, 29, 98]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves modifying the input list by repeating its first element. Specifically, the first element of the input list is prepended to the original list four additional times. This results in the first element appearing five times consecutively at the start of the output list, followed by the rest of the original sequence. This pattern is consistent across all examples regardless of the list length or the values of the integers."
   },
   {
     "idx": 25,
@@ -2311,7 +2336,8 @@
         "input": "[46, 88, 38, 6, 74, 54, 42]",
         "output": "[74]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the second largest element in the input list. By sorting the input values in ascending order and selecting the element at the second-to-last index, the rule consistently produces the single-element output list seen in all examples. For instance, in Example 1, the sorted list is [6, 17, 46, 80, 82, 85], and the second largest value is 82. This rule generalizes across varying list lengths and value ranges."
   },
   {
     "idx": 26,
@@ -2400,7 +2426,8 @@
         "input": "[86, 83, 81, 17, 54, 87, 4]",
         "output": "[87]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the first element of the input list as a threshold value. It then filters the entire list, retaining only those elements that are strictly greater than this first element. For instance, in Example 1, the threshold is 25, so values like 10 and 16 are removed, while 43 and 90 are kept. Note that the first element itself is always excluded because it is not strictly greater than itself."
   },
   {
     "idx": 27,
@@ -2489,7 +2516,8 @@
         "input": "[1, 8, 16, 13, 14, 26, 14]",
         "output": "[10, 31, 55, 46, 49, 85, 49]"
       }
-    ]
+    ],
+    "rationale": "The transformation follows a linear mapping applied element-wise to the input list. By comparing the input values to the output values (e.g., 13 becomes 46, 1 becomes 10, 0 becomes 7), we can observe that each output is exactly three times the input plus seven. This rule, $f(x) = 3x + 7$, consistently accounts for every example provided and generalizes to any integer input."
   },
   {
     "idx": 28,
@@ -2578,7 +2606,8 @@
         "input": "[6, 0, 7, 6, 4, 8, 8, 8]",
         "output": "[6, 7, 0, 6, 4, 8, 8, 8]"
       }
-    ]
+    ],
+    "rationale": "The transformation focuses on the first four elements of the input list. If the elements at index 1 and index 2 are equal, the elements at index 0 and index 3 are swapped. Otherwise, the elements at index 1 and index 2 are swapped. This rule consistently explains the changes in the examples, such as the swap of 0 and 6 in Example 4 (where indices 1 and 2 are both 3) and the swap of 1 and 6 in Example 1 (where indices 1 and 2 are different)."
   },
   {
     "idx": 29,
@@ -2667,7 +2696,8 @@
         "input": "[71, 16, 31, 29, 87]",
         "output": "[1, 9, 4, 3, 2, 5, 8, 0, 4, 9]"
       }
-    ]
+    ],
+    "rationale": "The training examples show that regardless of the input list's length or content, the output is consistently the same sequence of integers: [1, 9, 4, 3, 2, 5, 8, 0, 4, 9]. This indicates a constant transformation rule where the input is ignored and a fixed list is returned. The rule generalizes as a static mapping to this specific ten-digit sequence."
   },
   {
     "idx": 30,
@@ -2756,7 +2786,8 @@
         "input": "[7, 8, 4, 3, 5, 2]",
         "output": "[7, 56, 224, 672, 3360, 6720]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a cumulative product pattern across the input list. For each element in the input, the corresponding output is the product of that element and all preceding elements. This is evidenced by Example 1, where the sequence follows 5, 5*7=35, 35*2=70, and so on. The rule also correctly handles zeros; once a zero is encountered in the input (as seen in Examples 5, 7, and 10), all subsequent values in the output list become zero."
   },
   {
     "idx": 31,
@@ -2845,7 +2876,8 @@
         "input": "[40, 14, 2]",
         "output": "[40, 14, 14, 2]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves splitting the input list into two overlapping segments and concatenating them. Specifically, the output is formed by taking all elements of the input list except for the last one, followed by all elements of the input list except for the first one. This results in a list where the middle elements (those that are neither the first nor the last in the original list) are repeated in sequence. For example, in a list of length 5, the output contains indices [0, 1, 2, 3] followed by [1, 2, 3, 4]."
   },
   {
     "idx": 32,
@@ -2934,7 +2966,8 @@
         "input": "[18, 10, 44, 15, 28, 14]",
         "output": "[18, 11, 46, 18, 32, 19]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves adding the zero-based index of each element to its value. For instance, in Example 1, the input [6, 35, 36, 31, 14, 49] results in [6+0, 35+1, 36+2, 31+3, 14+4, 49+5], which equals [6, 36, 38, 34, 18, 54]. This pattern holds consistently across all examples, where the output at index $i$ is $lst[i] + i$. This rule generalizes to lists of any length and any integer values."
   },
   {
     "idx": 33,
@@ -3023,7 +3056,8 @@
         "input": "[0, 5, 2, 3, 4, 5]",
         "output": "[1, 0, 1, 1, 1, 1]"
       }
-    ]
+    ],
+    "rationale": "The transformation compares each element in the input list to its own index within that list. If the value of the element is equal to its zero-based index (i.e., `lst[i] == i`), the output at that position is 1; otherwise, it is 0. This rule consistently explains all examples, such as Example 1 where `lst[1] == 1` and `lst[3] == 3` result in 1s, and Example 7 where `lst[0] == 0` and `lst[4] == 4` result in 1s."
   },
   {
     "idx": 34,
@@ -3112,7 +3146,8 @@
         "input": "[39, 21, 85, 19]",
         "output": "[98, 39, 21, 85, 19, 37]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves modifying the input list by adding specific constant values at both ends. By comparing the input and output lists across all examples, it is evident that the integer 98 is prepended to the beginning of the list and the integer 37 is appended to the end. This pattern is consistent regardless of the list's length or the specific values contained within it."
   },
   {
     "idx": 35,
@@ -3201,7 +3236,8 @@
         "input": "[59, 73, 60, 57]",
         "output": "[1, 57, 2, 59, 3, 60, 4, 73]"
       }
-    ]
+    ],
+    "rationale": "The transformation sorts the input list in ascending order and then pairs each sorted element with its 1-based rank (index + 1). For every element in the sorted list, the output first includes the rank followed by the element itself. This pattern is consistent across all examples, including those with duplicate values, where each instance of the duplicate is assigned its own sequential rank."
   },
   {
     "idx": 36,
@@ -3290,7 +3326,8 @@
         "input": "[33, 66, 24, 16, 36]",
         "output": "[33, 36, 66, 16, 24]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies unique elements from the input list by interleaving elements from the start and the end of the list. Specifically, it processes the list by taking the first element, then the last, then the second, then the second-to-last, and so on. During this process, an element is added to the output only if it has not appeared previously in the sequence. This rule explains why Example 1 results in [98, 41, 76, 85, 53, 34], as it skips duplicates encountered during the inward-moving interleaving process."
   },
   {
     "idx": 37,
@@ -3379,7 +3416,8 @@
         "input": "[7, 4, 83, 72, 67, 78, 39]",
         "output": "[7, 39, 4, 78, 83, 67, 72, 72, 67, 83, 78, 4, 39, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation takes the input list and interleaves it with its own reverse. Specifically, for an input list of length $N$, the output list is of length $2N$, where the element at index $2i$ is the $i$-th element of the input, and the element at index $2i+1$ is the $i$-th element of the reversed input (or the $(N-1-i)$-th element of the original). This creates a sequence of pairs where the first half of the output mirrors the second half in reverse order."
   },
   {
     "idx": 38,
@@ -3468,7 +3506,8 @@
         "input": "[16, 40, 27, 36, 9, 29]",
         "output": "[16, 40, 27, 36, 9, 29, 9]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule checks for the presence of specific integers in the input list and appends a value based on a priority system. If the number 3 is present anywhere in the list, the value 3 is appended to the end of the list. If 3 is not present but the number 9 is present, the value 9 is appended instead. If neither 3 nor 9 is found in the input, the list remains unchanged. This logic accounts for Example 1 (contains 3), Example 3 (contains 9), and Example 2 (contains neither)."
   },
   {
     "idx": 39,
@@ -3557,7 +3596,8 @@
         "input": "[63, 24, 79, 61, 93]",
         "output": "[93]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output is a single-element list containing the largest integer from the input list. For instance, in Example 4, the maximum value of [16, 21, 44, 14, 8, 20] is 44, which matches the output. This pattern holds across all examples regardless of the list length or the position of the maximum value. The rule is to identify the maximum element in the input list and return it inside a new list."
   },
   {
     "idx": 40,
@@ -3646,7 +3686,8 @@
         "input": "[93, 59, 73, 67]",
         "output": "[59, 73, 67]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule consistently extracts a specific subsegment from the input list. By comparing the input and output lists across all examples, it is evident that the output always consists of the elements starting from index 1 up to, but not including, index 4. This slice (indices 1, 2, and 3) accounts for the three-element sequences observed in the outputs, regardless of the total length of the input list."
   },
   {
     "idx": 41,
@@ -3735,7 +3776,8 @@
         "input": "[51, 60, 14, 60, 71]",
         "output": "[51]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves removing a specific slice of elements from the input list. By observing the examples, the first element is always preserved, but the elements at indices 1, 2, 3, and 4 are consistently removed. The output then continues with the element at index 5 and all subsequent elements. This pattern holds across all examples regardless of the values of the integers, indicating a position-based removal rather than a value-based filter."
   },
   {
     "idx": 42,
@@ -3824,7 +3866,8 @@
         "input": "[45, 30, 67, 89, 59, 60, 12]",
         "output": "[45, 30, 60, 12]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies and extracts all elements from the input list that are divisible by 3. In Example 1, 81 and 48 (appearing twice) are kept, while in Example 2, only 66 is divisible by 3. This pattern consistently explains the outputs across all examples, including those with zero (Example 3 and 5) and multiple occurrences of divisible numbers."
   },
   {
     "idx": 43,
@@ -3913,7 +3956,8 @@
         "input": "[57, 0, 54, 50, 4, 13]",
         "output": "[1, 2, 3, 4]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the indices of all even integers within the input list. By examining the examples, we see that the output lists consist of strictly increasing integers representing the positions where the input values are divisible by 2. For instance, in Example 1, the values at indices 0, 2, 4, and 5 (28, 64, 80, 20) are even, while the values at indices 1 and 3 (57, 9) are odd. This rule consistently accounts for all provided input-output pairs."
   },
   {
     "idx": 44,
@@ -4002,7 +4046,8 @@
         "input": "[4, 41, 49, 1, 32, 23, 8, 20, 16, 26]",
         "output": "[49, 8, 16, 26]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies a threshold based on the first element of the input list. Specifically, it filters the list to retain only those elements whose last digit (ones place) is strictly greater than the value of the first element in the list. For example, in Example 1, the first element is 5, so only numbers with a last digit of 6, 7, 8, or 9 are kept. This rule consistently explains why certain elements are removed while others are preserved across all provided examples, including cases where the resulting list is empty."
   },
   {
     "idx": 45,
@@ -4091,7 +4136,8 @@
         "input": "[82, 66, 78, 23]",
         "output": "[82, 82, 82, 82, 82, 82, 82]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the first element of the input list and creates a new list consisting of that element repeated exactly seven times. Regardless of the input list's length or the values of subsequent elements, the output is always a list of length seven containing only the initial value. This pattern is consistent across all provided examples, such as Example 1 where 1 is repeated and Example 2 where 89 is repeated."
   },
   {
     "idx": 46,
@@ -4180,7 +4226,8 @@
         "input": "[53, 83, 78, 33, 61, 75, 59, 68, 92]",
         "output": "[59]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output is a single-element list containing the value located at index 6 of the input list. For instance, in Example 1, the value at index 6 is 14; in Example 2, it is 53; and in Example 8, it is 78. This rule holds across all provided examples regardless of the list's total length or the values of other elements."
   },
   {
     "idx": 47,
@@ -4269,7 +4316,8 @@
         "input": "[40, 63, 46, 28, 0, 21]",
         "output": "[40, 63]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list is a subset of the input list. Specifically, in every case from Example 1 to Example 10, the output consists of exactly the first two elements of the input list, regardless of the list's total length or the values of the integers. This pattern is simple and holds true across all provided data points, suggesting a rule of selecting the prefix of length two."
   },
   {
     "idx": 48,
@@ -4358,7 +4406,8 @@
         "input": "[4, 5, 93, 4, 10, 90]",
         "output": "[5, 93, 4, 10]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule uses the first element of the input list, let's call it $N$, as an index to determine which elements to remove. Specifically, the output is formed by taking the slice of the list starting from the second element (index 1) up to and including index $N$, and then concatenating it with the remainder of the list starting from index $N+2$. Effectively, the rule removes the very first element (the index pointer) and the element located at index $N+1$. This pattern consistently explains all examples, such as Example 1 where $N=4$ results in removing index 0 and index 5, and Example 4 where $N=0$ results in removing index 0 and index 1."
   },
   {
     "idx": 49,
@@ -4447,7 +4496,8 @@
         "input": "[95, 29, 43, 5]",
         "output": "[29, 43]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a specific subset of the input list by removing the first and last elements based on their original positions in the sequence. After excluding the elements at the first and last indices, the remaining elements are sorted in ascending order. This rule consistently explains the outputs across all examples, such as in Example 2 where [4, 94, 98, 15] results in [94, 98] after removing 4 and 15, and Example 3 where [57, 16, 4, 92] results in [4, 16] after removing 57 and 92."
   },
   {
     "idx": 50,
@@ -4536,7 +4586,8 @@
         "input": "[72, 44, 45, 86]",
         "output": "[72, 72, 44, 44, 45, 45, 86, 86]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves duplicating each element in the input list. By observing the examples, every integer in the input appears exactly twice in the output, maintaining the original order. For instance, in Example 1, the input [49, 49, 77, 36] results in each 49, the 77, and the 36 being doubled to produce [49, 49, 49, 49, 77, 77, 36, 36]. This pattern of element-wise repetition is consistent across all provided examples regardless of the list length or value of the integers."
   },
   {
     "idx": 51,
@@ -4625,7 +4676,8 @@
         "input": "[13, 51, 45, 30, 10]",
         "output": "[51, 45, 30]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule for these examples involves removing the first and last elements of the input list. In every example, regardless of the list length or the specific values of the integers, the output is a sublist starting from the second element (index 1) and ending at the second-to-last element. This pattern consistently accounts for the reduction in list length by exactly two and the preservation of the internal sequence."
   },
   {
     "idx": 52,
@@ -4714,7 +4766,8 @@
         "input": "[2, 6, 34, 72, 1, 15, 49, 38]",
         "output": "[1, 15, 49, 38]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule uses the first two elements of the input list as indices to extract a specific slice. Specifically, if the first element is $M$ and the second element is $N$, the output is the sublist starting from index $M+2$ up to (but not including) index $N+2$. For example, in Example 2, $M=4$ and $N=5$, so the slice is from index 6 to 7, resulting in [14]. If the starting index is greater than or equal to the ending index, an empty list is returned, as seen in Example 1."
   },
   {
     "idx": 53,
@@ -4803,7 +4856,8 @@
         "input": "[73, 53, 43, 50, 77, 74, 9, 36]",
         "output": "[77, 74, 53, 43, 50, 9, 36]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the first element of the input list as a pivot. The output list is then constructed by first collecting all elements from the original list (excluding the pivot itself) that are strictly greater than the pivot, followed by all elements that are strictly less than the pivot. Elements equal to the pivot (other than the first element) are omitted. This partitioning logic consistently explains the reordering and filtering observed across all training examples."
   },
   {
     "idx": 54,
@@ -4892,7 +4946,8 @@
         "input": "[67, 64, 51, 36, 2, 98, 44]",
         "output": "[44, 98, 2, 36, 51, 64, 67]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list is the exact reverse of the input list. For instance, in Example 1, the input [16, 86, 81, 40, 67, 57] results in [57, 67, 40, 81, 86, 16], where the last element becomes the first, the second-to-last becomes the second, and so on. This pattern holds across all examples regardless of list length or element values. The transformation is a simple list reversal."
   },
   {
     "idx": 55,
@@ -4981,7 +5036,8 @@
         "input": "[56, 45, 24, 31, 89, 23, 64]",
         "output": "[102, 80, 38, 52, 168, 36, 118]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule for each element in the input list is to multiply the value by 2 and then subtract 10. For example, in Example 1, 35 becomes (35 * 2) - 10 = 60, and 12 becomes (12 * 2) - 10 = 14. This linear transformation (2n - 10) consistently accounts for all outputs across the provided examples, including cases where the input is small (e.g., 10 becomes 10). The rule is applied element-wise and independently to every integer in the list."
   },
   {
     "idx": 56,
@@ -5070,7 +5126,8 @@
         "input": "[15, 11, 8, 7, 7]",
         "output": "[15, 11, 8, 7, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves checking for the presence of specific integers in the input list and appending a value based on priority. If the number 3 is present in the list, a 3 is appended to the end of the list. If 3 is not present but 9 is present, a 9 is appended to the end of the list. If neither 3 nor 9 is present, the list remains unchanged. This logic accounts for all examples, such as Example 2 (contains 3, appends 3), Example 5 (contains 9, no 3, appends 9), and Example 7 (contains neither, no change)."
   },
   {
     "idx": 57,
@@ -5159,7 +5216,8 @@
         "input": "[33, 80, 98, 69, 82, 22, 53]",
         "output": "[13, 25, 29, 22, 25, 10, 18]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves a linear mapping applied to each element of the input list. By observing the relationship between the input values and their corresponding outputs (e.g., 75 becomes 23, 27 becomes 11, and 0 becomes 5), we can identify that each element $x$ is divided by 4 using integer division, and then increased by 5. This formula, $f(x) = (x // 4) + 5$, consistently accounts for all provided examples, including cases where the input is very small or zero."
   },
   {
     "idx": 58,
@@ -5248,7 +5306,8 @@
         "input": "[5, 39, 54, 45, 56, 77, 96]",
         "output": "[5, 39, 54, 45, 56, 77, 96, 9]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a list of integers where the output is an exact copy of the input list with the integer 9 appended to the end. This pattern holds regardless of the input list's length or the values of its elements. The rule is a simple concatenation of the constant value 9 to the existing sequence."
   },
   {
     "idx": 59,
@@ -5337,7 +5396,8 @@
         "input": "[2, 58, 45, 27, 9, 7, 31, 21, 48, 43]",
         "output": "[45, 27, 9, 7, 31, 21, 48, 43]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a range defined by the first two elements of the input list. Specifically, it filters the entire list to retain only those elements whose values are strictly greater than the first element and strictly less than the second element. The order of the filtered elements remains the same as their original appearance in the input list. This rule consistently explains all examples, such as Example 1 where values between 2 and 57 are kept, and Example 4 where only 7 falls between 6 and 12."
   },
   {
     "idx": 60,
@@ -5426,7 +5486,8 @@
         "input": "[10, 12, 57, 5]",
         "output": "[57]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies a specific element based on its position within the input list. By observing the examples, the output is consistently a single-element list containing the value located at index 2 (the third element) of the input list. For instance, in Example 1, the third element is 11, and in Example 2, it is 75. The rule generalizes to extracting the element at index 2 regardless of the list's total length or the values of other elements."
   },
   {
     "idx": 61,
@@ -5515,7 +5576,8 @@
         "input": "[48, 44, 55, 59, 15]",
         "output": "[48, 44, 55, 59, 15, 0, 48, 44, 55, 59, 15]"
       }
-    ]
+    ],
+    "rationale": "The training examples demonstrate a pattern where the output list is a concatenation of the input list with itself, separated by a single integer 0. In every example, regardless of the input list's length or content (including when the input contains a 0 as in Example 2), the structure remains [input] + [0] + [input]. This rule consistently accounts for the doubling of the elements plus one additional zero in the middle."
   },
   {
     "idx": 62,
@@ -5604,7 +5666,8 @@
         "input": "[0, 0, 8, 14, 1, 6, 0]",
         "output": "[0, 8, 14, 1, 6, 0]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves removing a slice of elements from the input list based on the values of the first two elements. Specifically, the first element of the list (let's call it M) and the second element (N) define the range of indices to be removed. The output is constructed by taking the elements from the beginning of the list up to index M (exclusive) and concatenating them with the elements starting from index N + 1 to the end of the list. This rule consistently explains the outputs across all examples, such as Example 1 where M=1 and N=6 results in removing indices 1 through 6, leaving the first element and the last three."
   },
   {
     "idx": 63,
@@ -5693,7 +5756,8 @@
         "input": "[65, 88, 58, 38, 31, 28, 52, 7]",
         "output": "[3]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a specific property of the integers in the input list and returns a single-element list containing the count of elements satisfying that property. By examining the examples, we see that the output corresponds to the number of odd integers present in the input list. For instance, in Example 1, the odd numbers are 51, 23, 21, and 25, totaling 4; in Example 10, only 77 is odd, resulting in 1. This rule consistently accounts for all provided training examples."
   },
   {
     "idx": 64,
@@ -5782,7 +5846,8 @@
         "input": "[94, 26, 70, 28, 37, 48]",
         "output": "[47, 13, 35, 14, 24]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies all even integers within the input list and divides each by two using integer division. Odd integers are completely filtered out and do not appear in the output. The resulting list maintains the original relative order of the processed even numbers. This rule consistently explains all examples, such as Example 2 where [0, 60, 98, 62, 57, 13] results in [0, 30, 49, 31] by ignoring the odd values 57 and 13."
   },
   {
     "idx": 65,
@@ -5871,7 +5936,8 @@
         "input": "[41, 41, 25, 47, 71, 35]",
         "output": "[]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies and extracts all even integers from the input list. The resulting list contains these even integers in the reverse order of their appearance in the original input. For instance, in Example 1, the even numbers are 98 and 40; reversing their order results in [40, 98]. This rule consistently accounts for all examples, including those with duplicate even values or lists containing only a single even number."
   },
   {
     "idx": 66,
@@ -5960,7 +6026,8 @@
         "input": "[524, 748, 256, 538, 186]",
         "output": "[186, 256, 524, 538, 748]"
       }
-    ]
+    ],
+    "rationale": "The transformation sorts the unique elements of the input list based on their hundreds digit. For numbers smaller than 100, the hundreds digit is treated as 0. The rule maintains the relative order of numbers sharing the same hundreds digit as they appear in the input, but the primary sorting key is the value of the digit in the third position from the right. This accounts for the specific reordering seen in examples like Example 1, where 44 (hundreds digit 0) and 117/177/340 (hundreds digits 1 and 3) precede 897 and 821 (hundreds digit 8)."
   },
   {
     "idx": 67,
@@ -6049,7 +6116,8 @@
         "input": "[16, 54, 14, 80, 14, 0, 40]",
         "output": "[16, 54, 54, 80, 80, 80, 80]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves iterating through the input list and replacing each element at index $i$ with the maximum value found in the sub-list from the start up to that index (inclusive). This creates a non-decreasing sequence where each value is the \"running maximum\" of the prefix. For instance, in Example 1, the sequence [80, 28, 68, 99, 73] becomes [80, 80, 80, 99, 99] because 80 is the maximum until 99 is encountered. This logic consistently explains all provided examples, ensuring the output list is always monotonically increasing based on the historical peaks of the input."
   },
   {
     "idx": 68,
@@ -6138,7 +6206,8 @@
         "input": "[84, 63, 84, 84, 62, 43, 26]",
         "output": "[84, 3, 63, 1, 62, 1, 43, 1, 26, 1]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies each unique element in the input list and counts its total number of occurrences. The output is constructed by listing each unique element in the order it first appeared, immediately followed by its frequency count. For example, in Example 2, the number 82 appears three times, 41 twice, 65 once, and 67 once, resulting in the sequence [82, 3, 41, 2, 65, 1, 67, 1]. This rule generalizes by maintaining the original insertion order of unique values while aggregating counts from the entire list."
   },
   {
     "idx": 69,
@@ -6227,7 +6296,8 @@
         "input": "[30, 41, 68]",
         "output": "[30, 41]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves removing a single element from the input list based on its position. By comparing the input and output lists across all examples, it is evident that the element at index 2 (the third element) is consistently omitted while all other elements remain in their original order. This pattern holds regardless of the values or the length of the list, indicating a positional deletion rather than a value-based filter."
   },
   {
     "idx": 70,
@@ -6316,7 +6386,8 @@
         "input": "[66, 61, 92, 51, 53, 3]",
         "output": "[61, 92, 51, 53, 3]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where the first element of the input list is removed, while all subsequent elements are preserved in their original order. For instance, in Example 1, the input [90, 21, 43] results in [21, 43], and in Example 2, the input [68, 85, 54, 7, 15, 70, 24] results in [85, 54, 7, 15, 70, 24]. This pattern holds across all ten examples regardless of the list length or the values of the integers. The rule is a simple slice operation starting from the second element to the end of the list."
   },
   {
     "idx": 71,
@@ -6405,7 +6476,8 @@
         "input": "[8, 70, 16, 20, 66]",
         "output": "[66, 16, 8, 70, 20]"
       }
-    ]
+    ],
+    "rationale": "The transformation reorders the input list by first extracting elements in reverse order starting from the last element and skipping every other one, followed by the remaining elements in their original relative order. Specifically, the output is the concatenation of the elements at even indices of the reversed list (indices -1, -3, -5, etc.) and the elements at the remaining indices in increasing order. This pattern ensures that for a list of any length, the last element always moves to the front, followed by a specific interleaving of the rest of the sequence."
   },
   {
     "idx": 72,
@@ -6494,7 +6566,8 @@
         "input": "[34, 2, 21, 61, 32, 19]",
         "output": "[28]"
       }
-    ]
+    ],
+    "rationale": "The transformation calculates the arithmetic mean of the input list and rounds the result to the nearest integer. For example, in Example 1, the sum of [17, 90, 3, 1, 47, 41] is 199, and 199 divided by 6 is approximately 33.16, which rounds to 33. In Example 2, the sum of [29, 89, 79] is 197, and 197 divided by 3 is approximately 65.66, which rounds to 66. The rule consistently applies this rounding logic to the average of all elements in the list, returning the result as a single-element list."
   },
   {
     "idx": 73,
@@ -6583,7 +6656,8 @@
         "input": "[95, 16, 68, 21, 19, 3, 35, 73]",
         "output": "[3, 21, 35, 68, 73]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies specific indices within the input list to retain and then sorts those values in ascending order. Specifically, it extracts the elements at indices 2 and 3, as well as all elements from index 5 onwards, effectively discarding the elements at indices 0, 1, and 4. The resulting subset of the list is then sorted numerically. This rule consistently explains the outputs across all examples, regardless of the list's total length."
   },
   {
     "idx": 74,
@@ -6672,7 +6746,8 @@
         "input": "[48, 65, 41, 26, 9, 35]",
         "output": "[48, 65, 41, 26, 9, 35, 3]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list is identical to the input list with a single integer, 3, appended to the end. This pattern holds regardless of the input list's length, the values of its elements, or whether the value 3 already exists within the input (as seen in Example 8). The transformation is a simple concatenation of the list [3] to the input list."
   },
   {
     "idx": 75,
@@ -6761,7 +6836,8 @@
         "input": "[3, 4, 2, 5, 8, 0]",
         "output": "[5, 8, 0]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves slicing the input list based on its first and last elements. Specifically, the first element of the list determines the number of elements to remove from the beginning, and the last element determines the number of elements to remove from the end. If the last element is zero, no elements are removed from the end. This rule consistently explains the outputs: for instance, in Example 1, the first element is 5 and the last is 0, resulting in the removal of the first 5 elements and none from the end."
   },
   {
     "idx": 76,
@@ -6850,7 +6926,8 @@
         "input": "[23, 60, 25, 20, 2, 94, 2]",
         "output": "[94]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output is a single-element list containing the largest integer from the input list. For instance, in Example 1, the maximum value of [10, 4, 99, 46, 14] is 99, and in Example 3, the maximum of [8, 25, 58, 67, 85, 73] is 85. This rule holds across all examples, including those with duplicate maximum values like Example 9. The transformation generalizes as a selection of the maximum element from the input list."
   },
   {
     "idx": 77,
@@ -6939,7 +7016,8 @@
         "input": "[3, 5, 4, 6, 8, 5, 1, 5]",
         "output": "[3, 8, 4, 6, 5, 5, 1, 5]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule focuses on specific indices within the input list. It checks the values at index 2 and index 3: if the value at index 2 is strictly greater than the value at index 3, these two elements are swapped. Otherwise, the elements at index 1 and index 4 are swapped. This logic consistently explains the changes observed in the examples, such as Example 1 where 8 < 10 (swapping indices 1 and 4) and Example 2 where 9 > 6 (swapping indices 2 and 3)."
   },
   {
     "idx": 78,
@@ -7028,7 +7106,8 @@
         "input": "[53, 41, 6, 42, 55, 55, 78, 36]",
         "output": "[78, 36, 8, 53, 6]"
       }
-    ]
+    ],
+    "rationale": "The transformation extracts five specific properties from the input list to form a new list of length five. Specifically, the output consists of the maximum value in the list, the last element, the total count of elements (length), the first element, and the minimum value in the list, in that order. This pattern consistently accounts for all examples, including cases where the first or last elements happen to be the minimum or maximum."
   },
   {
     "idx": 79,
@@ -7117,7 +7196,8 @@
         "input": "[43, 6, 8, 54, 42]",
         "output": "[43, 6, 8, 54, 42, 7, 3, 8, 4, 3]"
       }
-    ]
+    ],
+    "rationale": "The training examples show that regardless of the length or content of the input list, the output is always the original list followed by the same sequence of five integers: 7, 3, 8, 4, and 3. This transformation is a simple concatenation of a fixed suffix to the input list. The rule is consistent across all examples, including those with varying input lengths and values, indicating a constant additive pattern."
   },
   {
     "idx": 80,
@@ -7206,7 +7286,8 @@
         "input": "[61, 56, 39, 79, 76]",
         "output": "[61, 56, 39, 79, 76, 61, 56, 39, 79, 76]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list is a concatenation of the input list with itself. In every case, from lists of length 3 to length 6, the output contains the original sequence followed immediately by an identical copy of that sequence. This rule is a simple duplication of the list structure and generalizes to any list of integers."
   },
   {
     "idx": 81,
@@ -7295,7 +7376,8 @@
         "input": "[71, 1, 63, 29, 55, 19, 21]",
         "output": "[63, 29, 71, 1, 55, 19, 21]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves swapping the first two elements of the list with the third and fourth elements. Specifically, the element at index 0 is swapped with the element at index 2, and the element at index 1 is swapped with the element at index 3. All other elements in the list remain in their original positions. This pattern is consistent across all provided examples regardless of the list length."
   },
   {
     "idx": 82,
@@ -7384,7 +7466,8 @@
         "input": "[57, 6, 57]",
         "output": "[57, 57]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list contains only two elements, regardless of the input list's length. By comparing the input and output, we can see that the first element of the output matches the first element of the input, and the second element of the output matches the last element of the input. Intermediate values are discarded. This rule generalizes to any list with at least two elements."
   },
   {
     "idx": 83,
@@ -7473,7 +7556,8 @@
         "input": "[59, 81, 84, 12, 21]",
         "output": "[59, 81, 84, 12, 21, 92, 63, 34, 18, 55]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list begins with the original input list and is followed by a fixed sequence of integers. Regardless of the input list's length or content, the sequence [92, 63, 34, 18, 55] is appended to the end. This transformation is a simple list concatenation where the suffix remains constant across all instances."
   },
   {
     "idx": 84,
@@ -7562,7 +7646,8 @@
         "input": "[0, 14, 20, 3, 16, 12, 14]",
         "output": "[79]"
       }
-    ]
+    ],
+    "rationale": "The training examples show a consistent pattern where a list of integers is transformed into a single-element list containing the sum of all integers in the input. For instance, in Example 2, 17 + 2 + 13 equals 32, and in Example 4, 5 + 7 + 4 + 0 equals 16. This rule holds across all provided examples regardless of the list length or the values of the integers."
   },
   {
     "idx": 85,
@@ -7651,7 +7736,8 @@
         "input": "[49, 63, 12, 30, 83, 85, 32]",
         "output": "[49, 8, 12, 30, 83, 85, 32]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where the second element of the input list (index 1) is replaced by the integer 8, while all other elements remain unchanged. This pattern holds regardless of the original value at that position or the length of the list. The rule is a simple positional substitution that generalizes to any list with at least two elements."
   },
   {
     "idx": 86,
@@ -7740,7 +7826,8 @@
         "input": "[7, 63, 79, 43, 53, 23, 79]",
         "output": "[0, 1, 0, 0, 0, 0, 0]"
       }
-    ]
+    ],
+    "rationale": "The training examples show a transformation where each integer in the input list is mapped to either 0 or 1. By examining the values that result in 1 (e.g., 69 in Example 1; 9 and 93 in Example 2; 12 and 99 in Example 3), it becomes clear that the output is 1 if the input number is divisible by 3, and 0 otherwise. This rule consistently explains all examples, including cases where no elements are divisible by 3 (Example 9)."
   },
   {
     "idx": 87,
@@ -7829,7 +7916,8 @@
         "input": "[3, 4, 2]",
         "output": "[1, 2, 3, 1, 2, 3, 4, 1, 2]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule processes each integer in the input list sequentially. For every element $n$ in the input, it generates a sequence of integers starting from 1 up to $n$ (inclusive). These sequences are then concatenated in the order they appear to form the final output list. If an element is 0 or less, no numbers are added for that specific element, as seen in examples where 0 is present in the input."
   },
   {
     "idx": 88,
@@ -7918,7 +8006,8 @@
         "input": "[1, 45, 87, 98, 6, 51]",
         "output": "[87]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the first element of the input list as an index, let's call it $N$. The output is a single-element list containing the value located at index $N + 1$ of the original input list. For instance, in Example 1, the first element is 0, so the output is the element at index 1 (4); in Example 2, the first element is 2, so the output is the element at index 3 (44)."
   },
   {
     "idx": 89,
@@ -8007,7 +8096,8 @@
         "input": "[26, 64, 39, 30, 52]",
         "output": "[30, 52, 64, 26, 39]"
       }
-    ]
+    ],
+    "rationale": "The transformation sorts the input list of integers based on the value of their last digit (the ones digit). For example, in Example 1, the numbers are rearranged such that their ones digits follow the sequence 3, 4, 5, 8, 8, 9. This rule consistently explains the ordering in all provided examples, including cases with duplicate ones digits where the stable sort property of Python's sorted function preserves the relative order of original elements. The rule generalizes to any list of non-negative integers by applying the modulo 10 operator as the sorting key."
   },
   {
     "idx": 90,
@@ -8096,7 +8186,8 @@
         "input": "[99, 66, 23, 78, 55, 9]",
         "output": "[81, 99, 41, 23, 22, 75, 68, 30]"
       }
-    ]
+    ],
+    "rationale": "The training examples show that regardless of the input list's length or content, the output is consistently the same fixed list of integers: [81, 99, 41, 23, 22, 75, 68, 30]. This indicates a constant transformation where the input is ignored in favor of a predefined sequence. The rule is a simple mapping of any input to this specific static list."
   },
   {
     "idx": 91,
@@ -8185,7 +8276,8 @@
         "input": "[75, 48, 37, 35, 24, 31, 16]",
         "output": "[75, 48, 37, 35, 3, 31, 16]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves checking the length of the input list. If the list contains more than five elements, the element at index 4 (the fifth element) is replaced with the integer 3. If the list has five or fewer elements, it remains unchanged. This pattern is observed in Example 5, Example 7, and Example 9, where the fifth element is modified, while shorter lists or lists where the fifth element is already 3 remain the same."
   },
   {
     "idx": 92,
@@ -8274,7 +8366,8 @@
         "input": "[66, 98, 2, 84, 0, 88, 0, 31, 63, 66]",
         "output": "[84, 2, 98, 66, 88, 66, 63, 31]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies segments of the input list separated by the value 0. Each segment (or sublist) of non-zero integers is reversed individually, and these reversed segments are then concatenated in their original relative order to form the output list. Zeros are treated strictly as delimiters and are excluded from the final result. This rule consistently explains all examples, such as Example 1 where [26, 63] becomes [63, 26] and [50, 75] becomes [75, 50], and Example 8 where the single segment after the leading zero is entirely reversed."
   },
   {
     "idx": 93,
@@ -8363,7 +8456,8 @@
         "input": "[1, 27, 3, 22]",
         "output": "[27]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the first element of the input list as an index and returns the element located at that specific index in a new list. For instance, in Example 1, the first element is 6, and the element at index 6 is 19. In Example 10, the first element is 0, and the element at index 0 is 0. This rule consistently accounts for all provided examples by treating the initial value as a pointer to the target output value."
   },
   {
     "idx": 94,
@@ -8452,7 +8546,8 @@
         "input": "[86, 36, 42, 14, 45, 45, 53]",
         "output": "[42, 14, 45, 45, 53]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule depends on a comparison between the first and last elements of the input list. If the first element is greater than the last element, the first two elements of the list are removed. Otherwise, the last two elements of the list are removed. This logic consistently explains all provided examples, such as Example 1 where 14 > 3 results in removing [14, 89], and Example 2 where 60 > 57 results in removing [60, 52]."
   },
   {
     "idx": 95,
@@ -8541,7 +8636,8 @@
         "input": "[2, 6, 0, 9, 7, 7]",
         "output": "[2, 6, 7, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the minimum and maximum values within the input list and removes all occurrences of both. In Example 1, the minimum is 0 and the maximum is 7, leaving [1, 1, 5, 2, 2]. In Example 4, the minimum is 3 and the maximum is 9, leaving only the 8. This rule consistently explains the reduction in list size across all examples by filtering out the extreme values while preserving the relative order of the remaining elements."
   },
   {
     "idx": 96,
@@ -8630,7 +8726,8 @@
         "input": "[32, 44, 22]",
         "output": "[32, 30, 28, 26, 24, 22]"
       }
-    ]
+    ],
+    "rationale": "The transformation generates a sequence of integers starting from the first element of the input list and ending at the last element. The sequence progresses in steps of 2. If the first element is less than the last, the sequence increments by 2; if the first element is greater than the last, it decrements by 2. This rule explains why intermediate elements in the input list are ignored and why the output length varies based on the numerical distance between the first and last values."
   },
   {
     "idx": 97,
@@ -8719,7 +8816,8 @@
         "input": "[7, 7, 7, 67, 7, 80, 46]",
         "output": "[4]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a specific integer value within the input list and counts its occurrences. By comparing the input lists to the single-element outputs, we observe that the output corresponds to the frequency of the integer that matches the total length of the input list. For instance, in Example 1, the list length is 8 and the number 8 appears 3 times, resulting in [3]. This rule consistently explains all examples, including cases where the length value does not appear at all (resulting in 0, though not shown) or appears multiple times."
   },
   {
     "idx": 98,
@@ -8808,7 +8906,8 @@
         "input": "[64, 10, 40, 72, 81, 38]",
         "output": "[5]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a specific property of the integers in the input list and returns a single-element list containing the count of elements satisfying that property. By examining the examples, we see that the output corresponds to the number of even integers in the input: Example 1 has 50, 26, 12 (count 3), Example 2 has 66, 48 (count 2), and Example 5 has 92, 44, 74, 26, 8 (count 5). This rule consistently accounts for all provided examples, where odd numbers are ignored and even numbers are counted."
   },
   {
     "idx": 99,
@@ -8897,7 +8996,8 @@
         "input": "[9, 88, 43]",
         "output": "[9]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that regardless of the length or content of the input list, the output is always a single-element list containing the integer 9. This suggests a constant transformation where the input is ignored in favor of a fixed output. The rule generalizes as a constant function returning [9]."
   },
   {
     "idx": 100,
@@ -8986,7 +9086,8 @@
         "input": "[19, 6, 18, 4, 15, 9, 19]",
         "output": "[19, 52, 19]"
       }
-    ]
+    ],
+    "rationale": "The transformation preserves the first and last elements of the input list while replacing all intermediate elements with their sum. In cases where the list has three or fewer elements, the structure remains largely unchanged as the middle portion is either a single element or empty. This rule consistently accounts for the outputs across all examples, such as Example 1 where [13, 3, 17, 4, 20] sums to 57, and Example 9 where [17, 12, 7, 20] sums to 56."
   },
   {
     "idx": 101,
@@ -9075,7 +9176,8 @@
         "input": "[85, 31, 34, 6, 29, 18, 4]",
         "output": "[31, 34, 6, 29, 18, 4]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where the first element of the input list is removed, while all subsequent elements are preserved in their original order. For instance, in Example 1, the input [3, 31, 40, 45, 9, 4] results in [31, 40, 45, 9, 4], and in Example 4, the input [99, 11, 36, 23, 75] results in [11, 36, 23, 75]. This pattern of slicing the list from the second element to the end holds across all provided examples regardless of the list's length or the values of the integers."
   },
   {
     "idx": 102,
@@ -9164,7 +9266,8 @@
         "input": "[65, 24, 15, 19, 67, 58, 59]",
         "output": "[7]"
       }
-    ]
+    ],
+    "rationale": "The training examples show a consistent pattern where the output is a single-element list containing an integer. By comparing the input lists to their corresponding outputs, it is evident that the output value matches the number of elements in the input list (e.g., Example 1 has 6 elements and outputs [6], Example 3 has 4 elements and outputs [4]). The rule is to calculate the length of the input list and return it inside a new list."
   },
   {
     "idx": 103,
@@ -9253,7 +9356,8 @@
         "input": "[69, 69, 81, 95, 91, 82, 69, 74, 39]",
         "output": "[81, 95, 91, 82, 74, 39]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves identifying the first element of the input list and removing all occurrences of that specific value from the entire list. In Example 1, the first element is 23, which is removed. In Example 3, the first element is 92, and all three instances of 92 are deleted from the output. This rule consistently accounts for all examples, including those where the first element appears only once or multiple times throughout the sequence."
   },
   {
     "idx": 104,
@@ -9342,7 +9446,8 @@
         "input": "[36, 72, 5, 48]",
         "output": "[36, 72, 48]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves removing a single element from the input list based on its position. By comparing the input and output lists across all examples, it is evident that the element at index 2 (the third element) is consistently omitted. For instance, in Example 1, the value 76 at index 2 is removed, and in Example 4, the value 16 at index 2 is removed. The rule is a simple positional deletion that preserves the order of all other elements and generalizes to any list with at least three elements."
   },
   {
     "idx": 105,
@@ -9431,7 +9536,8 @@
         "input": "[17, 39, 55, 9, 48, 4]",
         "output": "[55, 9, 48]"
       }
-    ]
+    ],
+    "rationale": "The transformation extracts a specific sub-sequence from the input list. By examining the examples, we see that the output consistently consists of three elements starting from the third element (index 2) and ending at the fifth element (index 4). For instance, in Example 1, the elements at indices 2, 3, and 4 are 32, 90, and 96, which match the output. This pattern holds across all examples regardless of the list's total length or the values of the integers."
   },
   {
     "idx": 106,
@@ -9520,7 +9626,8 @@
         "input": "[30, 12, 21, 21, 8]",
         "output": "[30, 42, 63, 71]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the unique elements in the input list based on their first occurrence, preserving their original order. It then calculates the cumulative sum of these unique elements to produce the output list. For example, in Example 1, the unique elements are [7, 27, 25, 12], and their cumulative sums are [7, 34, 59, 71]. This rule ensures that repeated values are ignored rather than simply summing the entire input list."
   },
   {
     "idx": 107,
@@ -9609,7 +9716,8 @@
         "input": "[0, 9, 4]",
         "output": "[13]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that regardless of the length of the input list or the values of the individual integers, the output is always a single-element list. By summing the elements of the input lists (e.g., 10+18+9=37 in Example 1, and 5+6+13=24 in Example 2), we find that the output value corresponds exactly to the sum of all integers in the input. This rule is consistent across all ten examples, including those with zeros or varying lengths."
   },
   {
     "idx": 108,
@@ -9698,7 +9806,8 @@
         "input": "[98, 42, 28, 70, 50, 79, 22]",
         "output": "[294, 126, 84, 210, 150, 237, 66]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule is determined by the length of the input list. If the list contains an even number of elements (as seen in Examples 1, 4, 5, 7, 9, and 10), every element in the list is multiplied by 2. If the list contains an odd number of elements (as seen in Examples 2, 3, 6, and 8), every element is multiplied by 3. This conditional scalar multiplication consistently accounts for all provided input-output pairs."
   },
   {
     "idx": 109,
@@ -9787,7 +9896,8 @@
         "input": "[41, 92, 36, 34, 69]",
         "output": "[92, 36, 34]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves removing the first and last elements of the input list. In every example, the output list is a sub-sequence of the input that excludes the initial and final integers. This pattern holds regardless of the list length or the specific values of the integers, indicating a simple slicing operation from index 1 to the second-to-last index."
   },
   {
     "idx": 110,
@@ -9876,7 +9986,8 @@
         "input": "[25, 36, 9, 60]",
         "output": "[29, 39, 11, 61]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves modifying each element in the input list based on its value and its position. Specifically, for each element at index `j` in a list of length `L`, the output value is calculated as `element + L - j`. This pattern is consistent across all examples; for instance, in Example 1, the first element 46 becomes 46 + 4 - 0 = 50, and the last element 70 becomes 70 + 4 - 3 = 71. The rule accounts for the decreasing offset added to each subsequent element in the list."
   },
   {
     "idx": 111,
@@ -9965,7 +10076,8 @@
         "input": "[11, 72, 59, 66, 60, 89, 8, 87]",
         "output": "[88, 27, 40, 33, 39, 10, 91, 12]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves subtracting each element of the input list from the constant value 99. By observing the examples, such as Example 1 where 97 becomes 2 (99-97) and 47 becomes 52 (99-47), the pattern is consistently applied across all elements. This linear mapping ensures that the sum of the input and output at each index is always 99, generalizing to any integer input."
   },
   {
     "idx": 112,
@@ -10054,7 +10166,8 @@
         "input": "[56, 95, 27]",
         "output": "[17, 38, 82, 56, 95, 27, 1, 55, 27]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves wrapping the input list with a fixed set of prefix and suffix elements. By comparing the input and output lists across all examples, it is evident that the sequence [17, 38, 82] is prepended to the start of the input list, and the sequence [1, 55, 27] is appended to the end. This pattern remains constant regardless of the length or content of the input list, indicating a simple concatenation rule."
   },
   {
     "idx": 113,
@@ -10143,7 +10256,8 @@
         "input": "[48, 98, 60, 57, 84, 37]",
         "output": "[48, 98, 57, 84, 37]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves removing a single element from the input list based on its position. By comparing the input and output lists across all examples, it is evident that the element at index 2 (the third element) is consistently omitted while all other elements remain in their original order. This rule applies regardless of the list's length or the values of the integers, ensuring the output is always the input list with the third item removed."
   },
   {
     "idx": 114,
@@ -10232,7 +10346,8 @@
         "input": "[19, 37, 49, 77]",
         "output": "[1, 2, 3, 5, 6, 7, 8, 9, 10]"
       }
-    ]
+    ],
+    "rationale": "The transformation generates a sequence of integers from 1 to 10, excluding a single value. By comparing the input lists to the outputs, we observe that the excluded value corresponds exactly to the number of elements in the input list (the length of the list). For instance, in Example 1, the input has 4 elements and the output skips 4; in Example 5, the input has 3 elements and the output skips 3. This rule consistently accounts for all examples and generalizes to any input list length between 1 and 10."
   },
   {
     "idx": 115,
@@ -10321,7 +10436,8 @@
         "input": "[25, 7, 22, 25]",
         "output": "[54, 25, 22, 7, 54]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the unique elements from the input list and sorts them (implicitly or explicitly depending on the set implementation, though the gold function suggests the set's unique values). It then calculates the sum of these unique elements and places this sum at both the beginning and the end of the list. For example, in Example 2, the unique elements of [28, 19, 7, 19] are {28, 19, 7}, which sum to 54, resulting in [54, 19, 28, 7, 54]. The rule generalizes by reducing any input list to its distinct members and wrapping that collection with their total sum."
   },
   {
     "idx": 116,
@@ -10410,7 +10526,8 @@
         "input": "[4, 39, 49, 31, 76, 87, 69, 65]",
         "output": "[39, 49, 31, 76]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule uses the first element of the input list (at index 0) as a length parameter, let's call it $N$. The output list is a slice of the input list starting from the second element (index 1) and including the next $N$ elements. For example, in Example 1, the first element is 4, so the output contains the 4 elements following it. If the first element is 0, as seen in Examples 2 and 9, the resulting list is empty. This rule consistently accounts for all provided examples by extracting a sub-list of a specific length determined by the initial value."
   },
   {
     "idx": 117,
@@ -10499,7 +10616,8 @@
         "input": "[94, 90, 11]",
         "output": "[94, 5, 90, 11]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the integer 5 is inserted into the input list at index 1. In every case, the first element of the input list remains at the start, followed immediately by the value 5, and then the remainder of the original list. This transformation is independent of the list's length or the specific values of the other integers."
   },
   {
     "idx": 118,
@@ -10588,7 +10706,8 @@
         "input": "[20, 70, 26, 93, 73]",
         "output": "[20, 70, 26, 93, 73]"
       }
-    ]
+    ],
+    "rationale": "The training examples demonstrate a consistent pattern where the output list is a prefix of the input list. Specifically, for inputs with more than five elements, the output is truncated to include only the first five elements. For inputs with exactly five elements, the output is identical to the input. This indicates a rule where the transformation returns the first five elements of the input list, or the entire list if its length is five or less."
   },
   {
     "idx": 119,
@@ -10677,7 +10796,8 @@
         "input": "[58, 58, 92, 10, 80, 3, 3, 59]",
         "output": "[1, 2, 1, 1, 1, 1, 2, 1]"
       }
-    ]
+    ],
+    "rationale": "The transformation replaces each element in the input list with its cumulative count of occurrences up to that index. For example, the first time a number appears, it is replaced by 1; the second time the same number appears, it is replaced by 2, and so on. This rule explains why Example 9, with three consecutive 81s, results in [1, 2, 3], and why Example 1, with the number 6 appearing at indices 0, 1, and 7, results in 1, 2, and 3 at those respective positions."
   },
   {
     "idx": 120,
@@ -10766,7 +10886,8 @@
         "input": "[87, 88, 89]",
         "output": "[87, 88, 88, 89]"
       }
-    ]
+    ],
+    "rationale": "The transformation generates a continuous sequence of integers between each adjacent pair of numbers in the input list. For every pair of consecutive elements (a, b), the rule creates a range starting at 'a' and ending at 'b', incrementing or decrementing by 1 as necessary. Because the end of one range (b) is the same as the start of the next range in the sequence, these values are repeated in the output, effectively \"connecting\" the input points with linear steps."
   },
   {
     "idx": 121,
@@ -10855,7 +10976,8 @@
         "input": "[99, 75, 68, 90, 77]",
         "output": "[68]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies a specific element from the input list based on its position. By examining the examples, we see that the output is always a single-element list containing the third item (index 2) of the input list. For instance, in Example 1, the third element of [59, 81, 91] is 91, and in Example 2, the third element of [63, 64, 12, 14, 79] is 12. The rule consistently selects the element at index 2 regardless of the list's total length or the values of the other elements."
   },
   {
     "idx": 122,
@@ -10944,7 +11066,8 @@
         "input": "[57, 90, 97, 22, 14, 57]",
         "output": "[90, 57]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule focuses on the first element of the input list as a reference value. The output list is constructed by taking the second element of the input list (index 1) and appending every subsequent element (from index 2 onwards) that is equal to the first element. This pattern holds across all examples: for instance, in Example 1, the first element is 28, the second is 62, and there are two more occurrences of 28 later in the list, resulting in [62, 28, 28]."
   },
   {
     "idx": 123,
@@ -11033,7 +11156,8 @@
         "input": "[66, 75, 30, 16]",
         "output": "[0, 75, 60, 48]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a relationship between the value of each element and its position in the list. By observing the outputs, the first element is always 0 (value * 0), the second element remains unchanged (value * 1), and subsequent elements are multiples of the original value (e.g., in Example 2, 19 becomes 38 and 86 becomes 258). The rule is to multiply each integer in the input list by its zero-based index. This pattern consistently accounts for all provided examples and generalizes to any list of integers."
   },
   {
     "idx": 124,
@@ -11122,7 +11246,8 @@
         "input": "[2, 7, 9, 1, 19, 11, 4]",
         "output": "[2, 5, 7, 9, 1, 19, 11, 4]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves inserting a specific integer at index 1 of the input list, shifting the subsequent elements to the right. The value to be inserted depends on the first element of the list (index 0): if the first element is greater than 5, the value 8 is inserted; otherwise, the value 5 is inserted. This rule consistently explains all examples, such as Example 1 (9 > 5, inserts 8) and Example 2 (3 <= 5, inserts 5)."
   },
   {
     "idx": 125,
@@ -11211,7 +11336,8 @@
         "input": "[97, 39, 19, 19, 85, 32]",
         "output": "[32, 85, 19, 19, 19, 19, 39, 97]"
       }
-    ]
+    ],
+    "rationale": "The transformation reverses the input list and then duplicates specific elements to increase the list length by two. Specifically, after reversing the list, the element originally at index 3 (now at index 3 of the reversed list) is inserted again at the position fourth from the end, and the element originally at index 4 (now at index 4 of the reversed list) is inserted at the position fifth from the end. This results in a symmetric-like expansion where the middle-to-end section of the reversed list repeats certain values, ensuring the rule generalizes for any list of sufficient length."
   },
   {
     "idx": 126,
@@ -11300,7 +11426,8 @@
         "input": "[40, 34, 52, 25, 88, 76]",
         "output": "[9, 6, 3, 8, 5, 40, 34, 52, 25, 88, 76]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where a specific sequence of five integers—9, 6, 3, 8, and 5—is prepended to the original input list. Regardless of the length or content of the input list, the output always begins with this fixed prefix followed by the original elements in their original order. This indicates a simple concatenation rule where the constant list [9, 6, 3, 8, 5] is added to the front of the input."
   },
   {
     "idx": 127,
@@ -11389,7 +11516,8 @@
         "input": "[8, 59, 30, 17]",
         "output": "[8, 59, 30]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output list is a truncated version of the input list. Regardless of the input length (ranging from 4 to 7 elements) or the specific values of the integers, the output always consists of exactly the first three elements of the input. This rule accounts for all provided examples, such as Example 1 where [18, 44, 53, 17] becomes [18, 44, 53] and Example 2 where [43, 31, 20, 28, 28, 95, 94] becomes [43, 31, 20]."
   },
   {
     "idx": 128,
@@ -11478,7 +11606,8 @@
         "input": "[1, 40, 91, 73, 45, 99, 3, 10]",
         "output": "[1, 3]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies elements in the input list based on the parity of the element immediately following them. Specifically, an element is included in the output if and only if the next element in the sequence is an even number. This rule explains why the last element of any input list is never included in the output, as it has no successor to evaluate. For instance, in Example 1, 19 is followed by 64 (even) and 67 is followed by 94 (even), so they are retained, while 86 is followed by 19 (odd) and is excluded."
   },
   {
     "idx": 129,
@@ -11567,7 +11696,8 @@
         "input": "[6, 8, 9, 6, 7]",
         "output": "[6, 6, 7, 8, 6, 7, 8, 9, 6, 6, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the first element of the input list as a reference value. For every subsequent element in the list (including the first element itself), the rule checks if that element is strictly greater than the reference value. If it is, the element is replaced by a range of integers starting from the reference value up to and including the current element; otherwise, the element is kept as is. This explains why sequences like [37, 47] in Example 1 expand into [37, 38, ..., 47], while smaller values like 20 and 8 remain unchanged."
   },
   {
     "idx": 130,
@@ -11656,7 +11786,8 @@
         "input": "[14, 10, 16, 8, 0]",
         "output": "[14]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the last element of the input list as an index and returns the element located at that specific index in the original list. For instance, in Example 1, the last element is 5, and the element at index 5 is 1. In Example 2, the last element is 3, and the element at index 3 is 13. This rule consistently explains the single-element output across all provided examples, where the final value serves as a pointer to the target value."
   },
   {
     "idx": 131,
@@ -11745,7 +11876,8 @@
         "input": "[77, 40, 65, 62, 97, 73, 87]",
         "output": "[77, 40, 62, 65, 97, 73, 87]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves a conditional swap based on the values at specific indices of the input list. If the element at index 2 is greater than the element at index 3, these two elements are swapped. Otherwise, the elements at index 1 and index 4 are swapped. This logic consistently explains all examples, such as Example 1 where 77 > 29 results in a swap of indices 2 and 3, and Example 2 where 19 < 47 results in a swap of indices 1 and 4."
   },
   {
     "idx": 132,
@@ -11834,7 +11966,8 @@
         "input": "[38, 49, 17, 21, 32, 40, 16, 6]",
         "output": "[132]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies and extracts all even integers from the input list and calculates their sum. The output is a single-element list containing this sum. For instance, in Example 1, the only even number is 10, resulting in [10], while in Example 2, the even numbers 42, 4, and 46 sum to 92. This rule consistently accounts for all provided examples, including cases with multiple even numbers or zeros."
   },
   {
     "idx": 133,
@@ -11923,7 +12056,8 @@
         "input": "[33, 76, 92]",
         "output": "[33, 33, 33, 33, 33, 33, 33]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show a transformation where the output is a list of exactly seven integers. In every case, the integer used is the first element of the input list, regardless of the input list's length or the values of the subsequent elements. For instance, in Example 3, the input starts with 62 and has six elements, while in Example 10, the input starts with 58 and has seven elements; both result in a list of seven copies of their respective first elements."
   },
   {
     "idx": 134,
@@ -12012,7 +12146,8 @@
         "input": "[64, 31, 38, 17, 15, 79, 92]",
         "output": "[17, 31, 38, 64, 15, 79, 92]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves swapping the elements at index 0 and index 3 of the input list. In Example 1, 79 (index 0) and 67 (index 3) are swapped. In Example 2, 49 and 18 are swapped. This pattern holds consistently across all examples, including Example 10 where the values at index 0 and index 3 are identical (73), resulting in an output that appears unchanged. The rule generalizes to any list of sufficient length by specifically targeting these two fixed positions."
   },
   {
     "idx": 135,
@@ -12101,7 +12236,8 @@
         "input": "[55, 74, 14, 18, 18, 20]",
         "output": "[55, 9, 14, 18, 18, 20]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves modifying a specific position within the input list. By comparing the input and output lists across all examples, it is evident that the element at index 1 is consistently replaced by the integer 9, regardless of its original value or the length of the list. All other elements in the list remain unchanged."
   },
   {
     "idx": 136,
@@ -12190,7 +12326,8 @@
         "input": "[92, 3, 53, 6]",
         "output": "[9, 92, 3, 53, 6, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves modifying the input list by adding specific constant values at both ends. By comparing the input and output lists across all examples, it is evident that the integer 9 is prepended to the start of the list and the integer 7 is appended to the end. This pattern is consistent regardless of the list length or the values of the elements within the list."
   },
   {
     "idx": 137,
@@ -12279,7 +12416,8 @@
         "input": "[93, 95, 52, 101, 35, 4, 73, 94]",
         "output": "[93, 95, 94]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the tens digit of the first element in the input list and filters the list to retain only those elements that share the same tens digit. For an element to be included, it must have at least two digits to possess a tens place. The rule accounts for all examples, such as Example 1 where the first element is 70 (tens digit 7), resulting in the output [70, 72, 70, 75], while single-digit numbers or numbers with different tens digits are excluded."
   },
   {
     "idx": 138,
@@ -12368,7 +12506,8 @@
         "input": "[5, 1, 2, 7, 9, 10, 0]",
         "output": "[5, 1, 2, 7, 9, 10, 0]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the last element of the input list, let's call it $N$, and returns a slice of the input list containing the last $N$ elements. If $N$ is 0, the rule treats it as a special case and returns the entire original list. For example, in Example 1, the last element is 4, so the output is the last 4 elements [10, 9, 4, 4]; in Example 9, the last element is 0, so the entire list is returned. This rule consistently explains all provided examples where the output length matches the value of the final integer in the input."
   },
   {
     "idx": 139,
@@ -12457,7 +12596,8 @@
         "input": "[63, 44, 41, 3, 63, 58]",
         "output": "[44, 41, 3, 63, 58]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the maximum value within the input list and removes its first occurrence while preserving the relative order of all other elements. In Example 1, the largest value 49 is removed; in Example 5, one of the two 83s is removed; and in Example 7, the leading 81 is removed as it is the maximum. This rule consistently accounts for the reduction in list length by exactly one across all provided examples."
   },
   {
     "idx": 140,
@@ -12546,7 +12686,8 @@
         "input": "[14, 11, 5, 17, 5, 11, 17, 11]",
         "output": "[8, 11, 17, 11, 5, 17, 5, 11, 14, 8]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the length of the input list and uses it as a boundary value. The output is constructed by taking the length of the input list, prepending it to the reversed version of the input list, and then appending the same length value at the end. For instance, in Example 1, the input has 7 elements, so the output starts and ends with 7, with the original elements reversed in between."
   },
   {
     "idx": 141,
@@ -12635,7 +12776,8 @@
         "input": "[5, 4, 11, 4, 22]",
         "output": "[11, 22]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves filtering the input list to remove specific elements based on their numerical value. By comparing the input and output lists across all examples, it is evident that elements with a value strictly less than 8 are excluded from the output. For instance, in Example 1, the values 7, 1, and 14 are present in the input, but only 7 and 1 are removed (14 remains), confirming the threshold is 8. This rule consistently accounts for all changes, such as the removal of 7, 5, 0, 4, and 1 across the various examples, while preserving all integers greater than or equal to 8."
   },
   {
     "idx": 142,
@@ -12724,7 +12866,8 @@
         "input": "[5, 4, 8, 3, 7, 4, 3, 3]",
         "output": "[5, 5, 10, 6, 11, 9, 9, 10]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies a relationship between the input values and their positions in the list. By comparing the input and output at each index, it is evident that the output is calculated by adding the zero-based index of each element to its original value. For example, in Example 1, the first element 6 remains 6 (6+0), the second element 8 becomes 9 (8+1), and the third element 0 becomes 2 (0+2). This rule consistently accounts for all changes across the provided examples and generalizes to any list of integers."
   },
   {
     "idx": 143,
@@ -12813,7 +12956,8 @@
         "input": "[40, 94, 50, 0, 99, 15, 53]",
         "output": "[99, 15, 53]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule identifies the first occurrence of the integer 0 in the input list and returns all elements that follow it. In Example 1, the 0 is at index 4, so the output contains the elements from index 5 onwards. In Example 4, where multiple zeros exist, the rule specifically triggers on the first 0 encountered, returning everything after it including any subsequent zeros. This logic consistently accounts for all provided examples, including those where the 0 is at the very beginning of the list."
   },
   {
     "idx": 144,
@@ -12902,7 +13046,8 @@
         "input": "[8, 16, 34]",
         "output": "[8]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves truncating the input list by removing its last two elements. In each example, the output list is a prefix of the input list, specifically excluding the final two integers regardless of the list's total length or the values of the integers. For instance, an input of length 7 results in an output of length 5, and an input of length 3 results in an output of length 1."
   },
   {
     "idx": 145,
@@ -12991,7 +13136,8 @@
         "input": "[97, 82, 12, 70]",
         "output": "[12, 70, 97, 82]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves swapping the first two elements of the list with the third and fourth elements. Specifically, the element at index 0 is swapped with the element at index 2, and the element at index 1 is swapped with the element at index 3. Any elements beyond the first four remain in their original positions. This rule consistently explains the reordering observed in all provided examples, regardless of the list length (provided it is at least 4)."
   },
   {
     "idx": 146,
@@ -13080,7 +13226,8 @@
         "input": "[7, 7, 0, 5, 3]",
         "output": "[7, 0, 5, 3]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves identifying the first occurrence of the integer 7 in the input list and removing it. In each example, the output list is identical to the input list except for the absence of the first 7 encountered. For instance, in Example 1, the 7 at index 0 is removed, while in Example 4, only the first 7 at index 1 is removed, leaving the subsequent 7s intact. If the number 7 appears at the end of the list, as in Example 9, it is simply omitted from the output."
   },
   {
     "idx": 147,
@@ -13169,7 +13316,8 @@
         "input": "[10, 62, 11, 44, 19]",
         "output": "[11, 62, 10, 44, 19]"
       }
-    ]
+    ],
+    "rationale": "The transformation involves swapping the first and third elements of the input list (indices 0 and 2). In all provided examples, the element at index 0 and the element at index 2 exchange positions, while all other elements, including the one at index 1 and those from index 3 onwards, remain in their original order. This rule consistently explains the change from input to output across lists of varying lengths."
   },
   {
     "idx": 148,
@@ -13258,7 +13406,8 @@
         "input": "[69, 73]",
         "output": "[4, 4]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the maximum and minimum values within the input list and calculates their absolute difference. Every occurrence of either the maximum or the minimum value in the original list is then replaced by this calculated difference, while all other elements remain unchanged. For instance, in Example 1, the min is 41 and max is 79, with a difference of 38, resulting in [67, 38, 38]. This rule consistently explains the outputs across all examples, including single-element lists where the min and max are identical, resulting in zero."
   },
   {
     "idx": 149,
@@ -13347,7 +13496,8 @@
         "input": "[3, 8, 4, 1, 5, 4, 9, 9, 1]",
         "output": "[1]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the value at the very first index of the input list and uses that value as a pointer to another index within the same list. Specifically, the output is a single-element list containing the value located at index `lst[0]`. For example, in Example 1, the first element is 5, and the element at index 5 is 6. This rule consistently accounts for all provided examples, such as Example 2 where the first element is 3 and the element at index 3 is 9."
   },
   {
     "idx": 150,
@@ -13436,7 +13586,8 @@
         "input": "[24, 7, 13, 11]",
         "output": "[7, 9, 11, 13, 15, 17, 19, 21, 23]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the minimum and maximum values within the input list and generates a sequence starting from the minimum value up to (but not exceeding) the maximum value, incrementing by 2 at each step. For instance, in Example 1, the range is from 22 to 40, resulting in [22, 24, ..., 40]. This rule consistently accounts for all examples, including those where the input list contains more than three elements or where the starting value is odd or even."
   },
   {
     "idx": 151,
@@ -13525,7 +13676,8 @@
         "input": "[92, 95, 6, 67, 47, 61]",
         "output": "[6]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that the output is a single-element list containing the value located at index 2 of the input list. For instance, in Example 1, the third element is 78, and in Example 2, it is 17. This pattern holds across all examples regardless of the list length or the values of other elements. The rule is to extract the element at index 2 and return it as a new list."
   },
   {
     "idx": 152,
@@ -13614,7 +13766,8 @@
         "input": "[4, 5, 0]",
         "output": "[4, 4, 4, 4, 5, 5, 5, 5, 5]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves iterating through each integer in the input list and repeating that integer a number of times equal to its value. For example, if the input contains a 4, the output will include four consecutive 4s at that position. If an element is 0, it is effectively removed from the sequence because it is repeated zero times. This rule consistently explains all examples, such as Example 1 where [2, 4, 1, 0] becomes two 2s, four 4s, and one 1."
   },
   {
     "idx": 153,
@@ -13703,7 +13856,8 @@
         "input": "[58, 2, 30, 25, 11]",
         "output": "[2, 58, 30, 25, 11]"
       }
-    ]
+    ],
+    "rationale": "The training examples demonstrate a consistent transformation where the first two elements of the input list are swapped, while all subsequent elements remain in their original positions. For instance, in Example 1, [40, 5, 50, 92] becomes [5, 40, 50, 92], and in Example 4, [1, 85, 30, 2, 47, 14, 37] becomes [85, 1, 30, 2, 47, 14, 37]. This rule applies regardless of the values or the length of the list (provided it has at least two elements). The transformation is a simple positional swap of index 0 and index 1."
   },
   {
     "idx": 154,
@@ -13792,7 +13946,8 @@
         "input": "[92, 50, 16, 77, 25, 75]",
         "output": "[8, 2, 7, 0, 3]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that regardless of the input list's length or content, the output is always the same fixed list of integers: [8, 2, 7, 0, 3]. This indicates a constant transformation rule where the input is ignored in favor of a static sequence. The rule generalizes as a constant function that returns this specific five-element list for any given input."
   },
   {
     "idx": 155,
@@ -13881,7 +14036,8 @@
         "input": "[22, 85, 54, 54, 85, 45, 18, 54]",
         "output": "[5]"
       }
-    ]
+    ],
+    "rationale": "The transformation identifies the number of unique elements present in the input list. For each example, the output is a single-element list containing the count of distinct integers found in the input. For instance, in Example 3, the input [52, 69, 69, 42, 52, 69, 69, 5] contains the unique values {52, 69, 42, 5}, resulting in the output [4]. This rule consistently accounts for all provided examples regardless of the list length or the frequency of repeated values."
   },
   {
     "idx": 156,
@@ -13970,7 +14126,8 @@
         "input": "[11, 28, 31, 34, 54, 45]",
         "output": "[5, 2]"
       }
-    ]
+    ],
+    "rationale": "The training examples consistently show that regardless of the input list's length or the specific integers it contains, the output is always the same static list: [5, 2]. The rule is a constant transformation where the input is ignored and a fixed list of two integers is returned. This pattern holds across all ten examples provided."
   },
   {
     "idx": 157,
@@ -14059,7 +14216,8 @@
         "input": "[1, 1, 4, 13, 6, 9, 6, 13]",
         "output": "[]"
       }
-    ]
+    ],
+    "rationale": "The transformation extracts a specific slice of the input list based on the values of the first two elements. Specifically, if the first element is $M$ and the second element is $N$, the output is the sublist starting from index $M+2$ up to (but not including) index $N+2$. For example, in Example 1, $M=1$ and $N=5$, so the slice is from index 3 to 7, resulting in [8, 8, 2]. If the calculated start index is greater than or equal to the end index, an empty list is returned, as seen in Examples 6 and 7."
   },
   {
     "idx": 158,
@@ -14148,7 +14306,8 @@
         "input": "[58, 62, 77]",
         "output": "[5, 6, 7]"
       }
-    ]
+    ],
+    "rationale": "The transformation extracts the tens digit from each integer in the input list. For two-digit numbers like 67 or 45, the output is the first digit (6 and 4, respectively). For single-digit numbers like 2 or 5, the tens digit is implicitly 0, which is reflected in the outputs. This rule consistently accounts for all examples, including cases where the number ends in zero or has identical digits."
   },
   {
     "idx": 159,
@@ -14237,6 +14396,7 @@
         "input": "[63, 10, 2, 85, 55, 5]",
         "output": "[5]"
       }
-    ]
+    ],
+    "rationale": "The transformation rule involves slicing the input list to remove the first five elements. In each example, the output consists of all elements starting from index 5 to the end of the list. If the input list has five or fewer elements, the resulting output is an empty list, as seen in Examples 5, 6, and 9. This rule consistently accounts for all provided training examples by skipping the initial segment of the sequence."
   }
 ]

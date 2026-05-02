@@ -144,7 +144,10 @@ def _process_metric(
         elif metric_type == "counting":
             val_a = mdata_a.get("example_count", 0) or 0
             val_b = mdata_b.get("example_count", 0) or 0
-        else:  # coverage
+        elif metric_type in ("coverage", "scorebased"):  # score is the primary value
+            val_a = mdata_a.get("score") or 0.0
+            val_b = mdata_b.get("score") or 0.0
+        else:
             val_a = mdata_a.get("score") or 0.0
             val_b = mdata_b.get("score") or 0.0
 

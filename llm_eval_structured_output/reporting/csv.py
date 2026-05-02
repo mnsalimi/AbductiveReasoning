@@ -96,15 +96,20 @@ def save_checkpoint_csvs(
                     _example_excerpt(e) for e in mdata.get("examples", []) if isinstance(e, dict)
                 )
 
-            unnorm_item[f"{mname}_count"] = count
-            unnorm_item[f"{mname}_detected"] = detected
+            # For scorebased metrics, score is the primary column; skip the
+            # boolean _detected and the always-zero _count so they don't clutter
+            # the summary CSVs and plots.
+            if mtype != "scorebased":
+                unnorm_item[f"{mname}_count"] = count
+                unnorm_item[f"{mname}_detected"] = detected
             unnorm_item[f"{mname}_analysis"] = analysis
             unnorm_item[f"{mname}_examples"] = examples_str
             if score is not None:
                 unnorm_item[f"{mname}_score"] = score
 
-            norm_item[f"{mname}_count"] = count * norm_factor
-            norm_item[f"{mname}_detected"] = detected
+            if mtype != "scorebased":
+                norm_item[f"{mname}_count"] = count * norm_factor
+                norm_item[f"{mname}_detected"] = detected
             norm_item[f"{mname}_analysis"] = analysis
             norm_item[f"{mname}_examples"] = examples_str
             if score is not None:
@@ -212,6 +217,7 @@ def write_debug_logs(all_results: list[dict]) -> None:
                     mname: {
                         "type":          mdata.get("type"),
                         "detected":      mdata.get("detected"),
+                        "score":         mdata.get("score"),  # primary for scorebased
                         "example_count": mdata.get("example_count"),
                         "analysis":      mdata.get("reasoning"),
                         "examples":      mdata.get("examples", []),
@@ -239,6 +245,9 @@ def write_debug_logs(all_results: list[dict]) -> None:
                 tok = mdata.get("tokens") or {}
                 row[f"{mname}_type"]             = mdata.get("type")
                 row[f"{mname}_detected"]         = mdata.get("detected")
+                _score_val = mdata.get("score")
+                if _score_val is not None:
+                    row[f"{mname}_score"] = _score_val  # primary for scorebased
                 row[f"{mname}_example_count"]    = mdata.get("example_count")
                 row[f"{mname}_analysis"]         = mdata.get("reasoning")
                 row[f"{mname}_examples"]         = _safe_json(mdata.get("examples", []))

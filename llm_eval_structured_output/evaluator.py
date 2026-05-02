@@ -75,6 +75,8 @@ def process_single_item(
             detail = f"count={len(result.examples)}"
         elif metric.metric_type == "coverage":
             detail = f"score={result.score:.2%}  ({sum(1 for e in result.examples if e.get('addressed'))}/{len(result.examples)} details)"
+        elif metric.metric_type == "scorebased":
+            detail = f"score={result.score}"
         elif metric.metric_type == "graph":
             detail = (
                 f"nodes={sum(1 for e in result.examples if e.get('kind') == 'vertex')}  "

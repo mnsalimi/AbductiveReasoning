@@ -15,11 +15,12 @@ llm_eval/
 ├── pyproject.toml              ← project metadata, dependencies, linter config
 ├── requirements.txt
 ├── .env                        ← API credentials (never commit – in .gitignore)
+├── .env.example                ← example format for API credentials
 ├── .gitignore
 │
 ├── docs/
 │   ├── adding_a_metric.md      ← step-by-step guide for adding new metrics
-│   └── metric_definitions.md  ← definitions of every metric and metric type
+│   └── metric_definitions.md   ← definitions of every metric and metric type
 │
 ├── metrics/
 │   ├── base.py                 ← MetricResult dataclass + abstract BaseMetric
@@ -27,34 +28,40 @@ llm_eval/
 │   ├── counting.py             ← CountingMetric class (list of examples)
 │   ├── coverage.py             ← CoverageMetric class (per-detail coverage + score)
 │   ├── graph_structure.py      ← Graph metric class (directed rationale graph + scalars)
+│   ├── scorebased.py           ← ScoreBasedMetric class (graded scalar scoring)
 │   └── registry.py             ← METRICS dict – add new metrics here
 │
 ├── prompts/
+│   ├── dataset_notes.py                 ← Dataset-specific prompt note rendering
 │   ├── binary/
-│   │   ├── uncertainty_language.py      ← binary: presence of hedging language
-│   │   ├── differential_evaluation.py   ← binary: explicit evaluation/refutation of alternatives
-│   │   ├── evidence_explanation_directionality.py ← binary: evidence → explanation direction awareness
-│   │   └── detail_coverage.py           ← binary: hypothesis covers all observation details
+│   │   └── evidence_explanation_directionality.py ← binary: evidence → explanation direction awareness
 │   ├── coverage/
 │   │   └── observation_coverage.py      ← coverage: per-detail observation coverage + score
 │   ├── graph_structure/
 │   │   └── rationale_graph.py           ← graph: text-grounded directed rationale graph extraction
+│   ├── scorebased/
+│   │   └── evidence_explanation_directionality_scorebased.py ← score-based: graded directionality scoring
 │   └── counting/
-│       ├── branchiness.py               ← counting: parallel hypothesis exploration
+│       ├── branchiness.py               ← counting: distinct candidate-explanation exploration
 │       ├── backtracking.py              ← counting: explicit self-correction moments
 │       ├── uncertainty_markers.py       ← counting: individual hedging word occurrences
 │       ├── prior.py                     ← counting: prior probability / base-rate reasoning
 │       └── differential_elimination.py  ← counting: explicit elimination of alternatives
 │
 ├── scripts/
+│   ├── generate_latex_report.py ← generate a full LaTeX report comparing checkpoints/metrics
 │   ├── generate_latex_slides.py ← generate Beamer .tex comparing one item across 2 checkpoints
+│   ├── gen_report.sh            ← edit variables here and run full report generation
+│   ├── gen_report_single.sh     ← shell wrapper for a single report run
 │   └── gen_slides.sh            ← edit variables here and run to generate slides
 │
 ├── random_samples/             ← pre-generated sample index files (pinned PIDs)
 │   ├── samples_3.json
 │   ├── samples_5.json
 │   ├── samples_10.json
-│   └── samples_50.json
+│   ├── samples_50.json
+│   ├── samples_100.json
+│   └── samples_200.json
 │
 ├── checkpoints/                ← input data (model checkpoint outputs)
 │   ├── raw_model/              ← treated as checkpoint-0
@@ -63,9 +70,8 @@ llm_eval/
 ├── reporting/                  ← output-generation package
 │   ├── csv.py                  ← per-checkpoint CSV writing, debug logs, config snapshot
 │   ├── excel.py                ← colour-coded Excel workbook builder
-│   ├── plots.py                ← evolution line plots (respects SAMPLE_CORRECT_RATIO)
-│   ├── comparison_logs.py      ← pairwise CSV diff logs (2-checkpoint runs)
-│   └── detailed_logs.py        ← backward-compat alias for comparison_logs.py
+│   ├── plots.py                ← evaluation line plots (respects SAMPLE_CORRECT_RATIO)
+│   └── comparison_logs.py      ← pairwise CSV diff logs (2-checkpoint runs)
 │
 └── results/                    ← generated outputs (see Outputs section)
 ```
@@ -77,7 +83,7 @@ See **[docs/metric_definitions.md](docs/metric_definitions.md)** for full defini
 ### Binary metrics
 The LLM reasons about whether a phenomenon is present (`detected: true/false`) and explains why.  It also quotes the strongest piece of supporting evidence.
 
-**Metrics:** `uncertainty_language`, `detail_coverage`, `differential_evaluation`, `evidence_explanation_directionality`
+**Metrics:** `evidence_explanation_directionality`
 
 ### Counting metrics
 The LLM does **not** produce a number.  Instead it returns a list of concrete **examples** (excerpt + explanation) of the phenomenon.  The pipeline derives a count as `len(examples)` for plotting.
@@ -94,6 +100,11 @@ The LLM extracts a text-grounded directed rationale graph (vertices + edges), th
 
 **Metrics:** `rationale_graph`
 
+### Score-based metrics
+The LLM assigns a graded scalar score rather than a binary label, with allowed values constrained in code.
+
+**Metrics:** `evidence_explanation_directionality_scorebased`
+
 ## Quick start
 
 ```bash
@@ -101,7 +112,7 @@ pip install -r requirements.txt
 # or, using pyproject.toml:
 pip install -e .
 
-# Set up credentials – add your API key to .env
+# Set up credentials – copy .env.example to .env and add your API key
 # OPENAI_API_KEY=your_key_here
 # OPENAI_BASE_URL=https://api.hyperbolic.xyz/v1   (OpenAI-compatible models)
 # GEMINI_BASE_URL=https://api.metisai.ir          (Gemini models, no /openai/v1 suffix)
@@ -147,6 +158,13 @@ class ObservationDetail(BaseModel):
 class ObservationCoverageResponse(BaseModel):
     observation_details: list[ObservationDetail]
     overall_analysis: str
+```
+
+**Score-based metrics** use `ScoreBasedResponse`:
+```python
+class ScoreBasedResponse(BaseModel):
+    reasoning_analysis: str      # Brief explanation of the graded judgment
+    directionality_score: float  # Snapped to one of {0.0, 0.5, 1.0}
 ```
 
 Token usage (input/output, and optionally reasoning/cached input) is recorded per LLM call and propagated into the full-debug outputs.
@@ -198,6 +216,7 @@ Metric results are rendered according to type:
 - **Binary** — large ✓/✗, detected status, reasoning text, evidence quote block
 - **Counting** — prominent count, overall analysis, numbered list of (excerpt, why) pairs
 - **Coverage** — `X/N = Y%` score, overall analysis, `tabularx` table with ✓/✗ per detail
+- **Score-based** — numeric score with short reasoning analysis
 
 Data is loaded from `results/llm_logs/{dataset}_full_debug.jsonl` (post-evaluation, includes metrics). If that file doesn't exist yet the script falls back to the raw checkpoint JSON (question + reasoning only, no metric data).
 
@@ -208,7 +227,7 @@ Data is loaded from `results/llm_logs/{dataset}_full_debug.jsonl` (post-evaluati
 See **[docs/adding_a_metric.md](docs/adding_a_metric.md)** for the full step-by-step guide.
 
 Two paths are covered:
-- **Path A** — add a binary (yes/no), counting (example-extraction), or coverage (per-detail) metric using the existing classes. Requires only a new prompt file and one line in `metrics/registry.py`.
+- **Path A** — add a binary, counting, coverage, graph, or score-based metric using the existing classes. Requires only a new prompt file and one line in `metrics/registry.py`.
 - **Path B** — add a completely new metric type with custom LLM output structure. Covers writing the Pydantic schema, the metric class, the prompt file, and registration.
 
 ## Outputs
@@ -222,26 +241,27 @@ results/
 │   │   └── summary_metrics.csv        ← per-dataset averages
 │   ├── all_checkpoints_summary.csv
 │   ├── checkpoint_comparison.xlsx     ← colour-coded comparison table
-│   └── evolution_<metric>_*.png       ← line plots (correct / incorrect / mix)
+│   └── evaluation_<metric>_*.png       ← line plots (correct / incorrect / mix)
 ├── normalized/                        ← same files but counts per 100 words
 ├── llm_logs/
 │   ├── <dataset>_llm_responses.jsonl  ← raw LLM call log (token usage per call)
+│   ├── <dataset>_full_debug.jsonl      ← full per-item debug log with source fields + metrics
 │   └── <dataset>_full_debug_<run>.csv ← all items × all metrics × all checkpoints
 ├── comparison_logs/                   ← only when exactly 2 checkpoints are run
 │   └── <dataset>/
 │       └── <metric>/
 │           ├── match.csv / mismatch.csv           (binary metrics)
-│           └── A_gt_B.csv / A_eq_B.csv / A_lt_B.csv (counting & coverage)
+│           └── A_gt_B.csv / A_eq_B.csv / A_lt_B.csv (counting, coverage, score-based, and graph-scalar metrics)
 └── latex_slides/
     └── <dataset>_pid<N>_ckpt<A>vs<B>_<metric>.tex
 ```
 
-### Evolution plots and `SAMPLE_CORRECT_RATIO`
+### Evaluation plots and `SAMPLE_CORRECT_RATIO`
 
 | `SAMPLE_CORRECT_RATIO` | Plots generated |
 |---|---|
-| `1.0` | `evolution_<metric>_correct.png` only |
-| `0.0` | `evolution_<metric>_incorrect.png` only |
+| `1.0` | `evaluation_<metric>_correct.png` only |
+| `0.0` | `evaluation_<metric>_incorrect.png` only |
 | any other value | `_correct.png`, `_incorrect.png`, and `_mix.png` (all statuses averaged) |
 
 ## Configuration reference (`config.py`)
@@ -258,6 +278,8 @@ results/
 | `ACTIVE_METRICS` | `[]` | Names of metrics to run. Empty list activates **all** registered metrics. |
 | `ACTIVE_DATASETS` | `[]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
 | `EXCLUDED_CHECKPOINTS` | `[]` | Checkpoint directory basenames to skip entirely (e.g. `["raw_model", "checkpoint-500"]`). |
+| `MAX_COMPLETION_TOKENS` | `2048` | Default max completion tokens per LLM call |
+| `METRIC_MAX_COMPLETION_TOKENS` | `{"observation_coverage": 4096, "rationale_graph": 8192}` | Per-metric token overrides; falls back to `MAX_COMPLETION_TOKENS` for unlisted metrics |
 | `CLEAR_PREVIOUS_OUTPUTS` | `True` | Delete existing JSONL logs on start |
 
 ## Pinned samples (`random_samples/`)

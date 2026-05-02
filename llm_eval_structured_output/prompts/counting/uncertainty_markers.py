@@ -11,7 +11,7 @@ quantitative measure of how densely hedged the reasoning trace is.
 
 DATASET_SPECIFIC_NOTES: dict[str, str] = {
     "medqa": (
-        "Extract markers from reasoning only, not from the question stem's given medical facts."
+        "Extract markers only when the model expresses uncertainty in its own reasoning or conclusions, not when it is merely listing probabilistic symptoms."
     ),
     "art": (
         "Focus on uncertainty while reasoning about which hypothesis better explains observations."
@@ -37,6 +37,8 @@ DATASET_SPECIFIC_NOTES: dict[str, str] = {
 }
 
 DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+INCLUDE_FEW_SHOT: bool = False
+INCLUDE_DATASET_SPECIFIC_NOTES: bool = True
 
 SYSTEM_PROMPT = """\
 You are an expert linguistic analyst evaluating AI-generated reasoning traces.
@@ -95,7 +97,7 @@ Do **NOT** extract the following linguistic constructs, as they do not represent
 
 - Extract **each individual marker occurrence** as a separate example, even if
   the same word appears multiple times. Every occurrence is its own entry.
-- The `text` must be a **short, direct quote** from the text — ideally the
+- The `excerpt` must be a **short, direct quote** from the text — ideally the
   single word or short phrase itself, plus just enough surrounding context
   (≤ 15 words) to make it readable.
 - The `explanation` must name the marker category (from the list above) and
@@ -119,7 +121,7 @@ Return ONLY valid JSON with this structure:
   "overall_analysis": "Brief analysis of uncertainty markers density in this reasoning trace",
   "examples": [
     {
-      "text": "Quote of the uncertainty marker from the reasoning trace",
+      "excerpt": "Quote of the uncertainty marker from the reasoning trace",
       "explanation": "Category and meaning of this uncertainty marker"
     }
   ]

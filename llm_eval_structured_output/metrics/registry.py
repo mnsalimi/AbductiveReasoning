@@ -20,6 +20,7 @@ from metrics.binary import BinaryMetric
 from metrics.counting import CountingMetric
 from metrics.coverage import CoverageMetric
 from metrics.graph_structure import RationaleGraphMetric
+from metrics.scorebased import ScoreBasedMetric
 
 # ---------------------------------------------------------------------------
 # Prompt imports – counting metrics
@@ -65,21 +66,17 @@ from prompts.graph_structure.rationale_graph import (
 # ---------------------------------------------------------------------------
 # Prompt imports – binary metrics
 # ---------------------------------------------------------------------------
-from prompts.binary.uncertainty_language import (
-    SYSTEM_PROMPT as UL_SYS,
-    USER_PROMPT_TEMPLATE as UL_USR,
-)
-from prompts.binary.detail_coverage import (
-    SYSTEM_PROMPT as DC_SYS,
-    USER_PROMPT_TEMPLATE as DC_USR,
-)
-from prompts.binary.differential_evaluation import (
-    SYSTEM_PROMPT as DE_SYS,
-    USER_PROMPT_TEMPLATE as DE_USR,
-)
 from prompts.binary.evidence_explanation_directionality import (
     SYSTEM_PROMPT as EED_SYS,
     USER_PROMPT_TEMPLATE as EED_USR,
+)
+
+# ---------------------------------------------------------------------------
+# Prompt imports – score-based metrics
+# ---------------------------------------------------------------------------
+from prompts.scorebased.evidence_explanation_directionality_scorebased import (
+    SYSTEM_PROMPT as EEDS_SYS,
+    USER_PROMPT_TEMPLATE as EEDS_USR,
 )
 
 # ---------------------------------------------------------------------------
@@ -119,29 +116,21 @@ METRICS: dict[str, BaseMetric] = {
         user_prompt_template=DELIM_USR,
     ),
     # ── Binary metrics ──────────────────────────────────────────────────────
-    "uncertainty_language": BinaryMetric(
-        name="uncertainty_language",
-        description="Use of probabilistic language rather than absolute certainty.",
-        system_prompt=UL_SYS,
-        user_prompt_template=UL_USR,
-    ),
-    "detail_coverage": BinaryMetric(
-        name="detail_coverage",
-        description="Hypothesis accounts for all specific observation details, not just the main event.",
-        system_prompt=DC_SYS,
-        user_prompt_template=DC_USR,
-    ),
-    "differential_evaluation": BinaryMetric(
-        name="differential_evaluation",
-        description="Active refutation of alternative hypotheses (Inference to the Best Explanation).",
-        system_prompt=DE_SYS,
-        user_prompt_template=DE_USR,
-    ),
     "evidence_explanation_directionality": BinaryMetric(
         name="evidence_explanation_directionality",
         description="Awareness that abduction runs from evidence to explanation, not reverse.",
         system_prompt=EED_SYS,
         user_prompt_template=EED_USR,
+    ),
+    # ── Score-based metrics ─────────────────────────────────────────────────
+    "evidence_explanation_directionality_scorebased": ScoreBasedMetric(
+        name="evidence_explanation_directionality_scorebased",
+        description=(
+            "Graded directionality score (0.0 / 0.5 / 1.0): how well the reasoning chain "
+            "respects the abductive direction from observations to explanation."
+        ),
+        system_prompt=EEDS_SYS,
+        user_prompt_template=EEDS_USR,
     ),
     # ── Coverage metrics ────────────────────────────────────────────────────
     "observation_coverage": CoverageMetric(

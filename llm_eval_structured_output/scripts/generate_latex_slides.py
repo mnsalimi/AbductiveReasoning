@@ -288,7 +288,7 @@ def _format_metric_binary(mdata: dict, metric_name: str) -> str:
 
     if examples:
         ev = examples[0]
-        excerpt = ev.get("excerpt", "")
+        excerpt = ev.get("excerpt", ev.get("text", ""))
         if excerpt:
             lines += [
                 r"\vspace{6pt}",
@@ -321,7 +321,7 @@ def _format_metric_counting(mdata: dict, metric_name: str) -> str:
             r"\begin{enumerate}\small",
         ]
         for ex in examples:
-            excerpt     = wrap(ex.get("excerpt", ""), 75)
+            excerpt     = wrap(ex.get("excerpt", ex.get("text", "")), 75)
             explanation = wrap(ex.get("explanation", ""), 75)
             lines.append(
                 r"  \item \textbf{Excerpt:} \textit{``" + excerpt + r"''}\\"

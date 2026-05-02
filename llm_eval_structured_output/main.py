@@ -63,7 +63,6 @@ def run() -> None:
     print(f"  Judge model: {config.JUDGE_MODEL}")
     print(f"  N samples  : {config.N_SAMPLES}")
     print(f"  Seed       : {config.RANDOM_SEED}")
-    print(f"  Correct %  : {config.SAMPLE_CORRECT_RATIO}")
     if config.EXCLUDED_CHECKPOINTS:
         print(f"  Excluded   : {', '.join(config.EXCLUDED_CHECKPOINTS)}")
 

@@ -209,6 +209,7 @@ def _openai_structured_call(
     model: str,
     input_messages: list[dict[str, str]],
     response_schema: type[BaseModel],
+    max_completion_tokens: int,
 ) -> tuple[dict, str | None, str | None, dict[str, int | None], str | None]:
     """Run one OpenAI structured-output call."""
     modern = _is_modern_model(model)
@@ -218,10 +219,10 @@ def _openai_structured_call(
         response_format=response_schema,
     )
     if modern:
-        call_kwargs["max_completion_tokens"] = config.MAX_COMPLETION_TOKENS
+        call_kwargs["max_completion_tokens"] = max_completion_tokens
         call_kwargs["reasoning_effort"] = config.REASONING_EFFORT
     else:
-        call_kwargs["max_tokens"] = config.MAX_COMPLETION_TOKENS
+        call_kwargs["max_tokens"] = max_completion_tokens
         call_kwargs["temperature"] = 0.0
 
     response = get_client().chat.completions.parse(**call_kwargs)
@@ -256,6 +257,7 @@ def _gemini_structured_call(
     system_prompt: str,
     user_prompt: str,
     response_schema: type[BaseModel],
+    max_completion_tokens: int,
 ) -> tuple[dict, str | None, str | None, dict[str, int | None], str | None]:
     """Run one Gemini structured-output call."""
     from google.genai import types
@@ -268,7 +270,7 @@ def _gemini_structured_call(
             response_mime_type="application/json",
             response_schema=response_schema,
             temperature=0.0,
-            max_output_tokens=config.MAX_COMPLETION_TOKENS,
+            max_output_tokens=max_completion_tokens,
         ),
     )
     raw_content: str | None = getattr(response, "text", None)
@@ -340,6 +342,10 @@ def ask_llm(
     # All models honour API_MAX_RETRIES; transient errors are always worth retrying
     max_tries = max(1, config.API_MAX_RETRIES)
 
+    effective_max_tokens = config.METRIC_MAX_COMPLETION_TOKENS.get(
+        metric_type, config.MAX_COMPLETION_TOKENS
+    )
+
     modern = _is_modern_model(model)
     is_gemini = _is_gemini_model(model)
     system_role = "developer" if modern else "system"
@@ -359,12 +365,14 @@ def ask_llm(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     response_schema=response_schema,
+                    max_completion_tokens=effective_max_tokens,
                 )
             else:
                 validated, raw_content, thinking, tokens, refusal = _openai_structured_call(
                     model=model,
                     input_messages=input_messages,
                     response_schema=response_schema,
+                    max_completion_tokens=effective_max_tokens,
                 )
 
             if refusal:

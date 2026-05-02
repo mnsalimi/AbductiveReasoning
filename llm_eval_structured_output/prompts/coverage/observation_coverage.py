@@ -36,6 +36,8 @@ DATASET_SPECIFIC_NOTES: dict[str, str] = {
 }
 
 DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+INCLUDE_FEW_SHOT: bool = False
+INCLUDE_DATASET_SPECIFIC_NOTES: bool = True
 
 SYSTEM_PROMPT = """\
 You are an expert evaluator of abductive reasoning traces.

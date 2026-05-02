@@ -97,10 +97,17 @@ class BinaryMetric(BaseMetric):
                 error="Empty or invalid input text.",
             )
 
+        full_input = ""
+        if context and isinstance(context, dict):
+            value = context.get("full_input")
+            if value is not None:
+                full_input = value if isinstance(value, str) else str(value)
+
         user_prompt = (
             self._user_prompt_template
             .replace("{text}", text)
             .replace("{dataset}", dataset)
+            .replace("{full_input}", full_input)
         )
 
         system_prompt = render_system_prompt(self._system_prompt, self.name, dataset)
@@ -108,6 +115,7 @@ class BinaryMetric(BaseMetric):
         payload = llm_client.ask_llm(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
+            source_full_input=full_input,
             response_schema=BinaryResponse,
             dataset=dataset,
             problem_id=problem_id,

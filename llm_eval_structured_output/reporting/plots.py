@@ -1,13 +1,11 @@
 """
 reporting/plots.py
 ------------------
-Evolution line plots.
+Evaluation line plots.
 
-Plotting behaviour is driven by ``config.SAMPLE_CORRECT_RATIO``:
-  == 1.0  →  only "Correct" items were sampled → produce a single "correct" plot
-  == 0.0  →  only "Incorrect" items were sampled → produce a single "incorrect" plot
-  otherwise → produce three plots: "correct", "incorrect", and a "mix"
-              (all statuses averaged together)
+Plots are generated directly from the statuses present in the summary data.
+If multiple statuses are present, one plot is produced per status plus an
+aggregate "mix" plot. If there is only one status, only that status is plotted.
 """
 
 from __future__ import annotations
@@ -17,8 +15,6 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
-
-import config
 
 matplotlib.use("Agg")
 
@@ -36,11 +32,16 @@ def _metric_columns(df: pd.DataFrame) -> list[str]:
     return cols
 
 
+def _status_slug(status: str) -> str:
+    normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in status).strip("_")
+    return normalized or "status"
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _evolution_plot(df: pd.DataFrame, metric_col: str, base_dir: str, suffix: str = "") -> None:
+def _evaluation_plot(df: pd.DataFrame, metric_col: str, base_dir: str, suffix: str = "") -> None:
     if metric_col not in df.columns:
         return
     try:
@@ -55,52 +56,37 @@ def _evolution_plot(df: pd.DataFrame, metric_col: str, base_dir: str, suffix: st
         ax.plot(pivot.index, pivot[ds], marker="o", label=ds, linewidth=2)
     ax.set_xlabel("Checkpoint")
     ax.set_ylabel(metric_col)
-    ax.set_title(f"{metric_col} – evolution across checkpoints" + (f" ({suffix})" if suffix else ""))
+    ax.set_title(f"{metric_col} – evaluation across checkpoints" + (f" ({suffix})" if suffix else ""))
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
-    fname = f"evolution_{metric_col}{'_' + suffix if suffix else ''}.png"
+    fname = f"evaluation_{metric_col}{'_' + suffix if suffix else ''}.png"
     os.makedirs(os.path.join(base_dir, suffix if suffix else "None"), exist_ok=True)
     plt.savefig(os.path.join(os.path.join(base_dir, suffix if suffix else "None"), fname), dpi=150)
     plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# Evolution line plots
+# Evaluation line plots
 # ---------------------------------------------------------------------------
 
-def build_evolution_plots(combined: pd.DataFrame, base_dir: str) -> None:
-    """Produce evolution PNGs based on ``config.SAMPLE_CORRECT_RATIO``.
-
-    * ratio == 1.0  →  only a "correct" plot per metric column
-    * ratio == 0.0  →  only an "incorrect" plot per metric column
-    * anything else →  three plots: "correct", "incorrect", and "mix"
-                       where "mix" averages over all statuses
-    """
+def build_evaluation_plots(combined: pd.DataFrame, base_dir: str) -> None:
+    """Produce evaluation PNGs from the statuses actually present in the data."""
     metric_cols = _metric_columns(combined)
-    ratio = config.SAMPLE_CORRECT_RATIO
-
     has_status = "Status" in combined.columns
+    statuses = []
+    if has_status:
+        statuses = [status for status in combined["Status"].dropna().unique()]
 
     for col in metric_cols:
-        if ratio == 1.0:
-            # Only correct
-            sub = combined[combined["Status"] == "Correct"] if has_status else combined
-            _evolution_plot(sub, col, base_dir, suffix="correct")
-
-        elif ratio == 0.0:
-            # Only incorrect
-            sub = combined[combined["Status"] == "Incorrect"] if has_status else combined
-            _evolution_plot(sub, col, base_dir, suffix="incorrect")
-
+        if not has_status:
+            _evaluation_plot(combined, col, base_dir, suffix="mix")
+        elif len(statuses) <= 1:
+            suffix = _status_slug(str(statuses[0])) if statuses else "status"
+            _evaluation_plot(combined, col, base_dir, suffix=suffix)
         else:
-            # Both individual statuses plus a mixed aggregate
-            if has_status:
-                for status in ("Correct", "Incorrect"):
-                    sub = combined[combined["Status"] == status]
-                    if not sub.empty:
-                        _evolution_plot(sub, col, base_dir, suffix=status.lower())
-                # Mix: aggregate over all statuses
-                _evolution_plot(combined, col, base_dir, suffix="mix")
-            else:
-                _evolution_plot(combined, col, base_dir, suffix="mix")
+            for status in statuses:
+                sub = combined[combined["Status"] == status]
+                if not sub.empty:
+                    _evaluation_plot(sub, col, base_dir, suffix=_status_slug(str(status)))
+            _evaluation_plot(combined, col, base_dir, suffix="mix")

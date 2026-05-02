@@ -15,7 +15,7 @@ remains relatively low." The 2% base rate is a prior being considered.
 
 DATASET_SPECIFIC_NOTES: dict[str, str] = {
     "medqa": (
-        "Ignore priors stated only in the question stem; extract priors only when introduced in the model's reasoning."
+        "Extract priors only when they are clearly introduced as part of the model's inferential reasoning, rather than simply restating historical patient data."
     ),
     "art": (
         "Do not count priors that merely restate provided hypotheses; count inferential base-rate/plausibility reasoning."
@@ -41,6 +41,8 @@ DATASET_SPECIFIC_NOTES: dict[str, str] = {
 }
 
 DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+INCLUDE_FEW_SHOT: bool = False
+INCLUDE_DATASET_SPECIFIC_NOTES: bool = True
 
 SYSTEM_PROMPT = """\
 You are an expert analyst evaluating AI-generated reasoning traces.
@@ -92,7 +94,7 @@ the prior with these observations...".
 ## Extraction rules
 
 - Extract **each distinct prior consideration** as a separate example.
-- The `text` must be a **short, direct quote** from the text that shows
+- The `excerpt` must be a **short, direct quote** from the text that shows
   the model referencing prior information (≤ 25 words of context).
 - The `explanation` must identify the type of prior (from the categories
   above) and briefly explain what prior probability or base rate is being
@@ -128,7 +130,7 @@ Return ONLY valid JSON with this structure:
   "overall_analysis": "Brief analysis of prior probability usage in this reasoning trace",
   "examples": [
     {
-      "text": "Quote of the prior probability consideration from the reasoning trace",
+      "excerpt": "Quote of the prior probability consideration from the reasoning trace",
       "explanation": "Type of prior and what probability/frequency is being referenced"
     }
   ]

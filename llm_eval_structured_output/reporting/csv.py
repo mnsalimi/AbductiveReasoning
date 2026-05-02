@@ -15,6 +15,10 @@ import pandas as pd
 
 import config
 
+
+def _example_excerpt(example: dict[str, Any]) -> str:
+    return example.get("excerpt", example.get("text", ""))
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -22,12 +26,10 @@ import config
 def _safe_json(obj: Any) -> str:
     try:
         return json.dumps(obj, ensure_ascii=False)
-    except Exception:
+    except (TypeError, ValueError):
         return str(obj)
 
-
 def _ensure(*dirs: str) -> None:
-    import os
     for d in dirs:
         os.makedirs(d, exist_ok=True)
 
@@ -53,7 +55,6 @@ def save_checkpoint_csvs(
     Returns (unnorm_summary_df, norm_summary_df) with a ``Checkpoint`` column
     already set, ready to be appended to the global summary list.
     """
-    import os
     _ensure(config.UNNORM_DIR, config.NORM_DIR)
 
     unnorm_rows: list[dict] = []
@@ -92,7 +93,7 @@ def save_checkpoint_csvs(
                 )
             else:
                 examples_str = "; ".join(
-                    e.get("excerpt", "") for e in mdata.get("examples", []) if isinstance(e, dict)
+                    _example_excerpt(e) for e in mdata.get("examples", []) if isinstance(e, dict)
                 )
 
             unnorm_item[f"{mname}_count"] = count
@@ -182,8 +183,7 @@ def write_debug_logs(all_results: list[dict]) -> None:
        prepended.
     """
     import os
-    _ensure(config.LOG_DIR)
-
+    
     by_dataset: dict[str, list[dict]] = {}
     for r in all_results:
         ds = r.get("dataset", "unknown")
@@ -304,7 +304,6 @@ def write_config_snapshot(
         # ── Sampling ─────────────────────────────────────────────────────
         "n_samples": config.N_SAMPLES,
         "random_seed": config.RANDOM_SEED,
-        "sample_correct_ratio": config.SAMPLE_CORRECT_RATIO,
         "max_workers": config.MAX_WORKERS,
         # ── Scope ────────────────────────────────────────────────────────
         "active_metrics": active_metric_names,

@@ -21,13 +21,13 @@ RUN_ID: str = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 # ---------------------------------------------------------------------------
 # Sampling
 # ---------------------------------------------------------------------------
-N_SAMPLES: int = 5          # How many items to evaluate per dataset per checkpoint
+N_SAMPLES: int = 3          # How many items to evaluate per dataset per checkpoint
 MAX_WORKERS: int = 1         # Parallel threads for LLM calls (keep low for testing)
 RANDOM_SEED: int = 42        # Fixed seed for reproducible sampling
 
-# Fraction of N_SAMPLES drawn from correct items (0.0–1.0).
-# Set to None to disable stratified sampling (pure random draw).
-SAMPLE_CORRECT_RATIO: float | None = None
+# Fraction of N_SAMPLES drawn from correct items is NO LONGER SUPPORTED.
+# ground-truth was removed from this pipeline.
+# SAMPLE_CORRECT_RATIO was removed.
 
 # Directory that contains pre-generated sample index files.
 # When N_SAMPLES matches one of these files (e.g. random_samples/samples_10.json),
@@ -58,9 +58,15 @@ GEMINI_BASE_URL: str = os.environ.get("GEMINI_BASE_URL", "")
 
 API_TIMEOUT: float = 60.0   # seconds
 API_MAX_RETRIES: int = 2
-# Maximum completion length per LLM call.
+# Default maximum completion length per LLM call.
 # If responses fail with "length limit was reached", increase this value.
-MAX_COMPLETION_TOKENS: int = 2048
+MAX_COMPLETION_TOKENS: int = 4096
+# Per-metric overrides for MAX_COMPLETION_TOKENS.
+# Metrics not listed here fall back to MAX_COMPLETION_TOKENS.
+METRIC_MAX_COMPLETION_TOKENS: dict[str, int] = {
+    "observation_coverage": 8192,
+    "rationale_graph": 8192,
+}
 
 # If True, continue the run even when the API connectivity check fails.
 # Useful for non-interactive or offline runs.
@@ -91,12 +97,17 @@ CLEAR_PREVIOUS_OUTPUTS: bool = True
 # Controlled by the metric registry (metrics/registry.py).
 # List only the metric names you want to evaluate.
 # Available metrics: "backtracking", "branchiness", "uncertainty_markers",
-#                    "uncertainty_language", "detail_coverage",
-#                    "observation_coverage", "differential_evaluation",
-#                    "evidence_explanation_directionality", "rationale_graph"
+#                    "prior", "differential_elimination",
+#                    "observation_coverage",
+#                    "evidence_explanation_directionality", "rationale_graph",
+#                    "evidence_explanation_directionality_scorebased"
 # An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-ACTIVE_METRICS: list[str] = []  # Empty list activates all metrics
+ACTIVE_METRICS: list[str] = ["backtracking", "branchiness", "uncertainty_markers",
+                            "prior", "differential_elimination", "observation_coverage",
+                            "evidence_explanation_directionality_scorebased"]  # Empty list activates all metrics
+
+# ACTIVE_METRICS: list[str] = ["observation_coverage", "evidence_explanation_directionality_scorebased"]
 
 # ---------------------------------------------------------------------------
 # Datasets to evaluate

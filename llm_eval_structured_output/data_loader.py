@@ -13,6 +13,7 @@ import glob
 import json
 import os
 import random
+import sys
 from typing import Any
 
 import config
@@ -74,7 +75,7 @@ def find_checkpoint_dirs() -> list[str]:
             continue
         result.append(path)
 
-    if len(result) > 2 and os.stdin.isatty():
+    if len(result) > 2 and sys.stdin.isatty():
         print("\n[INFO] More than 2 checkpoints found.")
         print("Select one checkpoint to evaluate:")
         for idx, path in enumerate(result, start=1):
@@ -285,7 +286,6 @@ def compute_sampled_pids(
     *,
     n_samples: int = config.N_SAMPLES,
     seed: int = config.RANDOM_SEED,
-    correct_ratio: float | None = config.SAMPLE_CORRECT_RATIO,
 ) -> dict[str, list]:
     """
     Pre-compute ONE shared sample set per dataset across ALL checkpoints.
@@ -293,8 +293,6 @@ def compute_sampled_pids(
     Benefits:
     - The same problem IDs are evaluated in every checkpoint → fair cross-checkpoint
       comparison.
-    - Status (Correct / Incorrect) is stable across checkpoints within the sampled
-      pool when ``correct_ratio`` is set.
 
     Returns a dict ``{dataset_name: [pid, ...]}`` for every dataset that is
     present across *all* checkpoints.
@@ -308,8 +306,6 @@ def compute_sampled_pids(
     expected_ckpt_count = len(ckpt_nums_by_dir)
 
     intersection: dict[str, set] = {}
-    correct_sets: dict[str, set] = {}
-    incorrect_sets: dict[str, set] = {}
     dataset_ckpt_count: dict[str, int] = {}
 
     for ckpt_dir, ckpt_num in ckpt_nums_by_dir.items():
@@ -323,20 +319,13 @@ def compute_sampled_pids(
                 continue
 
             valid_pids = set(pid_map)
-            # Since there's no ground truth, all items are considered valid
-            correct_pids: set = set()
-            incorrect_pids: set = set()
 
             dataset_ckpt_count[ds] = dataset_ckpt_count.get(ds, 0) + 1
 
             if ds not in intersection:
                 intersection[ds] = valid_pids
-                correct_sets[ds] = correct_pids
-                incorrect_sets[ds] = incorrect_pids
             else:
                 intersection[ds] &= valid_pids
-                correct_sets[ds] &= correct_pids
-                incorrect_sets[ds] &= incorrect_pids
 
     # Drop datasets not present in every checkpoint
     for ds in list(intersection):
@@ -377,25 +366,8 @@ def compute_sampled_pids(
                 )
                 continue
 
-        if correct_ratio is not None and 0.0 <= correct_ratio <= 1.0:
-            stable_correct = _sort_pids(correct_sets.get(ds, set()) & pid_set)
-            stable_incorrect = _sort_pids(incorrect_sets.get(ds, set()) & pid_set)
-
-            target_correct = int(n_samples * correct_ratio)
-            target_incorrect = n_samples - target_correct
-
-            pool: list = []
-            pool.extend(random.sample(stable_correct, min(target_correct, len(stable_correct))))
-            pool.extend(random.sample(stable_incorrect, min(target_incorrect, len(stable_incorrect))))
-
-            sampled[ds] = _sort_pids(set(pool))
-            print(
-                f"[OK] '{ds}': sampled {len(sampled[ds])} items "
-                f"(correct pool={len(stable_correct)}, incorrect pool={len(stable_incorrect)})"
-            )
-        else:
-            k = min(n_samples, len(pid_set))
-            sampled[ds] = _sort_pids(random.sample(_sort_pids(pid_set), k))
-            print(f"[OK] '{ds}': sampled {len(sampled[ds])} items (no stratification)")
+        k = min(n_samples, len(pid_set))
+        sampled[ds] = _sort_pids(random.sample(_sort_pids(pid_set), k))
+        print(f"[OK] '{ds}': sampled {len(sampled[ds])} items (no stratification)")
 
     return sampled

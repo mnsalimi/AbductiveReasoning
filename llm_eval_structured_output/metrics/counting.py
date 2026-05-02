@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 import llm_client
 from metrics.base import BaseMetric, MetricResult
@@ -30,7 +30,13 @@ from prompts import render_system_prompt
 # ---------------------------------------------------------------------------
 
 class ExampleItem(BaseModel):
-    excerpt: str = Field(..., description="Exact short quote from the reasoning text.")
+    model_config = ConfigDict(populate_by_name=True)
+
+    excerpt: str = Field(
+        ...,
+        description="Exact short quote from the reasoning text.",
+        validation_alias=AliasChoices("excerpt", "text"),
+    )
     explanation: str = Field(..., description="Why this excerpt is an example of the phenomenon.")
 
 
@@ -128,7 +134,9 @@ class CountingMetric(BaseMetric):
 
         examples = [
             {
-                "excerpt": e.get("excerpt", "") if isinstance(e, dict) else str(e),
+                "excerpt": (
+                    e.get("excerpt", e.get("text", "")) if isinstance(e, dict) else str(e)
+                ),
                 "explanation": e.get("explanation", "") if isinstance(e, dict) else "",
             }
             for e in raw_examples

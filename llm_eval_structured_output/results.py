@@ -6,7 +6,7 @@ Backward-compatible facade.
 All logic has been moved into the ``reporting`` package:
   - reporting/csv.py   → CSV saving and debug logs
   - reporting/excel.py → colour-coded Excel workbooks
-  - reporting/plots.py → evolution line plots and tier bar charts
+  - reporting/plots.py → evaluation line plots and tier bar charts
 
 This module re-exports the public API so that existing call-sites
 (``main.py`` and any scripts) continue to work without modification.
@@ -19,10 +19,9 @@ import os
 
 import pandas as pd
 
-import config
 from reporting.csv import save_checkpoint_csvs, write_debug_logs, write_config_snapshot  # noqa: F401
 from reporting.excel import build_excel_workbook
-from reporting.plots import build_evolution_plots  # noqa: F401
+from reporting.plots import build_evaluation_plots  # noqa: F401
 
 
 
@@ -59,4 +58,4 @@ def generate_comparison_tables(base_dir: str, label: str) -> None:
     combined.to_csv(os.path.join(base_dir, "all_checkpoints_summary.csv"), index=False)
 
     build_excel_workbook(combined, base_dir)
-    build_evolution_plots(combined, base_dir)
+    build_evaluation_plots(combined, base_dir)

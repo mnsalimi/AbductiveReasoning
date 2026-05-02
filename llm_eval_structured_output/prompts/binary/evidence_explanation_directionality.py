@@ -13,32 +13,42 @@ The LLM answers yes/no and explains why.
 
 DATASET_SPECIFIC_NOTES: dict[str, str] = {
     "medqa": (
-        "Check that reasoning starts from patient evidence and seeks explanation, rather than assuming an answer first."
+        "The 'Problem' text provides the patient's symptoms (the evidence). "
+        "Check that reasoning starts from this clinical evidence and seeks the condition (explanation). "
+        "Declaring a diagnosis upfront and checking if symptoms match is backward."
     ),
     "art": (
-        "Check that reasoning starts from observations and seeks explanatory hypotheses, not the reverse."
+        "Check that the reasoning starts from 'Observation 1' and 'Observation 2' "
+        "and seeks the connecting event/hypothesis, rather than assuming a hypothesis first and back-fitting observations."
     ),
     "strategyqa": (
-        "Check that reasoning starts from given evidence/question context and supports the conclusion from it."
+        "The 'Evidence' and 'Question' give the fixed facts. "
+        "Check that reasoning starts from these facts and logically supports the final YES/NO conclusion."
     ),
     "copa_guess_effect": (
-        "Check that reasoning starts from the premise observation and seeks best explanation/cause-effect account."
+        "The 'Cause' is the premise observation. Check that the reasoning uses this Cause "
+        "to evaluate which 'Option' is the best effect, rather than deducing from an Option."
     ),
     "defeasible_nli": (
-        "Check that reasoning starts from premise evidence and evaluates hypothesis relation from that evidence."
+        "The 'Premise', 'Hypothesis', and 'Update' are the evidence. Check that reasoning "
+        "evaluates the logical impact of the Update starting from this given text."
     ),
     "goemotion": (
-        "Look for reasoning that starts from input text cues before selecting emotion labels."
+        "Look for reasoning that extracts cues from the 'Text' before selecting the emotion label."
     ),
     "musr": (
-        "Check that reasoning starts from scenario details and builds explanations, not back-fitted support."
+        "The 'Context' provides scenario details. Check that reasoning builds explanations "
+        "from these details, rather than assuming a conclusion and back-fitting support."
     ),
     "neulr_abductive": (
-        "As in ART, ensure observation-to-explanation direction is explicit."
+        "Check that reasoning uses 'Logical Rules and Known Facts' to find the 'Missing Fact' (Target Conclusion), "
+        "rather than working backwards from a chosen fact."
     ),
 }
 
 DATASET_FEW_SHOT_EXAMPLES: dict[str, str] = {}
+INCLUDE_FEW_SHOT: bool = False
+INCLUDE_DATASET_SPECIFIC_NOTES: bool = True
 
 SYSTEM_PROMPT = """\
 You are an expert evaluator of abductive reasoning traces.
@@ -114,6 +124,12 @@ Dataset: {dataset}
 Analyze the following reasoning trace for Evidence-Explanation Directionality
 Awareness (does the model move from evidence to explanation, not the reverse?).
 
+**Observations / Evidence:**
+<observations>
+{full_input}
+</observations>
+
+**Model's Reasoning Chain:**
 <reasoning_trace>
 {text}
 </reasoning_trace>

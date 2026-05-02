@@ -18,9 +18,9 @@ A binary metric asks the judge LLM a single yes/no question about the reasoning 
 
 ### Counting Metric
 
-A counting metric asks the judge LLM to extract every individual occurrence of a phenomenon as a concrete example (a text quote + explanation pair).
+A counting metric asks the judge LLM to extract every individual occurrence of a phenomenon as a concrete example (an excerpt quote + explanation pair).
 
-- **Output:** An `overall_analysis` string and a list of `{text, explanation}` items.
+- **Output:** An `overall_analysis` string and a list of `{excerpt, explanation}` items.
 - **Count used in reports:** `len(examples)` — the raw number of extracted occurrences.  This can be normalized per 100 words in the `normalized/` results.
 - **Use when:** you want to measure the *density* or *frequency* of a phenomenon, not just its presence.
 
@@ -40,31 +40,17 @@ A graph metric asks the judge LLM to extract a directed, text-grounded rationale
 - **Score used in reports:** graph scalar metrics and normalized scalar metrics (per 100 words for selected keys).
 - **Use when:** you want to analyze reasoning structure and connectivity patterns, not only presence/count/coverage of specific phenomena.
 
+### Score-based Metric
+
+A score-based metric asks the judge LLM to assign a graded scalar value to a phenomenon in the reasoning trace.
+
+- **Output:** a score field plus a brief explanation of the judgment.
+- **Score used in reports:** the scalar score itself, usually averaged per dataset or checkpoint.
+- **Use when:** you want more granularity than a binary metric but less output structure than a full extraction metric.
+
 ---
 
 ## Implemented Metrics
-
-### `uncertainty_language` — Binary
-
-> **Does the reasoning trace use probabilistic or hedging language rather than absolute certainty?**
-
-Captures whether the model expresses any degree of epistemic humility during its reasoning process.  A single strong hedging phrase that is central to the argument is enough for `detected = true`.
-
-**Positive examples:** "probably", "likely", "I believe", "this suggests", "most likely", "we cannot be sure"  
-**Does not count:** confident logical deductions stated without hedges, purely factual recall, boiler-plate disclaimers
-
----
-
-### `detail_coverage` — Binary
-
-> **Does the reasoning trace account for all specific details of the observation, rather than focusing only on the main event?**
-
-Captures whether the model exhaustively matches its hypothesis against every concrete detail in the observation (symptoms, timeline, lab values, contextual facts), rather than explaining only the most salient finding.
-
-**Positive examples:** addressing each listed symptom individually, checking that the proposed answer is consistent with all given lab values, explicitly noting the absence of findings that would contradict the conclusion  
-**Does not count:** a brief summary of the main finding only, restating the question, applying general medical or factual knowledge without cross-checking specific details
-
----
 
 ### `uncertainty_markers` — Counting
 
@@ -85,12 +71,12 @@ Markers are grouped into five categories:
 
 ### `branchiness` — Counting
 
-> **How many times does the reasoning genuinely explore multiple distinct possibilities, hypotheses, or solution paths?**
+> **How many times does the reasoning genuinely explore multiple distinct candidate explanations for the same observation?**
 
-Measures whether the model thinks divergently rather than following a single linear chain.  Each distinct branching moment (building two or more hypotheses in parallel, trying multiple methods, or developing multiple conditional flows) is extracted as one example.
+Measures whether the model considers substantively different explanatory candidates rather than following a single linear chain or merely revising one candidate. Each distinct branching moment is extracted as one example.
 
-**Positive examples:** "If diagnosis X we'd expect F… If diagnosis Y we'd expect G…", trying two solution methods and comparing them  
-**Does not count:** the final answer selection, brief mention of an alternative followed by immediate rejection, simple step-by-step narration, restating the given answer options
+**Positive examples:** "If diagnosis X we'd expect F… If diagnosis Y we'd expect G…", comparing two different causal interpretations of the same evidence  
+**Does not count:** multiple phrasings or refinements of the same explanation, the final answer selection, brief mention of an alternative followed by immediate rejection, simple step-by-step narration, restating the given answer options
 
 ---
 
@@ -113,6 +99,42 @@ Extracts each distinct case where the model rules out an alternative hypothesis,
 
 **Positive examples:** "We can rule out A because it contradicts symptom X", "If B were true we'd see Y, but we don't"  
 **Does not count:** listing options without refuting them, pure support for the chosen option without alternative elimination
+
+---
+
+### `prior` — Counting
+
+> **How many times does the reasoning explicitly invoke prior probability, typicality, or base-rate knowledge?**
+
+Captures explicit references to what is common, rare, expected, or more probable before or alongside the case-specific evidence. This is useful when the trace relies on domain priors, typical scenarios, or general population tendencies.
+
+**Positive examples:** "This disease is rare", "Usually this symptom indicates...", "X is more common than Y"  
+**Does not count:** pure hedging language, generic facts without likelihood content, or conclusions drawn only from the specific case evidence
+
+---
+
+### `evidence_explanation_directionality` — Binary
+
+> **Does the reasoning clearly move from given evidence or observations toward an explanatory conclusion, rather than assuming the conclusion and back-fitting support?**
+
+This metric checks whether the trace respects the abductive direction from evidence to explanation. It is a presence/absence test of directional awareness, not a graded quality score.
+
+**Positive cases:** explicit separation of observations from explanatory hypotheses, reasoning that starts from the given facts and asks what best explains them  
+**Does not count:** assuming a hypothesis first and then merely verifying that it matches the evidence
+
+---
+
+### `evidence_explanation_directionality_scorebased` — Score-based
+
+> **How strongly does the reasoning respect the abductive direction from evidence to explanation?**
+
+This is the graded version of the directionality metric. The judge assigns exactly one of three scores:
+
+- `1.0` — clear evidence → explanation reasoning
+- `0.5` — mixed or ambiguous directionality
+- `0.0` — backward, circular, or missing directionality
+
+Use this when binary presence/absence is too coarse and you want a gradable measure of how well the trace follows abductive direction.
 
 ---
 
@@ -157,24 +179,24 @@ This metric extracts graph vertices and edges grounded in exact text spans, then
 ```
 Reasoning trace phenomenon
 │
-├── Is a phenomenon present at all?                → uncertainty_language  (binary)
-│
-├── Does it cover all observation details?         → detail_coverage       (binary)
+├── What graph structure does reasoning express?   → rationale_graph       (graph)
 │
 ├── What fraction of details are addressed?        → observation_coverage  (coverage)
 │
-├── What graph structure does reasoning express?   → rationale_graph       (graph)
-│
 ├── How densely does it hedge?                     → uncertainty_markers   (counting)
 │
-├── Does it explore multiple paths in parallel?    → branchiness           (counting)
+├── Does it explore multiple candidate explanations? → branchiness         (counting)
 │
 ├── Does it catch and fix its own mistakes?        → backtracking          (counting)
 │
-└── How many alternatives are explicitly ruled out? → differential_elimination (counting)
+├── Does it invoke priors or base rates?           → prior                 (counting)
+│
+├── How many alternatives are explicitly ruled out? → differential_elimination (counting)
+│
+├── Is directional reasoning (evidence→explanation) shown? → evidence_explanation_directionality (binary)
+│
+└── How strongly is that directionality expressed? → evidence_explanation_directionality_scorebased (score-based)
 ```
-
-Note that `uncertainty_language` and `uncertainty_markers` measure the **same underlying phenomenon** at different granularities — binary presence vs. raw occurrence count.  They are designed to complement rather than replace each other.
 
 ---
 

@@ -1551,6 +1551,8 @@ Answer:
 """,
 
 }
+INCLUDE_FEW_SHOT: bool = False
+INCLUDE_DATASET_SPECIFIC_NOTES: bool = True
 
 SYSTEM_PROMPT = """\
 You are an expert reasoning-graph annotator.

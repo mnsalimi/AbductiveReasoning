@@ -57,8 +57,8 @@ def generate_comparison_tables(base_dir: str, label: str) -> None:
     combined.sort_values(["Dataset", "Checkpoint"], inplace=True)
     combined.to_csv(os.path.join(base_dir, "all_checkpoints_summary.csv"), index=False)
 
-    # Compact log-friendly summary with only the key columns requested.
-    compact_columns = [
+    # Compact non-graph summary: only key columns, only those actually evaluated.
+    _wanted_compact = [
         "Dataset",
         "Checkpoint",
         "branchiness_count",
@@ -70,8 +70,9 @@ def generate_comparison_tables(base_dir: str, label: str) -> None:
         "observation_coverage_score",
         "Word Count",
     ]
-    compact_df = combined.reindex(columns=compact_columns)
-    compact_df.to_csv(os.path.join(base_dir, "all_checkpoints_summary_compact.csv"), index=False)
+    compact_columns = [c for c in _wanted_compact if c in combined.columns]
+    compact_df = combined[compact_columns]
+    compact_df.to_csv(os.path.join(base_dir, "all_checkpoints_summary_compact_non_graph.csv"), index=False)
 
     build_excel_workbook(combined, base_dir)
     build_evaluation_plots(combined, base_dir)

@@ -34,6 +34,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_uniadilr_prompt, SYSTEM_PROMPT_UniADILR
 
 # ============================================================================
 # Configuration
@@ -218,66 +220,7 @@ def load_finetuned_model(checkpoint_path, device):
 # ============================================================================
 # Helper functions: prompting, parsing, metrics
 # ============================================================================
-SYSTEM_PROMPT_UniADILR = textwrap.dedent("""\
-    You are an expert in logical reasoning and abductive inference. Your task is to identify which sentences from a given context provide the necessary evidence to support or explain a hypothesis.
 
-    You will be provided with:
-    1. A Context containing multiple numbered sentences (sent1, sent2, sent3, etc.)
-    2. A Hypothesis that needs to be supported or explained
-
-    Your goal is to identify which sentence(s) from the context, when combined, provide the logical foundation for the hypothesis through abductive reasoning.
-
-    ## Instructions:
-    1. Carefully read all sentences in the context
-    2. Analyze the hypothesis
-    3. Identify which sentences, when combined, best explain or support the hypothesis
-    4. Consider both direct evidence and logical connections
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Sentence numbers only, comma-separated. For example: 5, 13 or 2, 7, 9]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the sentence numbers separated by commas. Do not include the word "sent" or any other text.
-""").strip()
-
-def create_uniadilr_prompt(example):
-    """
-    Build system + user prompt for a UniADILR example.
-
-    Expected example structure:
-        {
-            "datasetName": "UniADILR",
-            "context": { "sent1": "...", "sent2": "...", ... },
-            "hypothesis": "...",
-            "proof": ...   # used only for ground truth
-        }
-    """
-    context = example["context"]
-    hypothesis = example["hypothesis"]
-
-    # Preserve the original order of context items as in the JSON
-    context_lines = [f"{k}: {v}" for k, v in context.items()]
-    context_str = "\n".join(context_lines)
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context_str}
-
-        Hypothesis:
-        {hypothesis}
-
-        Which sentence numbers provide the necessary evidence for the hypothesis?
-    """).strip()
-
-    system_prompt = SYSTEM_PROMPT_UniADILR
-    return system_prompt, user_prompt
 
 
 def extract_sentence_numbers(text: str, dataset_name: str = "UniADILR"):

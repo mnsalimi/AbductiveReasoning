@@ -36,6 +36,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_causelogics_prompt, SYSTEM_PROMPT_CAUSELOGICS
 
 np.random.seed(42)
 
@@ -202,106 +204,6 @@ def load_finetuned_model(checkpoint_path, device):
     print("✅ Fine-tuned model loaded successfully")
     
     return model, base_tokenizer
-
-
-SYSTEM_PROMPT_CAUSELOGICS = textwrap.dedent("""\
-    You are an expert logician and careful reasoning assistant. Your task is to identify whether a given Possible Cause, when added to the provided knowledge base, logically entails an observed Phenomenon.
-
-    You will be provided with:
-    1. A set of Premises (facts)
-    2. A set of Rules (implications)
-    3. An observed Phenomenon
-    4. A Possible Cause (a hypothesis)
-
-    Your goal is to determine whether the Phenomenon can be logically inferred by forward reasoning using ONLY the given Premises + Rules (+ the Possible Cause).
-
-    ## Instructions:
-    1. Carefully read all Premises and Rules
-    2. Assume the Possible Cause is added as an additional premise
-    3. Using ONLY the given Premises + Rules (+ the Possible Cause), reason forward
-    4. Decide whether the Phenomenon can be logically inferred
-       - If the Phenomenon can be inferred, the Possible Cause is TRUE
-       - If the Phenomenon cannot be inferred, the Possible Cause is FALSE
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Output exactly one of these two options: TRUE, FALSE]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY one of these two options: TRUE or FALSE. Do not include any other text.
-""").strip()
-
-
-def create_causelogics_prompt(example: dict):
-    """
-    Create a prompt for CauseLogics (abductive logical decision) from a single example record.
-
-    Expected example keys (case-insensitive-ish):
-      - Premises / premises: list[str] or str
-      - Rules / rules: list[str] or str
-      - Phenomenon / phenomenon: str
-      - PossibleCause / possible_cause: str
-      - (optional) causelogics_level, dataset_name, Label/label, id, etc.
-
-    Returns:
-      system_prompt (str), user_prompt (str)
-    """
-
-    def _get_any(d, keys, default=None):
-        for k in keys:
-            if k in d:
-                return d[k]
-        return default
-
-    premises_raw = _get_any(example, ["Premises", "premises"], default=[])
-    rules_raw = _get_any(example, ["Rules", "rules"], default=[])
-    phenomenon = _get_any(example, ["Phenomenon", "phenomenon"], default=None)
-    possible_cause = _get_any(example, ["PossibleCause", "possible_cause"], default=None)
-
-    # Convert premises/rules into printable text
-    if isinstance(premises_raw, list):
-        premises_text = "\n".join([f"- {x}" for x in premises_raw])
-    else:
-        premises_text = f"- {premises_raw}" if premises_raw is not None else ""
-
-    if isinstance(rules_raw, list):
-        rules_text = "\n".join([f"- {x}" for x in rules_raw])
-    else:
-        rules_text = f"- {rules_raw}" if rules_raw is not None else ""
-
-    if phenomenon is None or possible_cause is None:
-        missing = []
-        if phenomenon is None:
-            missing.append("Phenomenon")
-        if possible_cause is None:
-            missing.append("PossibleCause")
-        raise KeyError(f"CauseLogics example missing required field(s): {', '.join(missing)}")
-
-    system_prompt = SYSTEM_PROMPT_CAUSELOGICS
-
-    user_prompt = textwrap.dedent(f"""\
-        Premises:
-        {premises_text}
-
-        Rules:
-        {rules_text}
-
-        Phenomenon:
-        {str(phenomenon)}
-
-        Possible Cause:
-        {str(possible_cause)}
-
-        Is the Possible Cause logically TRUE or FALSE?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 

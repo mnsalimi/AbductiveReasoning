@@ -35,6 +35,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_climate_fever_prompt, SYSTEM_PROMPT_CLIMATE_FEVER
 
 # ============================================================================
 # Configuration
@@ -201,59 +203,7 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-SYSTEM_PROMPT_CLIMATE_FEVER = textwrap.dedent("""\
-    You are an expert climate scientist and professional fact-checker. Your task is to determine whether a set of provided evidences supports, refutes, disputed or is insufficient to evaluate a specific claim.
 
-    You will be provided with:
-    1. A specific Claim
-    2. A list of Evidences
-
-    Your goal is to decide whether the Evidence SUPPORTS or REFUTES or DISPUTED the Claim, or if there is NOT ENOUGH INFO, and to justify that decision by citing specific parts of the evidence.
-
-    ## Instructions:
-    1. Carefully read the Claim and all provided Evidences
-    2. Determine if the Evidence SUPPORTS or REFUTES or DISPUTED the Claim, or if there is NOT ENOUGH INFO
-    3. Think step by step about how the specific parts of the evidence relate to the claim
-    4. Output the final label
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-
-    <answer>
-    [Output exactly one of these four options: SUPPORTS, REFUTES, DISPUTED, NOT ENOUGH INFO]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY one of these four options: SUPPORTS, REFUTES, DISPUTED, NOT ENOUGH INFO. Do not include any other text.
-""").strip()
-
-def create_climate_fever_prompt(example: dict):
-    """Create a prompt for Climate-FEVER fact verification from one example record."""
-
-    system_prompt = SYSTEM_PROMPT_CLIMATE_FEVER
-
-    claim = example["claim"]
-
-    # Extract evidence strings from the dataset
-    evidence_objs = example.get("evidences", [])
-    evidence_list = [e.get("evidence", "") for e in evidence_objs]
-    evidence_text = "\n".join([f"- {txt}" for txt in evidence_list if txt])
-
-    user_prompt = textwrap.dedent(f"""\
-        Claim:
-        {claim}
-
-        Evidence:
-        {evidence_text}
-
-        Does the provided evidence SUPPORT, REFUTE, DISPUTED or provide NOT ENOUGH INFO for the claim?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_answer(response):

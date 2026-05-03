@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_MedQA_prompt, SYSTEM_PROMPT_MEDQA
 
 # ============================================================================
 # Configuration
@@ -194,46 +196,7 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-SYSTEM_PROMPT_MEDQA = textwrap.dedent("""\
-    You are an expert medical clinician and diagnostician. Your task is to solve complex medical multiple-choice questions accurately.
 
-    You will be provided with:
-    1. A medical Problem, which typically includes a clinical vignette or medical question along with four candidate choices (A, B, C, D)
-
-    Your goal is to evaluate the clinical presentation and select the single most accurate answer.
-
-    ## Instructions:
-    1. Carefully read the medical problem, noting key patient demographics, symptoms, physical exam findings, and lab values where applicable
-    2. Identify the core medical question being asked (e.g., next best step in management, most likely diagnosis, underlying mechanism)
-    3. Evaluate all four candidate options (A, B, C, D) using evidence-based clinical reasoning
-    4. Select the letter corresponding to the correct medical answer
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Exactly one letter: A, B, C, or D]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the single uppercase letter of the correct choice (A, B, C, or D). Do not include parentheses, periods, or any textual explanation.
-""").strip()
-
-def create_MedQA_prompt(problem):
-    """Create a prompt for a MedQA multiple-choice medical question."""
-    
-    system_prompt = SYSTEM_PROMPT_MEDQA
-
-    user_prompt = textwrap.dedent(f"""\
-        Problem: {problem}
-
-        Which option is the correct answer?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 

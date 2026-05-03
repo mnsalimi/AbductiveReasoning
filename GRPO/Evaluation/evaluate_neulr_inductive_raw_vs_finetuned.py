@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_neulr_inductive_prompt, SYSTEM_PROMPT_NEULR_INDUCTIVE
 
 # ============================================================================
 # Configuration
@@ -194,56 +196,6 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 import textwrap
-
-SYSTEM_PROMPT_NEULR_INDUCTIVE = textwrap.dedent("""\
-    You are an expert logical reasoner and pattern recognition specialist. Your task is to perform inductive reasoning to identify properties of entities based on shared group characteristics.
-
-    You will be provided with:
-    1. Context: A set of facts containing entities, their group memberships, and their specific properties.
-    2. Problem: A specific question asking you to determine a missing property for a target entity.
-
-    Your goal is to use inductive reasoning to determine the correct property of the target entity by analyzing the properties of other members in its group, and output the exact alphanumeric code.
-
-    ## Instructions:
-    1. Carefully read the Context to identify all entities, their assigned groups, and their associated properties.
-    2. Analyze the Problem to identify the target entity in question.
-    3. Determine which group the target entity belongs to based on the Context.
-    4. Examine other entities within that same group to induce the shared property they possess.
-    5. Conclude the target entity's missing property based on this shared group characteristic.
-    6. Extract the exact alphanumeric code of the resulting property from the text.
-    7. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Exactly one alphanumeric code]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the exact alphanumeric code answer. Do not include any extra words, punctuation, full sentences, or explanations inside the answer tags.
-""").strip()
-
-
-def create_neulr_inductive_prompt(problem, context):
-    """Create a prompt for a detective-style reasoning question involving shared properties."""
-
-    system_prompt = SYSTEM_PROMPT_NEULR_INDUCTIVE
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context}
-
-        Problem:
-        {problem}
-
-        What is the exact alphanumeric code answer?
-    """).strip()
-
-    return system_prompt, user_prompt
-
 
 
 def extract_reasoning(response):

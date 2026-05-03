@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_strategyqa_prompt, SYSTEM_PROMPT_STRATEGYQA
 
 # np.random.seed(42)
 
@@ -266,51 +268,7 @@ def _get_evidence_obj(example: dict):
 
 import textwrap
 
-SYSTEM_PROMPT_STRATEGYQA = textwrap.dedent("""\
-    You are an expert deductive reasoner and fact-checker. Your task is to answer a yes/no question using the provided evidence.
 
-    You will be provided with:
-    1. A Question: A specific query requiring a YES or NO answer.
-    2. Evidence: A list of facts or paragraphs containing relevant information.
-
-    Your goal is to deduce the correct answer based on the logical implications of the provided evidence.
-
-    ## Instructions:
-    1. Carefully read the Question to understand what is being asked.
-    2. Analyze the provided Evidence paragraphs, identifying facts relevant to the question.
-    3. Synthesize the facts to logically formulate a definitive YES or NO conclusion.
-    4. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Output exactly YES or NO]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the word YES or the word NO. Do not include any other text, punctuation, or explanations.
-""").strip()
-
-
-def create_strategyqa_prompt(question, evidence_text):
-    """Create a prompt for StrategyQA (Yes/No QA with evidence)."""
-
-    system_prompt = SYSTEM_PROMPT_STRATEGYQA
-
-    user_prompt = textwrap.dedent(f"""\
-        Question:
-        {question}
-
-        Evidence:
-        {evidence_text}
-
-        Is the answer to the question YES or NO?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_answer(response):

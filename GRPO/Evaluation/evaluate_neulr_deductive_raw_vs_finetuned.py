@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_neulr_deductive_prompt, SYSTEM_PROMPT_NEULR_DEDUCTIVE
 
 # ============================================================================
 # Configuration
@@ -194,55 +196,6 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 import textwrap
-
-SYSTEM_PROMPT_NEULR_DEDUCTIVE = textwrap.dedent("""\
-    You are an expert logical reasoner specializing in symbolic logic and deductive pattern recognition. Your task is to analyze factual statements and logical rules to deduce specific relationships between entities.
-
-    You will be provided with:
-    1. Context: A set of logical rules and facts involving alphanumeric codes, defining properties (e.g., who belongs to what group) and relationships (e.g., who is afraid of whom).
-    2. Problem: A specific question asking you to determine the target of a relationship for a given subject.
-
-    Your goal is to use deductive reasoning to trace the logical connections from the subject to the correct target and identify the exact alphanumeric code representing the answer.
-
-    ## Instructions:
-    1. Carefully read the Context to parse all facts (identifying entities and their properties) and rules (defining conditional relationships).
-    2. Analyze the Problem to identify the starting subject and the specific relationship being queried.
-    3. Trace the logical chain-of-thought, explicitly linking the individual to their group, and the group to the object of their relationship (e.g., fear).
-    4. Apply the rules step by step to deduce the final, correct target.
-    5. Extract the exact alphanumeric code of the resulting entity from the text.
-    6. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Exactly one alphanumeric code]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the exact alphanumeric code answer. Do not include any extra words, punctuation, full sentences, or explanations inside the answer tags.
-""").strip()
-
-
-def create_neulr_deductive_prompt(problem, context):
-    """Create a prompt for a detective-style multiple-choice reasoning question."""
-
-    system_prompt = SYSTEM_PROMPT_NEULR_DEDUCTIVE
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context}
-
-        Problem:
-        {problem}
-
-        What is the exact alphanumeric code answer?
-    """).strip()
-
-    return system_prompt, user_prompt
-
 
 
 def extract_reasoning(response):

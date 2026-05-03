@@ -26,6 +26,9 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import create_aimo_prompt, SYSTEM_PROMPT_AIMO
 
 # ============================================================================
 # Configuration
@@ -191,46 +194,6 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-SYSTEM_PROMPT_AIMO = textwrap.dedent("""\
-    You are an expert mathematician specializing in competition mathematics (such as AMC, AIME). Your task is to solve complex mathematical problems.
-
-    You will be provided with:
-    1. A mathematical Problem (which may contain LaTeX notation)
-
-    Your goal is to logically and rigorously solve the problem to find the correct final mathematical value.
-
-    ## Instructions:
-    1. Carefully read and analyze the problem, paying close attention to all mathematical conditions and LaTeX notation
-    2. Formulate a structured, mathematical approach to arrive at the solution
-    3. Execute your calculations, verifying your algebraic and logical steps along the way
-    4. Simplify your final result into a single number, decimal, or fraction (e.g., a/b)
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Output a single number, decimal, or fraction here]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the final numerical answer (a number, decimal, or fraction like a/b). Do not include variables, units, equations, or any other text.
-""").strip()
-
-def create_aimo_prompt(problem):
-    """Create a prompt for AIMO problem - handles LaTeX properly."""
-    system_prompt = SYSTEM_PROMPT_AIMO
-
-    user_prompt = textwrap.dedent(f"""\
-        Problem:
-        {problem}
-
-        What is the final answer to this problem?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_reasoning(response):

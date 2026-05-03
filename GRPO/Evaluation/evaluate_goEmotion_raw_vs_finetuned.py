@@ -27,6 +27,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_goemotion_prompt, SYSTEM_PROMPT_GOEMOTION, GOEMOTION_LABELS
 
 # ============================================================================
 # Configuration
@@ -36,22 +38,13 @@ from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, g
 PROJECT_ROOT = get_project_root()
 
 # Allow path injection from orchestrator
-RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH', 
+RAW_MODEL_PATH = os.environ.get('EVAL_RAW_MODEL_PATH',
     "/home/moein_salimi/PLLMS/unsloth-Qwen2.5-3B-Instruct-unsloth-bnb-4bit")
 TRAINING_DIR = os.environ.get('EVAL_TRAINING_DIR',
     os.path.join(get_results_dir(), "dt11.10.16:42_e20_unsloth_Qwen2.5_3B_Instruct_unsloth_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b16"))
 CHECKPOINT_DIR = os.path.join(TRAINING_DIR, "checkpoint")
 OUTPUT_DIR = os.environ.get('EVAL_OUTPUT_DIR',
     os.path.join(get_evaluation_dir(), "goEmotion_evaluation_results"))  # Change default per script
-
-# GoEmotions emotion labels (27 emotions + neutral)
-GOEMOTION_LABELS = [
-    'admiration', 'amusement', 'anger', 'annoyance', 'approval', 'caring', 
-    'confusion', 'curiosity', 'desire', 'disappointment', 'disapproval', 
-    'disgust', 'embarrassment', 'excitement', 'fear', 'gratitude', 'grief', 
-    'joy', 'love', 'nervousness', 'optimism', 'pride', 'realization', 
-    'relief', 'remorse', 'sadness', 'surprise', 'neutral'
-]
 
 # ============================================================================
 # Helper Functions
@@ -200,56 +193,6 @@ def load_finetuned_model(checkpoint_path, device):
     print("✅ Fine-tuned model loaded successfully")
     
     return model, base_tokenizer
-
-_emotions_list_str = ", ".join(GOEMOTION_LABELS)
-
-SYSTEM_PROMPT_GOEMOTION = textwrap.dedent(f"""\
-    You are an expert text analyst and emotion classifier. Your task is to identify all emotions expressed in a given text.
-
-    You will be provided with:
-    1. A short Text to analyze
-
-    Your goal is to detect the presence of specific emotions from the following predefined list:
-    [{_emotions_list_str}]
-
-    ## Instructions:
-    1. Carefully read the provided text
-    2. Analyze the context, tone, and nuance to understand the underlying feelings
-    3. Match the expressed feelings strictly against the predefined list of available emotions
-    4. Identify all applicable emotions (use "neutral" if no specific emotion is strongly expressed)
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Comma-separated list of applicable emotions]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the exact emotion names from the available list, separated by commas if there are multiple (e.g., joy, surprise). Do not include any other text, explanation, or capitalization.
-""").strip()
-
-def create_goemotion_prompt(text):
-    """Create a prompt for GoEmotions emotion classification.
-    
-    Args:
-        text: The input text to classify
-    
-    Returns:
-        system_prompt, user_prompt
-    """
-    system_prompt = SYSTEM_PROMPT_GOEMOTION
-
-    user_prompt = textwrap.dedent(f"""\
-        Text: "{text}"
-
-        What emotion(s) are expressed in this text?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_reasoning(response):

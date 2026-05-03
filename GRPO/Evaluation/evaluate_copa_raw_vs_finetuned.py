@@ -28,6 +28,9 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import create_copa_prompt, SYSTEM_PROMPT_COPA
 
 # ============================================================================
 # Configuration
@@ -195,58 +198,6 @@ def load_finetuned_model(checkpoint_path, device):
 
 import textwrap
 
-SYSTEM_PROMPT_COPA = textwrap.dedent("""\
-    You are an expert in logical reasoning and common-sense causal inference. Your task is to determine which of two given options represents the most plausible cause for a given effect.
-
-    You will be provided with:
-    1. An Effect describing a situation or event
-    2. Two Options (Option 1 and Option 2)
-
-    Your goal is to select the option that best describes the direct cause, logical predecessor, or most likely triggering action of the given effect.
-
-    ## Instructions:
-    1. Carefully read the provided effect
-    2. Evaluate both Option 1 and Option 2 as potential preceding causes
-    3. Consider common sense, real-world knowledge, and typical cause-and-effect relationships
-    4. Select the option that represents the most plausible direct cause
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Either "1" or "2" - just the number, nothing else]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
-""").strip()
-
-def create_copa_prompt(premise, choice1, choice2):
-    """Create a prompt for COPA causal reasoning task.
-    
-    Args:
-        premise: The effect that occurred
-        choice1: First possible cause
-        choice2: Second possible cause
-    
-    Returns:
-        system_prompt, user_prompt
-    """
-    system_prompt = SYSTEM_PROMPT_COPA
-
-    user_prompt = textwrap.dedent(f"""\
-        Effect: {premise}
-
-        Option 1: {choice1}
-        Option 2: {choice2}
-
-        Which of the following is the most plausible CAUSE of this effect?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_reasoning(response):

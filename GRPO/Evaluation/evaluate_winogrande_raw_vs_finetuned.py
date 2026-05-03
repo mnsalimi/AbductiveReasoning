@@ -28,6 +28,9 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import create_winogrande_prompt, SYSTEM_PROMPT_WINOGRANDE
 
 # np.random.seed(42)
 
@@ -196,55 +199,6 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-SYSTEM_PROMPT_WINOGRANDE = textwrap.dedent("""\
-    You are an expert in commonsense reasoning and pronoun resolution. Your task is to determine the correct word or phrase to complete a given sentence.
-
-    You will be provided with:
-    1. A Sentence: A statement containing a blank space represented by an underscore character (_).
-    2. Option 1: The first candidate to fill the blank.
-    3. Option 2: The second candidate to fill the blank.
-
-    Your goal is to decide which candidate option best fills the blank to make the sentence coherent, logically correct, and aligned with everyday commonsense.
-
-    ## Instructions:
-    1. Read the sentence carefully and analyze the context surrounding the blank.
-    2. Evaluate Option 1 and Option 2 as potential replacements for the blank.
-    3. Use commonsense reasoning to determine which option creates a logically sound sentence.
-    4. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Output exactly 1 or 2]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the number 1 or the number 2. Do not include the actual text of the option, any other text, punctuation, or explanations.
-""").strip()
-
-
-def create_winogrande_prompt(sentence, option1, option2):
-    """Create a prompt for WinoGrande-style commonsense pronoun resolution."""
-
-    system_prompt = SYSTEM_PROMPT_WINOGRANDE
-
-    user_prompt = textwrap.dedent(f"""\
-        Sentence:
-        {sentence}
-
-        Option 1:
-        {option1}
-
-        Option 2:
-        {option2}
-
-        Which option correctly fills the blank "_" in the sentence?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 

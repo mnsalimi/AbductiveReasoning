@@ -44,6 +44,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_crypto_functions_prompt, SYSTEM_PROMPT_CRYPTO_FUNCTION
 
 # Verify installation
 # --- LOCAL SETUP ---
@@ -233,78 +235,7 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 # ## 4. Data Processing and Prompt Engineering
-# Define `string_to_list` and `list_to_string` for data serialization. Include `SYSTEM_PROMPT_LIST_FUNCTION` and `create_crypto_functions_prompt` to format inputs for the LLM.
 
-# In[ ]:
-
-
-def identity_string(s):
-    """Return the string unchanged; kept only for minimal structural changes."""
-    return s
-
-SYSTEM_PROMPT_CRYPTO_FUNCTION = textwrap.dedent("""\
-    You are an expert at inferring exact string transformation rules from examples and expressing them as correct Python functions.
-
-    You will be given several training examples. Each example contains:
-    - Input: a string
-    - Output: the result of applying the same hidden transformation rule to the input
-
-    Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
-
-    Before answering, make sure the same rule explains all examples exactly and consistently at the character level.
-    Think abductively: consider alternative hypotheses and choose the one that explains all examples exactly.
-
-    Output format (MUST follow exactly):
-    <think>
-    [Explain your thought process: reason step by step about the possible rules, consider alternative hypotheses, and explain why the rule you chose best fits all examples.]
-    </think>
-    <answer>
-    def transform(s):
-        ...
-    </answer>
-
-    Code requirements:
-    - Define EXACTLY one function named transform.
-    - The function takes one argument: s (a string).
-    - It MUST return a string.
-    - NO IMPORTS allowed.
-    - NO printing, no input(), no randomness.
-    - Do not hardcode specific training inputs/outputs; generalize the logic.
-    - Preserve the behavior implied by the examples for all characters that appear.
-
-    STRICT FORMATTING RULES:
-    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
-    - Do NOT repeat the code. Write the function exactly once.
-    - Ensure you close the tag with </answer>.
-    - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
-    - Do NOT write any text before <think> or after </answer>.
-""").strip()
-
-
-def create_crypto_functions_prompt(example):
-    """Create a prompt for the crypto rule-inference-to-code task."""
-
-    system_prompt = SYSTEM_PROMPT_CRYPTO_FUNCTION
-
-    train_examples = example["train"]
-    if isinstance(train_examples, dict):
-        train_examples = train_examples.get("normal", [])
-    train_examples = train_examples[:10]
-
-    train_prompt = "\n".join([
-        f"Example {i+1}:\nInput: {repr(ex['input'])}\nOutput: {repr(ex['output'])}"
-        for i, ex in enumerate(train_examples)
-    ])
-
-    user_prompt = textwrap.dedent(f"""\
-        Training examples:
-        {train_prompt}
-
-        Infer the underlying string transformation and provide the Python function implementation in the required format.
-    """).strip()
-
-    return system_prompt, user_prompt
-    return system_prompt, user_prompt
 
 
 # ## 5. Response Extraction and Evaluation Logic

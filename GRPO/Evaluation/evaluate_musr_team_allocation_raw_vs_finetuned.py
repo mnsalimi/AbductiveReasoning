@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_musr_team_prompt, SYSTEM_PROMPT_MUSR_TEAM
 
 # ============================================================================
 # Configuration
@@ -196,54 +198,7 @@ def load_finetuned_model(checkpoint_path, device):
 
 import textwrap
 
-SYSTEM_PROMPT_MUSR_TEAM = textwrap.dedent("""\
-    You are an expert logical reasoner specializing in evaluating team skills and assigning people to tasks optimally. Your task is to analyze a story describing people, their abilities, and their teamwork dynamics in order to determine the best assignment of people to tasks.
 
-    You will be provided with:
-    1. Context: A story describing several people, their abilities at different tasks, and how well they work with others
-    2. Problem: A question asking which assignment of people to tasks results in the most effective completion of the tasks, along with multiple-choice options indexed as 0, 1, 2, ...
-
-    Your goal is to determine which assignment best utilizes each person's skills while also considering teamwork effectiveness when two people must work together on a task.
-
-    ## Instructions:
-    1. Carefully read the Context and identify each person's skill level for the relevant tasks (e.g., great, acceptable, or bad)
-    2. Determine how well different pairs of people work together when assigned to the same task
-    3. Remember that one task will require two people working together
-    4. Consider that if one person is bad at a task, the other person's skill may not fully compensate unless they work well together
-    5. Evaluate the overall effectiveness of each assignment option
-    6. Select the option that results in the most effective overall completion of all tasks
-    7. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Exactly one integer representing the index of the correct choice]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the numeric index number of the correct choice. Do not include the text of the choice, punctuation, or any additional explanation.
-""").strip()
-
-
-def create_musr_team_prompt(problem, context):
-    """Create a prompt for a detective-style multiple-choice reasoning question."""
-
-    system_prompt = SYSTEM_PROMPT_MUSR_TEAM
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context}
-
-        Problem:
-        {problem}
-
-        What is the index number of the correct choice?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 
@@ -288,7 +243,7 @@ def evaluate_on_musr_team(model, tokenizer, max_samples=None, model_name="Model"
     
     # Load musr_team dataset
     print(f"Loading musr_team dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "team_allocation.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "team_allocation.json"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

@@ -28,6 +28,9 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import create_clutrr_prompt, SYSTEM_PROMPT_CLUTRR
 
 np.random.seed(42)
 
@@ -195,64 +198,6 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-SYSTEM_PROMPT_CLUTRR = textwrap.dedent("""\
-    You are a logic expert specializing in genealogy and family trees. Your task is to deduce the kinship relationship between two specific people based on a provided narrative.
-
-    You will be provided with:
-    1. A short Story describing various family relationships
-    2. A Query asking for the relationship between two specific people from the story
-
-    Your goal is to trace the family ties described in the story and identify the exact kinship relation connecting the first person to the second person in the query.
-
-    ## Instructions:
-    1. Carefully read the story to construct a mental or logical family tree
-    2. Identify the two specific individuals mentioned in the query
-    3. Trace the genealogical path between these two individuals using the facts established in the story
-    4. Determine the exact kinship relation (e.g., aunt, grandfather, son-in-law)
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [The exact kinship relation word]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the exact kinship relation word or short phrase (e.g., aunt, uncle, grandfather, son-in-law). Do not include any other text, explanation, or punctuation.
-""").strip()
-
-def create_clutrr_prompt(story, query):
-    """
-    Create a prompt for CLUTRR (Family Relation Reasoning).
-    
-    The Query is usually a tuple like ('Alice', 'Bob') or a string "How is Alice related to Bob?".
-    The Model needs to output the kinship relation (e.g., 'aunt', 'grandfather').
-    """
-
-    # If query is a tuple/list ['Alice', 'Bob'], format it. 
-    # If it's already a string, keep it.
-    if isinstance(query, list) or isinstance(query, tuple):
-        entity_1 = query[0]
-        entity_2 = query[1]
-        formatted_query = f"What is the relationship of {entity_1} to {entity_2}?"
-    else:
-        formatted_query = query
-
-    system_prompt = SYSTEM_PROMPT_CLUTRR
-
-    user_prompt = textwrap.dedent(f"""\
-        Story:
-        {story}
-        Query:
-        {formatted_query}
-        
-        Output the exact kinship relation.
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_answer(response):

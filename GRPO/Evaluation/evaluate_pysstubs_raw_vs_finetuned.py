@@ -27,6 +27,10 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import (create_pysstubs_prompt as create_debugging_prompt,
+    SYSTEM_PROMPT_PYSSTUBS as SYSTEM_PROMPT_DEBUGGING, add_line_numbers)
 
 # ============================================================================
 # Configuration
@@ -192,60 +196,8 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-SYSTEM_PROMPT_DEBUGGING = textwrap.dedent("""\
-    You are an expert software developer and debugger. Your task is to identify the exact line number of a bug in the provided source code.
 
-    You will be provided with:
-    1. The buggy source code with line numbers added at the beginning of each line.
 
-    Your goal is to analyze the code, reason about all possible bugs, and logically deduce the exact line number where the bug exists.
-
-    ## Instructions:
-    1. Carefully read and analyze the provided source code.
-    2. Formulate a rigorous step-by-step reasoning to identify the bug. You must reason and think of all the possible bugs and then conclude which line has the bug.
-    3. Ensure your final answer is the exact integer line number of the bug.
-    4. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here, reasoning about all possible bugs and concluding which line has the bug]
-    </think>
-    <answer>
-    [Integer representing the exact line number of the bug]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the final integer representing the line number. Do not include any other text, variables, code snippets, or punctuation.
-""").strip()
-
-def add_line_numbers(code: str) -> str:
-    """Adds line numbers to the beginning of each line in a code snippet (1-based index)."""
-    if not code:
-        return ""
-    lines = code.split('\n')
-    numbered_lines = [f"{i+1}: {line}" for i, line in enumerate(lines)]
-    return '\n'.join(numbered_lines)
-
-def create_debugging_prompt(sample):
-    """Create a prompt for code debugging selection task."""
-    system_prompt = SYSTEM_PROMPT_DEBUGGING
-
-    # Get the code from the sample (assuming 'source_code', 'code', or 'file_content' columns)
-    raw_code = sample.get('buggy_code_before', sample.get('code', sample.get('file_content', '')))
-    
-    numbered_code = add_line_numbers(str(raw_code))
-
-    user_prompt = textwrap.dedent(f"""\
-        Source Code:
-        ```python
-        {numbered_code}
-        ```
-
-        What is the exact line number of the bug?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

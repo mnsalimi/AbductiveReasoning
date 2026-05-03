@@ -42,6 +42,11 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import (create_acr_prompt, SYSTEM_PROMPT_ACR,
+    SYSTEM_PROMPT_ACR_V1, SYSTEM_PROMPT_ACR_V2, SYSTEM_PROMPT_ACR_V3,
+    grid_to_string, grid_to_string_simple)
 
 
 # Verify installation
@@ -252,162 +257,8 @@ def load_finetuned_model(checkpoint_path, device):
 
 
 # ! diffrence
-def grid_to_string_simple(grid):
-    """Converts a 2D list (grid) into a compact string representation."""
-    if not grid or not isinstance(grid[0], list):
-        return str(grid)
-    return "[" + ", ".join([str(row) for row in grid]) + "]"
-
-def grid_to_string(grid):
-    """Converts a 2D list (grid) into a visual string representation."""
-    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):
-        return str(grid)
-    return "\n".join([" ".join([str(val) for val in row]) for row in grid])
-
-# Version 1: Without any change
-SYSTEM_PROMPT_ACR_V1 = textwrap.dedent("""\
-    You are an expert at inferring grid transformation rules from examples and expressing them as correct Python functions.
-
-    You will be given several training examples. Each example contains:
-    - Input:  a 2D grid (nested list of integers)
-    - Output: the result of applying the same hidden transformation rule to the input grid
-
-    Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
-
-    ### Output format:
-    <think>
-    Briefly describe the rule you inferred and any important edge cases.
-    </think>
-    <answer>
-    def transform(grid):
-        ...
-    </answer>
-
-    Code requirements:
-    - Define EXACTLY one function named transform.
-    - The function takes one argument: grid (nested list of integers).
-    - It MUST return the transformed grid (nested list of integers).
-    - NO IMPORTS allowed.
-    - NO printing, no input(), no randomness.
-    - Do not hardcode specific training inputs/outputs; generalize the logic.
-
-    STRICT FORMATTING RULES:
-    - Output ONLY the <think> and <answer> blocks—no other text.
-    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
-    - Do NOT repeat the code. Write the function exactly once.
-    - Ensure you close the tag with </answer>.
-    - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
-""").strip()
-
-# Version 2: With one small hint of the data to help model
-SYSTEM_PROMPT_ACR_V2 = textwrap.dedent("""\
-    You are an expert at inferring grid transformation rules from examples and expressing them as correct Python functions.
-
-    You will be given several training examples. Each example contains:
-    - Input:  a 2D grid (nested list of integers)
-    - Output: the result of applying the same hidden transformation rule to the input grid
-
-    Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
-
-    Hint: MiniARC tasks often involve identifying distinct objects (connected components of the same color), counting elements, or applying simple geometric transformations like flips and rotations.
-
-    ### Output format:
-    <think>
-    Briefly describe the rule you inferred and any important edge cases.
-    </think>
-    <answer>
-    def transform(grid):
-        ...
-    </answer>
-
-    Code requirements:
-    - Define EXACTLY one function named transform.
-    - The function takes one argument: grid (nested list of integers).
-    - It MUST return the transformed grid (nested list of integers).
-    - NO IMPORTS allowed.
-    - NO printing, no input(), no randomness.
-    - Do not hardcode specific training inputs/outputs; generalize the logic.
-
-    STRICT FORMATTING RULES:
-    - Output ONLY the <think> and <answer> blocks—no other text.
-    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
-    - Do NOT repeat the code. Write the function exactly once.
-    - Ensure you close the tag with </answer>.
-    - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
-""").strip()
-
-# Version 3: With detailed hint of data
-SYSTEM_PROMPT_ACR_V3 = textwrap.dedent("""\
-    You are an expert at inferring grid transformation rules from examples and expressing them as correct Python functions.
-
-    You will be given several training examples. Each example contains:
-    - Input:  a 2D grid (nested list of integers)
-    - Output: the result of applying the same hidden transformation rule to the input grid
-
-    Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
-
-    Detailed Hint: MiniARC tasks typically require reasoning about:
-    1. Objects: Groups of adjacent pixels of the same color.
-    2. Geometry: Flips, rotations, translations, and scaling of objects.
-    3. Topology: Containment (inside/outside), boundaries, and connectivity.
-    4. Counting: Number of objects, number of pixels of a certain color, or dimensions.
-    5. Color Logic: Changing colors based on frequency, position, or neighbor colors.
-    6. Symmetry: Horizontal, vertical, or diagonal symmetry.
-    7. Movement: Moving objects until they hit a boundary or another object (gravity, bouncing).
-
-    ### Output format:
-    <think>
-    [Explain your thought process: reason step by step about the possible rules, consider alternative hypotheses, and explain why your final rule best fits ALL training examples.]
-    </think>
-    <answer>
-    def transform(grid):
-        ...
-    </answer>
-
-    Code requirements:
-    - Define EXACTLY one function named transform.
-    - The function takes one argument: grid (nested list of integers).
-    - It MUST return the transformed grid (nested list of integers).
-    - NO IMPORTS allowed.
-    - NO printing, no input(), no randomness.
-    - Do not hardcode specific training inputs/outputs; generalize the logic.
-
-    STRICT FORMATTING RULES:
-    - Output ONLY the <think> and <answer> blocks—no other text.
-    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
-    - Do NOT repeat the code. Write the function exactly once.
-    - Ensure you close the tag with </answer>.
-    - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
-""").strip()
-
-# Default to V1 for now
-SYSTEM_PROMPT_ACR = SYSTEM_PROMPT_ACR_V1
-
-def create_acr_prompt(example):
-    """Create a prompt for the MiniARC rule-inference-to-code task."""
-    system_prompt = SYSTEM_PROMPT_ACR
-    train_prompt = "\n".join([
-        f"--- Example {i+1} ---\nInput:\n{grid_to_string(ex['input'])}\nOutput:\n{grid_to_string(ex['output'])}"
-        for i, ex in enumerate(example["train"])
-    ])
-    user_prompt = textwrap.dedent(f"""\
-        Training examples:
-        {train_prompt}
-
-        Infer the underlying grid transformation and provide the Python function implementation in the required format.
-    """).strip()
-    return system_prompt, user_prompt
 
 
-# ## 5. Response Extraction and Evaluation Logic
-# Implements regex-based extraction of reasoning and code from model responses, and provides a secure execution environment with timeouts to validate the generated transformation functions.
-
-# In[ ]:
-
-
-# ============================================================================
-# Dynamic Evaluation (Code Execution)
-# ============================================================================
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags."""

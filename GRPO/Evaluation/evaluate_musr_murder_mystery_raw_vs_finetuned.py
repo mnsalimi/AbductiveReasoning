@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_musr_murder_prompt, SYSTEM_PROMPT_MUSR_MURDER
 
 # ============================================================================
 # Configuration
@@ -195,51 +197,7 @@ def load_finetuned_model(checkpoint_path, device):
 
 import textwrap
 
-SYSTEM_PROMPT_MUSR_MURDER = textwrap.dedent("""\
-    You are a brilliant detective and an expert in deductive reasoning. Your task is to analyze clues to solve complex mysteries.
 
-    You will be provided with:
-    1. Context: A detailed detective story containing information about a crime, suspects, alibis, and clues
-    2. Problem: A question about the mystery, followed by a list of numbered multiple-choice options
-
-    Your goal is to logically deduce the truth from the context and identify the correct choice by its index number.
-
-    ## Instructions:
-    1. Carefully read the Context to identify timelines, motives, means, and logical inconsistencies among the suspects' statements
-    2. Evaluate the Problem and all the provided choices
-    3. Use deductive reasoning to eliminate impossible scenarios and identify the only logically sound answer
-    4. Note the index number (e.g., 0, 1, 2, ...) of the correct choice
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Exactly one integer representing the index of the correct choice]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the numeric index number of the correct choice. Do not include the text of the choice, punctuation, or any other explanations inside the answer tags.
-""").strip()
-
-def create_musr_murder_prompt(problem, context):
-    """Create a prompt for a detective-style multiple-choice reasoning question."""
-
-    system_prompt = SYSTEM_PROMPT_MUSR_MURDER
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context}
-
-        Problem:
-        {problem}
-
-        What is the index number of the correct choice?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 
@@ -284,7 +242,7 @@ def evaluate_on_musr_murder(model, tokenizer, max_samples=None, model_name="Mode
     
     # Load musr_murder dataset
     print(f"Loading musr_murder dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "murder_mystery.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "murder_mystery.json"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

@@ -26,6 +26,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_art_prompt, SYSTEM_PROMPT_ART
 
 
 # ============================================================================
@@ -201,51 +203,7 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-SYSTEM_PROMPT_ART = textwrap.dedent("""\
-    You are an expert in abductive reasoning and narrative comprehension. Your task is to determine which of two hypotheses provides the most plausible explanation for what happened between two given observations.
 
-    You will be provided with:
-    1. Observation 1 (the initial situation or event)
-    2. Observation 2 (the subsequent outcome or resulting event)
-    3. Two Hypotheses (Hypothesis 1 and Hypothesis 2)
-
-    Your goal is to select the hypothesis that logically and narratively bridges the gap between Observation 1 and Observation 2, explaining how the situation transitioned from the first observation to the second.
-
-    ## Instructions:
-    1. Carefully read Observation 1 and Observation 2 to understand the chronological and narrative context
-    2. Evaluate both Hypothesis 1 and Hypothesis 2 as potential bridging events
-    3. Consider common sense, cause-and-effect relationships, and everyday plausibility
-    4. Select the hypothesis that best explains the transition
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Either "1" or "2" - just the number, nothing else]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
-""").strip()
-
-def create_art_prompt(obs1, obs2, hyp1, hyp2):
-    """Create prompt for ART task."""
-    system_prompt = SYSTEM_PROMPT_ART
-
-    user_prompt = textwrap.dedent(f"""\
-        Observation 1: {obs1}
-        Observation 2: {obs2}
-
-        Hypothesis 1: {hyp1}
-        Hypothesis 2: {hyp2}
-
-        Which hypothesis better explains the transition from Observation 1 to Observation 2?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_reasoning(response):

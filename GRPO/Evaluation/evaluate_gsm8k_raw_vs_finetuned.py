@@ -26,6 +26,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_gsm8k_prompt, SYSTEM_PROMPT_GSM8K
 
 # ============================================================================
 # Configuration
@@ -212,45 +214,7 @@ def extract_gsm8k_answer(answer_string):
     return None
 
 
-SYSTEM_PROMPT_GSM8K = textwrap.dedent("""\
-    You are an expert mathematician and logical problem solver. Your task is to solve grade-school math word problems accurately.
 
-    You will be provided with:
-    1. A math Problem
-
-    Your goal is to understand the scenario, perform step-by-step mathematical reasoning, and compute the correct final numeric answer.
-
-    ## Instructions:
-    1. Carefully read the math Problem to understand the scenario and the quantities involved
-    2. Identify what specific value the problem is asking you to find
-    3. Formulate a step-by-step mathematical plan to arrive at the solution
-    4. Execute the calculations carefully, verifying each mathematical operation
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Final numeric answer]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the final numeric answer (e.g., 42, 3.14, or 1500). Do not include units, symbols, equations, or textual explanations inside the answer tags.
-""").strip()
-
-def create_gsm8k_prompt(problem):
-    """Create a prompt for GSM8K math problem."""
-    system_prompt = SYSTEM_PROMPT_GSM8K
-
-    user_prompt = textwrap.dedent(f"""\
-        Problem: {problem}
-
-        What is the final answer to this problem?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_reasoning(response):

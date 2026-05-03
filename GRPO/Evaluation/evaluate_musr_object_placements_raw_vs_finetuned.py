@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_musr_object_prompt, SYSTEM_PROMPT_MUSR_OBJECT
 
 # ============================================================================
 # Configuration
@@ -194,54 +196,7 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 
-SYSTEM_PROMPT_MUSR_OBJECT = textwrap.dedent("""\
-    You are an expert logical reasoner specializing in tracking beliefs and object locations in narrative stories. Your task is to analyze a story and determine where a character believes an object is located.
 
-    You will be provided with:
-    1. Context: A story describing characters, their actions, and movements of objects
-    2. Problem: A question about where a specific character believes an object is located, along with multiple-choice options indexed as 0, 1, 2, ...
-
-    Your goal is to determine the correct answer by reasoning about what the character observed and therefore believes about the object's location.
-
-    ## Instructions:
-    1. Carefully read the Context and track the object's location throughout the story
-    2. Track what each character observes when the object is moved
-    3. If a character observes the object moving, they update their belief about the object's location
-    4. If a character does NOT observe the object moving (e.g., they are absent or distracted), they will continue to believe the object remains in the last location where they saw it
-    5. Analyze the Problem and evaluate all provided choices
-    6. Determine which option correctly represents the character's belief about the object's location
-    7. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Exactly one integer representing the index of the correct choice]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the numeric index number of the correct choice. Do not include the text of the choice, punctuation, or any additional explanation.
-""").strip()
-
-
-def create_musr_object_prompt(problem, context):
-    """Create a prompt for a detective-style multiple-choice reasoning question."""
-
-    system_prompt = SYSTEM_PROMPT_MUSR_OBJECT
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context}
-
-        Problem:
-        {problem}
-
-        What is the index number of the correct choice?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 
@@ -286,7 +241,7 @@ def evaluate_on_musr_object(model, tokenizer, max_samples=None, model_name="Mode
     
     # Load musr_object dataset
     print(f"Loading musr_object dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "object_placements.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "object_placements.json"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

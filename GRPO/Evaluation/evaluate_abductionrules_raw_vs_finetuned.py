@@ -34,6 +34,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_abductionrules_prompt, SYSTEM_PROMPT_AbductionRules
 
 # ============================================================================
 # Configuration
@@ -233,79 +235,7 @@ def load_finetuned_model(checkpoint_path, device):
 # Helper functions: prompting, parsing, metrics
 # ============================================================================
 
-SYSTEM_PROMPT_AbductionRules = textwrap.dedent("""\
-    You are an expert in logical reasoning and abductive inference. Your task is to identify the single missing fact that, when added to a given context, makes a query logically decidable.
 
-    You will be provided with:
-    1. A Context containing facts and rules
-    2. A Query that is currently not decidable from the context alone
-
-    Your goal is to infer ONE additional fact that, when combined with the context, allows the query to be either:
-    - proved true, or
-    - proved false
-
-    ## Instructions:
-    1. Carefully read all facts and rules in the context
-    2. Analyze the query
-    3. Identify the single missing fact that would make the query decidable
-    4. Prefer a direct, minimal explanation:
-       - Output exactly one fact
-       - Do not output a rule
-       - Do not output multiple facts
-       - Do not paraphrase beyond the style already used in the context
-    5. The fact should be one that works with the existing rules and facts to prove or disprove the query
-    6. Be careful with negation:
-       - Sometimes the right missing fact helps prove the query
-       - Sometimes it helps derive the opposite of the query, thereby disproving it
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Explain your thought process: which rule(s) matter, which existing facts are relevant, and why the missing fact makes the query provable or disprovable]
-    </think>
-
-    <answer>
-    [Output the single missing fact only, exactly as a natural-language sentence ending with a period]
-    </answer>
-
-    CRITICAL:
-    - The answer section must contain ONLY one missing fact.
-    - Do not include any extra commentary in the answer section.
-    - Do not output more than one sentence.
-    - Do not output a rule; output a fact about an entity in the context.
-""").strip()
-
-
-def create_abductionrules_prompt(example):
-    """
-    Build system + user prompt for an AbductionRules example.
-
-    Expected example structure:
-        {
-            "context_id": "...",
-            "context": "...",
-            "query_id": "...",
-            "query": "...",
-            "answer": "...",   # used only for ground truth
-            ...
-        }
-    """
-    context = example["context"]
-    query = example["query"]
-
-    user_prompt = textwrap.dedent(f"""\
-        Context:
-        {context}
-
-        Query:
-        {query}
-
-        Based on the context and query above, identify the single missing fact that, when added to the context, makes the query logically decidable.
-    """).strip()
-
-    system_prompt = SYSTEM_PROMPT_AbductionRules
-    return system_prompt, user_prompt
 
 
 def extract_answer_text(text: str):

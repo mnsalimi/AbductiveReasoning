@@ -35,6 +35,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_copa_cause_prompt as create_copa_prompt, SYSTEM_PROMPT_COPA_CAUSE
 
 # ============================================================================
 # Configuration
@@ -200,56 +202,7 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-SYSTEM_PROMPT_balanced_copa_cause_only = textwrap.dedent("""\
-    You are an expert in logical reasoning and abductive inference. Your task is to determine which of two given choices represents the most plausible cause for a given premise.
 
-    You will be provided with:
-    1. A Premise describing a situation or event
-    2. Two Choices (Choice 1 and Choice 2)
-
-    Your goal is to select the choice that best explains WHY the premise happened - identifying the root cause that led to the described situation.
-
-    ## Instructions:
-    1. Carefully read the premise
-    2. Think step by step to evaluate both choices as potential causes
-    3. Consider common sense, real-world knowledge, and typical causal relationships when making your decision
-    4. Select the choice that represents the most plausible and direct cause
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Either "1" or "2" - just the number, nothing else]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the number 1 or 2. Do not include any other text, explanation, or punctuation.
-""").strip()
-
-def create_copa_prompt(example):
-    """Create a prompt for COPA causal reasoning task.
-    
-    Args:
-        example (dict): A dictionary containing the premise, choice1, and choice2.
-    
-    Returns:
-        tuple: system_prompt and user_prompt strings.
-    """
-    system_prompt = SYSTEM_PROMPT_balanced_copa_cause_only
-
-    user_prompt = textwrap.dedent(f"""\
-        Premise: {example['premise']}
-
-        Choice 1: {example['choice1']}
-        Choice 2: {example['choice2']}
-
-        Which choice is the most plausible cause for the premise?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 def extract_reasoning(response):
     """Extract chain-of-thought reasoning from <think>...</think> tags, if present."""

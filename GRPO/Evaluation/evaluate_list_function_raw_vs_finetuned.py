@@ -44,6 +44,8 @@ if current_dir not in sys.path:
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_list_functions_prompt, SYSTEM_PROMPT_LIST_FUNCTION
 
 # Verify installation
 # --- LOCAL SETUP ---
@@ -233,91 +235,7 @@ def load_finetuned_model(checkpoint_path, device):
     return model, base_tokenizer
 
 # ## 4. Data Processing and Prompt Engineering
-# Define `string_to_list` and `list_to_string` for data serialization. Include `SYSTEM_PROMPT_LIST_FUNCTION` and `create_list_functions_prompt` to format inputs for the LLM.
 
-# In[ ]:
-
-
-def string_to_list(s):
-    """
-    Safely converts a string representation of a 1D list of integers
-    (e.g., "[1, 2, 3]") into a Python list ([1, 2, 3]).
-    Returns None on failure.
-    """
-    if not s:
-        return None
-    try:
-        # json.loads is safer than eval()
-        parsed_list = json.loads(s)
-
-        # Basic validation: ensure it's a list of ints
-        if isinstance(parsed_list, list) and all(isinstance(val, int) for val in parsed_list):
-            return parsed_list
-        else:
-            return None
-    except:
-        return None
-
-def list_to_string(lst):
-    """Converts a 1D list of integers into a string representation."""
-    if not lst:
-        return str(lst)
-    return str(lst).replace(" ", "") # Use simple str() output for [1, 2, 3]
-
-SYSTEM_PROMPT_LIST_FUNCTION = textwrap.dedent("""\
-    You are an expert at inferring simple list transformations from examples and expressing them as correct Python functions.
-
-    You will be given several training examples. Each example contains:
-    - Input:  a list of integers
-    - Output: the result of applying the same hidden transformation rule to the input
-
-    Infer the transformation rule that is consistent with ALL training examples, then write a general Python implementation of that rule.
-
-    Output format (MUST follow exactly):
-    <think>
-    [Explain your thought process: reason step by step about the possible rules, consider alternative hypotheses, and explain why your final rule best fits ALL training examples.]
-    </think>
-    <answer>
-    def transform(lst):
-        ...
-    </answer>
-
-    Code requirements:
-    - Define EXACTLY one function named transform.
-    - The function takes one argument: lst (a list of integers).
-    - It MUST return a list of integers. If the rule results in a single value, return it as a single-element list (e.g., [val]).
-    - NO IMPORTS allowed.
-    - NO printing, no input(), no randomness.
-    - Do not hardcode specific training inputs/outputs; generalize the logic.
-    - BE ROBUST: Handle edge cases like empty lists or lists with only 1 element.
-
-    STRICT FORMATTING RULES:
-    - Do NOT use markdown code blocks (like ```python) inside the <answer> tags. Just write raw code.
-    - Do NOT repeat the code. Write the function exactly once.
-    - Ensure you close the tag with </answer>.
-    - The <answer> tag must contain ONLY valid Python code, no comments or explanations outside the function.
-    - Do NOT write any text before <think> or after </answer>.
-""").strip()
-
-
-def create_list_functions_prompt(example):
-    """Create a prompt for the list_functions rule-inference-to-code task."""
-
-    system_prompt = SYSTEM_PROMPT_LIST_FUNCTION
-
-    train_prompt = "\n".join([
-        f"--- Example {i+1} ---\nInput: {ex['input']}\nOutput: {ex['output']}"
-        for i, ex in enumerate(example["train"])
-    ])
-
-    user_prompt = textwrap.dedent(f"""\
-        Training examples:
-        {train_prompt}
-
-        Infer the underlying list transformation and provide the Python function implementation in the required format.
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 # ## 5. Response Extraction and Evaluation Logic

@@ -28,6 +28,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_defeasible_nli_prompt, SYSTEM_PROMPT_DEFEASIBLE_NLI
 
 np.random.seed(42)
 
@@ -198,66 +200,7 @@ def load_finetuned_model(checkpoint_path, device):
 
 import textwrap
 
-SYSTEM_PROMPT_DEFEASIBLE_NLI = textwrap.dedent("""\
-    You are an expert in defeasible reasoning and logical analysis. Your task is to determine how new information affects the likelihood of a given hypothesis.
 
-    You will be provided with:
-    1. A Hypothesis (a tentative conclusion)
-    2. An Update (new information)
-    3. A Premise (optional contextual background)
-
-    Your goal is to analyze the context and decide if the new Update makes the Hypothesis more likely or less likely to be true.
-
-    ## Instructions:
-    1. Read the Hypothesis and the Premise (if provided) to understand the initial situation
-    2. Carefully evaluate the new Update
-    3. Determine if the Update provides evidence that supports the Hypothesis (strengthens it) or contradicts it (weakens it)
-    4. Classify the effect as either STRENGTHENS or WEAKENS
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [STRENGTHENS or WEAKENS]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the exact word STRENGTHENS or WEAKENS. Do not include any other text, explanation, or punctuation.
-""").strip()
-
-def create_defeasible_nli_prompt(premise, hypothesis, update):
-    """Create a prompt for Defeasible NLI (Thinking Like a Skeptic)."""
-
-    system_prompt = SYSTEM_PROMPT_DEFEASIBLE_NLI
-
-    # Handle cases where Premise might be empty (e.g., Social Norms subset)
-    if premise and isinstance(premise, str) and len(premise.strip()) > 0:
-        context_block = textwrap.dedent(f"""\
-            Premise:
-            {premise}
-
-            Hypothesis:
-            {hypothesis}
-        """).strip()
-    else:
-        context_block = textwrap.dedent(f"""\
-            Hypothesis:
-            {hypothesis}
-        """).strip()
-
-    user_prompt = textwrap.dedent(f"""\
-        {context_block}
-
-        Update:
-        {update}
-
-        Does this Update STRENGTHEN or WEAKEN the Hypothesis?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 

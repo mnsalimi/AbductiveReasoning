@@ -31,6 +31,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_debugging_prompt, SYSTEM_PROMPT_DEBUGGING
 
 # ============================================================================
 # Configuration
@@ -200,62 +202,7 @@ def load_finetuned_model(checkpoint_path, device="cuda:0"):
 # Prompting and Processing
 # ==================================================================
 
-SYSTEM_PROMPT_DEBUGGING = textwrap.dedent("""\
-    You are an expert Python developer and debugger. Your task is to identify and fix errors in Python code snippets.
 
-    You will be provided with:
-    1. Task Instructions: The intended behavior and requirements for the code
-    2. Buggy Code: The incorrect Python code snippet that is failing its tests
-    3. Runtime Error / Test Feedback: The execution logs, tracebacks, or failing test results
-
-    Your goal is to analyze the failure, correct the bug, and provide the complete, working Python code.
-
-    ## Instructions:
-    1. Carefully read the Task Instructions to understand the desired functionality
-    2. Analyze the Buggy Code in conjunction with the Runtime Error / Test Feedback to pinpoint the root cause of the failure
-    3. Determine the necessary corrections to fix the bug without breaking existing correct functionality
-    4. Provide the full, corrected, and self-contained Python code. Do NOT omit any part of the function or use placeholders (e.g., "# rest of the code")
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    ```python
-    [Your full, corrected Python code here]
-    ```
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the full, corrected Python code block. Do not include any other text, explanations, or formatting before or after the code block inside the answer tags.
-""").strip()
-
-def create_debugging_prompt(sample):
-    """Create a prompt for code debugging task."""
-    bug_code = sample.get('bug_code', '')
-    runtime_feedback = sample.get('runtime_feedback', '')
-    instruct_prompt = sample.get('instruct_prompt', '')
-    
-    system_prompt = SYSTEM_PROMPT_DEBUGGING
-
-    user_prompt = textwrap.dedent(f"""\
-        Task Instructions:
-        {instruct_prompt}
-
-        Buggy Code:
-        ```python
-        {bug_code}
-        ```
-
-        Runtime Error / Test Feedback:
-        {runtime_feedback}
-
-        What is the fully corrected Python code?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 def extract_code(response):
     """Extract Python code from the model's response, strictly requiring <answer> tags."""

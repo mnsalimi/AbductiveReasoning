@@ -23,11 +23,13 @@ from peft import PeftModel
 import time
 import numpy as np
 import warnings
-import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+import sys, os as _os
+sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from prompts import create_ecare_prompt
 
 # np.random.seed(42)
 
@@ -194,61 +196,6 @@ def load_finetuned_model(checkpoint_path, device):
     print("✅ Fine-tuned model loaded successfully")
     
     return model, base_tokenizer
-
-
-import textwrap
-
-SYSTEM_PROMPT_ECARE = textwrap.dedent("""\
-    You are an expert in causal reasoning and multiple-choice evaluation. Your task is to determine the correct causal relationship based on a given premise and question type.
-
-    You will be provided with:
-    1. A Premise describing a specific situation or event
-    2. Additional context containing the Question Type (asking for either a cause or an effect) and two candidate choices
-
-    Your goal is to evaluate both choices and select the one that represents the most plausible cause or effect, depending on what the question asks.
-
-    ## Instructions:
-    1. Carefully read the Premise
-    2. Identify the Question Type from the provided text to determine if you are looking for a cause of the premise or an effect resulting from the premise
-    3. Evaluate both candidate choices against the premise
-    4. Select the choice that forms the most logical causal relationship
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Either CHOICE1 or CHOICE2]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the exact word CHOICE1 or CHOICE2. Do not include any other text, explanation, or punctuation.
-""").strip()
-
-def create_ecare_prompt(claim, evidence_text):
-    """
-    Create a prompt for e-CARE Causal Reasoning (multiple-choice).
-
-    NOTE: Kept function name/signature to minimize changes.
-    Here:
-      - `claim` == the e-CARE "premise"
-      - `evidence_text` == a formatted block containing question + choices
-    """
-
-    system_prompt = SYSTEM_PROMPT_ECARE
-
-    user_prompt = textwrap.dedent(f"""\
-        Premise:
-        {claim}
-
-        {evidence_text}
-
-        Which choice is the correct answer?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 

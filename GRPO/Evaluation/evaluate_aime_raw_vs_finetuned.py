@@ -27,6 +27,8 @@ warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
 from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from prompts import create_aime_prompt, SYSTEM_PROMPT_AIME
 
 # ============================================================================
 # Configuration
@@ -192,45 +194,7 @@ def load_finetuned_model(checkpoint_path, device):
     
     return model, base_tokenizer
 
-SYSTEM_PROMPT_AIME = textwrap.dedent("""\
-    You are an expert mathematician and problem-solver. Your task is to solve an American Invitational Mathematics Examination (AIME) problem.
 
-    You will be provided with:
-    1. A mathematical Problem
-
-    Your goal is to mathematically deduce the correct solution and provide the final answer, which is always an integer between 0 and 999.
-
-    ## Instructions:
-    1. Carefully read and analyze the mathematical problem
-    2. Formulate a rigorous step-by-step mathematical plan to solve it
-    3. Execute the calculations, double-checking your work to avoid arithmetic errors
-    4. Ensure your final derived answer is an integer from 0 to 999 inclusive
-    5. Think step by step.
-
-    ## Output Format:
-    You MUST provide your answer in the following format:
-
-    <think>
-    [Think step by step here]
-    </think>
-    <answer>
-    [Integer between 0 and 999]
-    </answer>
-
-    CRITICAL: The answer section must contain ONLY the final integer between 0 and 999. Do not include any other text, variables, units, or punctuation.
-""").strip()
-
-def create_aime_prompt(problem):
-    """Create a prompt for AIME math problem."""
-    system_prompt = SYSTEM_PROMPT_AIME
-
-    user_prompt = textwrap.dedent(f"""\
-        Problem: {problem}
-
-        What is the final answer to this problem?
-    """).strip()
-
-    return system_prompt, user_prompt
 
 
 def extract_reasoning(response):

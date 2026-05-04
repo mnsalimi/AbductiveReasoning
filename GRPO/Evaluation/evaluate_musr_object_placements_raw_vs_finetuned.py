@@ -241,7 +241,7 @@ def evaluate_on_musr_object(model, tokenizer, max_samples=None, model_name="Mode
     
     # Load musr_object dataset
     print(f"Loading musr_object dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "object_placements.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "object_placements.jsonl"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

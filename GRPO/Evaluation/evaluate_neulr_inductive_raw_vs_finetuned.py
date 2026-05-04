@@ -234,7 +234,7 @@ def evaluate_on_neulr_inductive(model, tokenizer, max_samples=None, model_name="
     
     # Load neulr_inductive dataset
     print(f"Loading neulr_inductive dataset (split={split})...")
-    dataset_path = os.path.join(get_datasets_dir(), "NeuLR", "inductive_neutral.json")
+    dataset_path = os.path.join(get_datasets_dir(), "neulr", "inductive.jsonl")
     dataset = load_dataset("json", data_files=dataset_path)["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")

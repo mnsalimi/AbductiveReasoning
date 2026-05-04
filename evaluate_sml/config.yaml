@@ -148,7 +148,7 @@ prompt_templates:
 datasets:
   medqa:
     source: "https://github.com/jind11/MedQA"
-    file_path: "datasets/MedQA/phrases_no_exclude_test.jsonl"
+    file_path: "datasets/medqa/test_with_phrases.jsonl"
     prompts:
       - type: "Only Final Answer"
         template: "multiple_choice_only_final_answer"
@@ -175,7 +175,7 @@ datasets:
         
   uniadilr:
     source: "https://github.com/YuSheng-00/UniADILR/tree/main/data/UniADILR-HGc"
-    file_path: "datasets/UniADILR-HGc/abduction.jsonl"
+    file_path: "datasets/uniadilr/abduction.jsonl"
     prompts:
       - type: "Only Final Answer"
         template: "uniadilr_only_final_answer"

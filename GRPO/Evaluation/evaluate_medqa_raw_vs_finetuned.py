@@ -241,7 +241,7 @@ def evaluate_on_MedQA(model, tokenizer, max_samples=None, model_name="Model", ba
     
     # Load MedQA dataset
     print(f"Loading MedQA dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "MedQA/test.jsonl"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "medqa/test.jsonl"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

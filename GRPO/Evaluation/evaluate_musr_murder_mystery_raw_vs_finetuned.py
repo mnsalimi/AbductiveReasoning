@@ -242,7 +242,7 @@ def evaluate_on_musr_murder(model, tokenizer, max_samples=None, model_name="Mode
     
     # Load musr_murder dataset
     print(f"Loading musr_murder dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "murder_mystery.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "murder_mystery.jsonl"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

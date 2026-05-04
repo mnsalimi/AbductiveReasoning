@@ -234,7 +234,7 @@ def evaluate_on_neulr_deductive(model, tokenizer, max_samples=None, model_name="
     
     # Load neulr_deductive dataset
     print(f"Loading neulr_deductive dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "NeuLR/deductive_neutral.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "neulr/deductive.jsonl"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

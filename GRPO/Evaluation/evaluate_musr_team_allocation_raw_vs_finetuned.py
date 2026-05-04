@@ -243,7 +243,7 @@ def evaluate_on_musr_team(model, tokenizer, max_samples=None, model_name="Model"
     
     # Load musr_team dataset
     print(f"Loading musr_team dataset (split={split})...")
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "team_allocation.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "musr", "team_allocation.jsonl"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

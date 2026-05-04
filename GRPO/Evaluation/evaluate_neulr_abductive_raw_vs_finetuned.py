@@ -231,7 +231,7 @@ def evaluate_on_neulr_abductive(model, tokenizer, max_samples=None, model_name="
     # Load neulr_abductive dataset
     print(f"Loading neulr_abductive dataset (split={split})...")
     # Updated path to match your request implies using the json loader
-    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "NeuLR/abductive_neutral.json"))["train"]
+    dataset = load_dataset("json", data_files=os.path.join(get_datasets_dir(), "neulr/abductive.jsonl"))["train"]
     
     print("\nFiltering dataset for samples with input tokens <= 4096...")
     original_len = len(dataset)

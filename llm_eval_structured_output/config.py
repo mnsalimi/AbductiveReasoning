@@ -103,9 +103,7 @@ CLEAR_PREVIOUS_OUTPUTS: bool = True
 #                    "evidence_explanation_directionality_scorebased"
 # An empty list activates ALL registered metrics.
 # ---------------------------------------------------------------------------
-ACTIVE_METRICS: list[str] = ["backtracking", "branchiness", "uncertainty_markers",
-                            "prior", "differential_elimination", "observation_coverage",
-                            "evidence_explanation_directionality_scorebased"]  # Empty list activates all metrics
+ACTIVE_METRICS: list[str] = ["rationale_graph"]  # Empty list activates all metrics
 
 # ACTIVE_METRICS: list[str] = ["observation_coverage", "evidence_explanation_directionality_scorebased"]
 

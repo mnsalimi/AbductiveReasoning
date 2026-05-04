@@ -1552,45 +1552,48 @@ Answer:
 
 }
 INCLUDE_FEW_SHOT: bool = False
-INCLUDE_DATASET_SPECIFIC_NOTES: bool = True
+INCLUDE_DATASET_SPECIFIC_NOTES: bool = False
 
 SYSTEM_PROMPT = """\
 You are an expert reasoning-graph annotator.
 
 ## Task
-Build a directed graph from the rationale text.
-- Vertices are phrases/concepts/observations/facts explicitly present in the rationale.
-- Directed edges are explicit directional connections made in the rationale.
+Build an exhaustive, directed reasoning graph from the rationale text that maps the complete logical trace and argumentation path.
+- Vertices are atomic logical propositions, concepts, observations, or facts explicitly present in the rationale.
+- Directed edges are explicit logical entailments, reasoning steps, and conclusions made in the rationale.
+- Focus strictly on the reasoning trace (argumentation, deductions, logic). Do NOT map purely grammatical or syntactical linguistic dependencies.
 
 ## Core constraints (strict)
-1. Do NOT add missing knowledge.
-2. Do NOT infer hidden intermediate nodes.
-3. Every vertex and edge must be grounded in an exact quote from the rationale.
-4. Graph may be disconnected (multiple isolated subgraphs are allowed).
-5. Keep labels concise but faithful to quoted text.
+1. Be Exhaustive: Capture the entire narrative, including all intermediate reasoning steps, minor explicit entailments, and final conclusions.
+2. Maintain Granularity Balance: Vertices should represent distinct, atomic propositions. Do not bundle multiple reasoning steps into one oversized vertex, but do not divide a single cohesive proposition into meaningless fragmented pieces. Strongly emphasize separating distinct evidences, observations, prior facts, and conclusions into their own distinct vertices instead of bundling them together.
+3. Strict Grounding: Every vertex and edge must be based on an exact occurrence/quote from the rationale.
+4. No Inference: Do NOT add missing knowledge or infer hidden intermediate nodes. If a logical step is implied but not explicitly written, exclude it.
+5. Graph may be disconnected (multiple isolated subgraphs are allowed).
+6. Keep labels concise but faithful to quoted text.
 
 ## Vertex rules
 For each vertex include:
 - vertex_id: unique id like v1, v2, v3
 - label: concise label
-- description: what role this vertex plays
+- description: what logical role this vertex plays (e.g., premise, intermediate deduction, observation, conclusion)
 - text_correspondence: exact quote from rationale grounding the vertex
 
 ## Edge rules
 For each edge include:
-- source_vertex_label: label of source vertex
-- target_vertex_label: label of target vertex
-- edge_label: concise relation label
-- description: why relation exists in rationale
-- text_correspondence: exact quote from rationale grounding this edge relation
+- source_vertex_label: label of source vertex (CRITICAL: You must use the exact vertex "label" here, NOT the vertex_id. This confusion should not happen.)
+- target_vertex_label: label of target vertex (CRITICAL: You must use the exact vertex "label" here, NOT the vertex_id. This confusion should not happen.)
+- edge_label: concise relation label denoting the logical connection (e.g., ENTAILS, CONTRADICTS, CONSEQUENCE_OF, SUPPORTS, REFUTES, CAUSES, EXEMPLIFIES, PREVENTS)
+- description: why the logical relation exists in the rationale
+- text_correspondence: exact quote from rationale grounding this explicit edge relation
 
 Only output edges whose source and target correspond to listed vertices.
 
 ## Quality checks before final output
-- No vertex without an exact quote.
-- No edge without an exact quote.
-- No node/edge introduced from external knowledge.
-- Preserve directionality exactly as stated.
+- Completeness: Does the graph capture the WHOLE reasoning path and explicit conclusions?
+- Granularity: Are vertices balanced (neither bundling too much info nor splitting atomic thoughts)?
+- Logical Focus: Do edges represent actual reasoning and argumentation rather than mere syntax?
+- Grounding & Inference: Are all vertices and edges exactly quoted with ZERO inferred external logic? (Must be YES).
+- Preserve directionality exactly as stated in the text.
 
 ## Dataset-specific note (current dataset only)
 
@@ -1600,6 +1603,7 @@ Only output edges whose source and target correspond to listed vertices.
 
 {dataset_few_shot_examples}
 """
+
 
 USER_PROMPT_TEMPLATE = """\
 Dataset: {dataset}

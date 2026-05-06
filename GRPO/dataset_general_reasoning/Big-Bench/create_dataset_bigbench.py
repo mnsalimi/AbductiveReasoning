@@ -42,7 +42,7 @@ TRAIN_PER_TASK = 80
 VAL_PER_TASK = 20
 SEED = 42
 
-DATASET_NAME = "google/bigbench"
+DATASET_NAME = "tasksource/bigbench"
 TRAIN_SPLIT = "train"
 VAL_SPLIT = "validation"
 
@@ -222,7 +222,9 @@ def sample_task_split(
     seen_inputs: Set[str],
 ) -> List[Dict]:
     """Filter, sample, and shuffle one BIG-Bench task split."""
-    valid_examples = filter_valid_examples(rows, task, split, seen_inputs)
+    
+    local_seen = set(seen_inputs)
+    valid_examples = filter_valid_examples(rows, task, split, local_seen)
 
     log(
         f"Task {task!r} {split} valid standard MC examples after filtering: "
@@ -241,6 +243,9 @@ def sample_task_split(
 
     log(f"Shuffling task {task!r} split {split!r} sampled examples ...")
     rng.shuffle(sampled_rows)
+
+    for row in sampled_rows:
+        seen_inputs.add(row["input"].casefold())
 
     return sampled_rows
 

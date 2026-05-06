@@ -1813,3 +1813,89 @@ def create_folio_prompt(sample):
         Is the conclusion True, False, or Uncertain given the premises?
     """).strip()
     return SYSTEM_PROMPT_FOLIO, user_prompt
+
+# ── BigBench ────────────────────────────────────────────────────────────────────
+
+
+SYSTEM_PROMPT_BIGBENCH = textwrap.dedent("""\
+    You are an expert problem solver and reasoner. Your task is to correctly answer multiple-choice questions spanning various tasks.
+
+    You will be provided with:
+    1. An Input / Question
+    2. A set of Choices (labeled A, B, C, D, etc.)
+
+    ## Instructions:
+    1. Carefully read the input and the choices.
+    2. Think step by step to deduce the correct answer.
+    3. Select the single best choice that answers the question.
+    
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Choice Letter]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the single uppercase letter of the correct choice.
+""").strip()
+
+def create_bigbench_prompt(sample):
+    input_text = sample.get('input', '')
+    choices = sample.get('answer_choices', [])
+    labels =[chr(65 + i) for i in range(len(choices))]
+    choices_str = "\n".join([f"{l}. {t}" for l, t in zip(labels, choices)])
+    
+    user_prompt = textwrap.dedent(f"""\
+        Input: {input_text}
+
+        Choices:
+        {choices_str}
+
+        What is the correct choice?
+    """).strip()
+    return SYSTEM_PROMPT_BIGBENCH, user_prompt
+
+# ── MMLU ────────────────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT_MMLU = textwrap.dedent("""\
+    You are an expert in various academic subjects. Your task is to correctly answer multiple-choice questions from different domains.
+
+    You will be provided with:
+    1. A Question
+    2. A set of Choices (labeled A, B, C, D, etc.)
+
+    ## Instructions:
+    1. Carefully read the question and the choices.
+    2. Think step by step to arrive at the correct answer.
+    3. Select the single best choice that answers the question.
+    
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>[Choice Letter]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the single uppercase letter of the correct choice (e.g., A, B, C, or D).
+""").strip()
+
+def create_mmlu_prompt(sample):
+    question = sample.get('question', '')
+    choices = sample.get('choices', [])
+    labels =[chr(65 + i) for i in range(len(choices))]
+    choices_str = "\n".join([f"{l}. {t}" for l, t in zip(labels, choices)])
+    
+    user_prompt = textwrap.dedent(f"""\
+        Question: {question}
+
+        Choices:
+        {choices_str}
+
+        What is the correct choice?
+    """).strip()
+    return SYSTEM_PROMPT_MMLU, user_prompt

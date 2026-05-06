@@ -106,23 +106,48 @@ def convert_examples(rows: List[Dict]) -> List[Dict]:
     return output
 
 
-def get_balanced_quotas(labels: Sequence[str], n: int) -> Dict[str, int]:
+def get_stratified_quotas(rows: List[Dict], n: int) -> Dict[str, int]:
     """
-    Create near-balanced quotas across labels.
+    Create quotas that approximately preserve the original label distribution.
 
     Example:
-    - n=320 and 3 labels -> 107, 107, 106
-    - n=80 and 3 labels -> 27, 27, 26
+    If the source split is:
+      SUPPORTS: 50%
+      REFUTES: 30%
+      NOT ENOUGH INFO: 20%
+
+    and n=320, this returns approximately:
+      SUPPORTS: 160
+      REFUTES: 96
+      NOT ENOUGH INFO: 64
     """
-    if not labels:
-        raise ValueError("No labels found.")
+    label_counts = Counter(row[LABEL_FIELD] for row in rows)
+    total = sum(label_counts.values())
 
-    sorted_labels = sorted(labels)
-    base = n // len(sorted_labels)
-    remainder = n % len(sorted_labels)
+    if total == 0:
+        raise ValueError("No rows found when calculating label quotas.")
 
-    quotas = {label: base for label in sorted_labels}
-    for label in sorted_labels[:remainder]:
+    raw_quotas = {
+        label: (count / total) * n
+        for label, count in label_counts.items()
+    }
+
+    quotas = {
+        label: int(raw_quota)
+        for label, raw_quota in raw_quotas.items()
+    }
+
+    assigned = sum(quotas.values())
+    remainder = n - assigned
+
+    # Add leftover samples to labels with the largest fractional parts.
+    fractional_parts = sorted(
+        raw_quotas.items(),
+        key=lambda item: item[1] - int(item[1]),
+        reverse=True,
+    )
+
+    for label, _ in fractional_parts[:remainder]:
         quotas[label] += 1
 
     return quotas
@@ -146,7 +171,7 @@ def stratified_sample(rows: List[Dict], n: int, rng: random.Random) -> List[Dict
         rows_by_label[row[LABEL_FIELD]].append(row)
 
     labels = sorted(rows_by_label.keys())
-    quotas = get_balanced_quotas(labels, n)
+    quotas = get_stratified_quotas(rows, n)
 
     selected = []
     selected_ids = set()
@@ -155,7 +180,7 @@ def stratified_sample(rows: List[Dict], n: int, rng: random.Random) -> List[Dict
     for label in labels:
         log(f"  {label}: {len(rows_by_label[label])}")
 
-    log("Target label quotas:")
+    log("Target label quotas, preserving original split ratios:")
     for label in labels:
         log(f"  {label}: {quotas[label]}")
 

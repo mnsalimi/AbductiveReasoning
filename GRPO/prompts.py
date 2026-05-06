@@ -1728,3 +1728,88 @@ def create_ecare_prompt(claim, evidence_text):
     """).strip()
 
     return system_prompt, user_prompt
+
+# ── CommonsenseQA ────────────────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT_CSQA = textwrap.dedent("""\
+    You are an expert at commonsense reasoning. Your task is to correctly answer multiple-choice questions based on everyday knowledge.
+
+    You will be provided with:
+    1. A Question
+    2. A set of Choices (labeled A, B, C, D, E)
+
+    ## Instructions:
+    1. Carefully read the question and the choices.
+    2. Think step by step about the relationships between the concepts and everyday commonsense scenarios.
+    3. Select the single best choice that answers the question.
+    
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [Choice Letter]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY the single uppercase letter of the correct choice (A, B, C, D, or E).
+""").strip()
+
+def create_csqa_prompt(sample):
+    question = sample['question']
+    labels = sample['choices']['label']
+    texts = sample['choices']['text']
+    choices_str = "\n".join([f"{l}. {t}" for l, t in zip(labels, texts)])
+    
+    user_prompt = textwrap.dedent(f"""\
+        Question: {question}
+
+        Choices:
+        {choices_str}
+
+        What is the correct choice?
+    """).strip()
+    return SYSTEM_PROMPT_CSQA, user_prompt
+
+# ── FOLIO ────────────────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT_FOLIO = textwrap.dedent("""\
+    You are an expert in first-order logic. Your task is to determine the truth value of a conclusion given a set of premises.
+
+    You will be provided with:
+    1. A list of Premises
+    2. A Conclusion
+
+    ## Instructions:
+    1. Carefully read the premises and assume they are all true.
+    2. Apply strict logical deduction to evaluate the conclusion.
+    3. Determine if the conclusion is strictly True, strictly False, or if it is Uncertain (Unknown) based solely on the provided premises.
+
+    ## Output Format:
+    You MUST provide your answer in the following format:
+
+    <think>
+    [Think step by step here]
+    </think>
+    <answer>
+    [True/False/Uncertain]
+    </answer>
+
+    CRITICAL: The answer section must contain ONLY one of the exact words: True, False, or Uncertain.
+""").strip()
+
+def create_folio_prompt(sample):
+    premises = sample['premises']
+    conclusion = sample['conclusion']
+    premises_str = "\n".join([f"- {p}" for p in premises])
+    
+    user_prompt = textwrap.dedent(f"""\
+        Premises:
+        {premises_str}
+
+        Conclusion: {conclusion}
+
+        Is the conclusion True, False, or Uncertain given the premises?
+    """).strip()
+    return SYSTEM_PROMPT_FOLIO, user_prompt

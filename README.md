@@ -50,15 +50,25 @@ pip install -e llm_eval_structured_output/
 
 ## Models
 
-| Component | Value |
+We apply GRPO post-training to four base models:
+
+| Model | HuggingFace ID |
 |---|---|
-| Base model | `unsloth/Meta-Llama-3.1-8B-Instruct-unsloth-bnb-4bit` (Meta-Llama-3.1-8B) |
+| Qwen3-4B | `Qwen/Qwen3-4B` |
+| Qwen3-8B | `Qwen/Qwen3-8B` |
+| DeepSeek-R1-Distill-Qwen-7B | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` |
+| Llama-3.1-8B-Instruct | `meta-llama/Llama-3.1-8B-Instruct` |
+
+All models are fine-tuned with the same PEFT configuration:
+
+| Setting | Value |
+|---|---|
 | Quantization | 4-bit NF4 via `bitsandbytes` |
 | LoRA target modules | `q, k, v, o, up, down, gate` projections |
 | LoRA rank / alpha | 64 / 64 |
 | Training method | GRPO (`trl.GRPOTrainer`) |
 
-Fine-tuned weights are fully reproducible from the training scripts below. The base model is publicly available on Hugging Face at `unsloth/Meta-Llama-3.1-8B-Instruct-unsloth-bnb-4bit`.
+Fine-tuned weights are fully reproducible from the training scripts below.
 
 ## Training
 

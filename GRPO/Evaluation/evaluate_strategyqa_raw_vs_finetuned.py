@@ -27,7 +27,7 @@ import textwrap
 warnings.filterwarnings('ignore')
 
 # Import path utilities for project-relative paths
-from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir
+from path_utils import get_project_root, get_datasets_dir, get_evaluation_dir, get_results_dir, get_grpo_dir, EVALUATION_SUBSET_VERSION, is_evaluation_cache_current
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from prompts import create_strategyqa_prompt, SYSTEM_PROMPT_STRATEGYQA
 
@@ -385,9 +385,7 @@ def evaluate_on_strategyqa(
     max_new_tokens=2048,
 ):
     """Evaluate model on voidful/StrategyQA dataset."""
-    # split="validation"
     print(f"\n🔍 Evaluating {model_name} on StrategyQA...")
-    split = "test"
     print(f"   Split: {split}")
     print(f"   Batch size: {batch_size}")
 
@@ -410,34 +408,10 @@ def evaluate_on_strategyqa(
             data = json.load(f)
         dataset = Dataset.from_list(data)
 
-    print("\nFiltering dataset for samples with input tokens <= 4096...")
-    original_len = len(dataset)
-    
-    def filter_by_token_length(sample):
-        system_prompt, user_prompt = create_strategyqa_prompt(sample)
-        try:
-            messages =[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-            formatted_prompt = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
-        except Exception:
-            formatted_prompt = f"{system_prompt}\n\n{user_prompt}"
-            
-        # Get the tokenized length
-        tokenized = tokenizer(formatted_prompt, truncation=False, add_special_tokens=True)
-        return len(tokenized["input_ids"]) <= 4096
-        
-    dataset = dataset.filter(filter_by_token_length, desc="Filtering lengths")
-    print(f"Filtered out {original_len - len(dataset)} samples exceeding 4096 tokens.")
-    print(f"{len(dataset)} valid samples remaining.\n")
-
     if max_samples:
-        dataset = dataset.select(range(min(max_samples, len(dataset))))
+        if len(dataset) < max_samples:
+            raise ValueError(f"StrategyQA has {len(dataset)} samples, but {max_samples} were requested.")
+        dataset = dataset.select(range(max_samples))
         print(f"Evaluating on {len(dataset)} samples (limited)")
     else:
         print(f"Evaluating on {len(dataset)} samples (full split)")
@@ -537,10 +511,9 @@ def evaluate_on_strategyqa(
                 pad_token_id=tokenizer.pad_token_id,
             )
 
+        input_length = inputs["input_ids"].shape[1]
         for i in range(batch_size_actual):
-            # IMPORTANT FIX vs the original: use attention_mask to get the true per-sample prompt length
-            prompt_len = int(inputs["attention_mask"][i].sum().item())
-            response = tokenizer.decode(outputs[i][prompt_len:], skip_special_tokens=True)
+            response = tokenizer.decode(outputs[i][input_length:], skip_special_tokens=True)
 
             predicted_answer = extract_answer(response)
 
@@ -643,10 +616,10 @@ def ensure_raw_results_cached(args):
     
     raw_results_file = os.path.join(
         raw_results_dir,
-        f"raw_results_train_all.json"
+        "raw_results_train_all.json"
     )
     
-    if os.path.exists(raw_results_file):
+    if is_evaluation_cache_current(raw_results_file, args.max_samples, args.split):
         print(f"\n📂 Found cached raw model results: {raw_results_file}")
         with open(raw_results_file, "r") as f:
             raw_results = json.load(f)
@@ -667,6 +640,7 @@ def ensure_raw_results_cached(args):
         return None
     
     raw_results_with_meta = {
+        "evaluation_subset_version": EVALUATION_SUBSET_VERSION,
         "model_path": RAW_MODEL_PATH,
         "dataset": dataset_name,
         "split": split,
@@ -687,7 +661,9 @@ def ensure_finetuned_results_cached(args, ckpt_name):
     """
     dataset_name = "strategyqa"
     ckpt_output_dir = os.path.join(get_grpo_dir(), args.output_path, ckpt_name, dataset_name)
-    if os.path.exists(ckpt_output_dir) and os.path.exists(os.path.join(ckpt_output_dir, "disagreement_cases.json")) and os.path.exists(os.path.join(ckpt_output_dir, "all_cases.json")):
+    all_cases_file = os.path.join(ckpt_output_dir, "all_cases.json")
+    disagreement_file = os.path.join(ckpt_output_dir, "disagreement_cases.json")
+    if os.path.exists(disagreement_file) and is_evaluation_cache_current(all_cases_file, args.max_samples, args.split):
         print(f"\n📂 Found cached fine-tuned model results: {ckpt_output_dir}")
         return True
     
@@ -793,6 +769,8 @@ def evaluate_checkpoint_cases(args, checkpoint_path):
     print(f"💾 Disagreement cases saved to: {disagreement_file}")
     
     finetune_results_with_meta = {
+        "evaluation_subset_version": EVALUATION_SUBSET_VERSION,
+        "split": args.split,
         "dataset": dataset_name,
         "max_samples": args.max_samples,
         **finetuned_results

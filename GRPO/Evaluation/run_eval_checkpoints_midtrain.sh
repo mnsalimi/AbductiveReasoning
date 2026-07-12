@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ===============================
 #      Evaluation Datasets 
@@ -53,6 +54,24 @@ declare -A BATCH_SIZES=(
     ["evaluate_ml_debugging_raw_vs_finetuned.py"]=16
     ["evaluate_uniadilr_raw_vs_finetuned"]=4
     ["evaluate_pysstubs_raw_vs_finetuned.py"]=8
+)
+
+declare -A SAMPLE_COUNTS=(
+    ["evaluate_art_raw_vs_finetuned.py"]=400
+    ["evaluate_neulr_abductive_raw_vs_finetuned.py"]=400
+    ["evaluate_defeasible_nli_raw_vs_finetuned.py"]=400
+    ["evaluate_goEmotion_raw_vs_finetuned.py"]=400
+    ["evaluate_musr_murder_mystery_raw_vs_finetuned.py"]=250
+    ["evaluate_medqa_raw_vs_finetuned.py"]=400
+    ["evaluate_ml_debugging_raw_vs_finetuned.py"]=400
+    ["evaluate_copa_raw_vs_finetuned_guess_effect.py"]=250
+    ["evaluate_musr_object_placements_raw_vs_finetuned.py"]=250
+    ["evaluate_musr_team_allocation_raw_vs_finetuned.py"]=250
+    ["evaluate_strategyqa_raw_vs_finetuned.py"]=400
+)
+
+declare -A SPLITS=(
+    ["evaluate_strategyqa_raw_vs_finetuned.py"]="train"
 )
 
 # CHECKPOINTS=(
@@ -121,24 +140,27 @@ echo "====================================="
 
 for script in "${scripts[@]}"; do
     batch_size="${BATCH_SIZES[$script]:-256}"
-    echo "Running $script with checkpoint $ckpt (batch_size=$batch_size) ..."
+    sample_count="${SAMPLE_COUNTS[$script]}"
+    split="${SPLITS[$script]:-test}"
+    echo "Running $script with checkpoint $ckpt (batch_size=$batch_size, samples=$sample_count, split=$split) ..."
     python3 "${SCRIPT_DIR}/${script}" \
         $COMMON_ARGS \
         --batch_size "$batch_size" \
         --checkpoint_path "$ckpt" \
         --run "$RUN_NAME" \
-        --split "test" \
+        --split "$split" \
         --raw_path "$RAW_MODEL_PATH" \
         --output_path "$OUTPUT_DIR" \
-        --max_samples 500
+        --max_samples "$sample_count"
 
     echo "Finished $script"
     echo "-------------------------------------"
+done
+
 python3 "${SCRIPT_DIR}/create_table.py" \
     --root "$ROOT_DIR" \
     --out_csv "${SCRIPT_DIR}/metrics_summary_${BASE_MODEL_NAME}.xlsx" \
     --run "$RUN_NAME" \
     --base_model_name "$BASE_MODEL_NAME" \
     --base_result_dir "$BASE_RESULTS_DIR" \
-    --train_data "$TRAIN_DATA" 
-done
+    --train_data "$TRAIN_DATA"

@@ -3,7 +3,28 @@ Path utilities for handling project-relative paths.
 This module provides functions to get project root and construct relative paths.
 """
 import os
+import json
 from pathlib import Path
+
+
+EVALUATION_SUBSET_VERSION = "source_prefix_no_length_filter_v1"
+
+
+def is_evaluation_cache_current(path, max_samples, split):
+    """Return whether a cached result matches the current fixed evaluation subset."""
+    if not os.path.isfile(path):
+        return False
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            cached = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return False
+
+    if cached.get("evaluation_subset_version") != EVALUATION_SUBSET_VERSION:
+        return False
+    if cached.get("max_samples") != max_samples or cached.get("split") != split:
+        return False
+    return max_samples is None or cached.get("total") == max_samples
 
 
 def get_project_root():

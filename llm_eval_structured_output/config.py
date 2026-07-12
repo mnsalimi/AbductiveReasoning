@@ -21,7 +21,7 @@ RUN_ID: str = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 # ---------------------------------------------------------------------------
 # Sampling
 # ---------------------------------------------------------------------------
-N_SAMPLES: int = 10          # How many items to evaluate per dataset per checkpoint
+N_SAMPLES: int = 50          # How many items to evaluate per dataset per checkpoint
 MAX_WORKERS: int = 1         # Parallel threads for LLM calls (keep low for testing)
 RANDOM_SEED: int = 42        # Fixed seed for reproducible sampling
 
@@ -112,7 +112,18 @@ ACTIVE_METRICS: list[str] = ["backtracking", "branchiness", "uncertainty_markers
 # List only the dataset names (folder names inside each checkpoint) to include.
 # An empty list evaluates ALL datasets found in each checkpoint.
 # ---------------------------------------------------------------------------
-ACTIVE_DATASETS: list[str] = []  # Test dataset
+ACTIVE_DATASETS: list[str] = [
+    "art",
+    "neulr_abductive",
+    "defeasible_nli",
+    "goemotion",
+    "musr_murder",
+    "medqa",
+    "copa_guess_effect",
+    "musr_object",
+    "musr_team",
+    "strategyqa",
+]
 
 # ---------------------------------------------------------------------------
 # Excluded checkpoints

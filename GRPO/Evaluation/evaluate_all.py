@@ -32,126 +32,88 @@ RAW_MODEL_PATH = "/home/msalimi/PLLMS/unsloth-Qwen2.5-14B-Instruct-bnb-4bit"
 TRAINING_DIR = "/home/msalimi/users/Nima/AbductiveReasoning/GRPO/results/Training_dt11.26.15:08_e20_unsloth_Qwen2.5_14B_Instruct_bnb_4bit_bnb_4bit_lr1e-05_t0.7_ε0.2_r64_b4"
 BASE_OUTPUT_DIR = str(SCRIPT_DIR)
 
-NUM_EPOCHS = 20  # Default number of training epochs
+NUM_EPOCHS = 3  # Must match the GRPO training run for checkpoint-to-epoch mapping
 
 
 # List of evaluation scripts to run
 EVALUATION_SCRIPTS = [
     {
-        'script': str(SCRIPT_DIR /'evaluate_strategyqa_raw_vs_finetuned.py'),
-        'name': 'evaluate_strategyqa Dataset Evaluation',
-        'output_subdir': 'strategyqa_evaluation_results',
-        'params': {
-            'split': 'test',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },
-    {
-        'script': str(SCRIPT_DIR /'evaluate_defeasible_nli_raw_vs_finetuned.py'),
-        'name': 'defeasible_nli (atomic) Dataset Evaluation',
-        'output_subdir': 'defeasible_nli_atomic_evaluation_results',
-        'params': {
-            'split': 'test',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },
-    {
-        'script': str(SCRIPT_DIR /'evaluate_neulr_abductive_raw_vs_finetuned.py'),
-        'name': 'evaluate_neulr_abductive Dataset Evaluation',
-        'output_subdir': 'neulr_abductive_evaluation_results',
-        'params': {
-            'split': 'test',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },
-
-    #THIS WAS TAKING SO LONG TO RUN. WE COMMENTED IT.
-
-    # {
-    #     'script': str(SCRIPT_DIR / 'evaluate_aimo_raw_vs_finetuned.py'),
-    #     'name': 'AIMO Dataset Evaluation',
-    #     'output_subdir': 'aimo_evaluation_results',
-    #     'params': {
-    #         'split': 'test',
-    #         'max_samples': 8,
-    #         'skip_raw': True,
-    #     },
-    #     'override_terminal': False
-    # },
-
-
-
-    {
-        'script': str(SCRIPT_DIR / 'evaluate_aime_raw_vs_finetuned.py'),
-        'name': 'AIME 2025 Dataset Evaluation',
-        'output_subdir': 'aime_evaluation_results',
-        'params': {
-            'split': 'train',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },
-    {
-        'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_cause.py'),
-        'name': 'COPA Dataset Evaluation (Guess Cause)',
-        'output_subdir': 'copa_evaluation_guess_cause_results',
-        'params': { 
-            'split': 'train',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },
-    {
-        'script': str(SCRIPT_DIR /'evaluate_copa_raw_vs_finetuned_guess_effect.py'),
-        'name': 'COPA Dataset Evaluation (Guess effect)',
-        'output_subdir': 'copa_evaluation_guess_effect_results',
-        'params': {
-            'split': 'train',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },
-    {
-        'script': str(SCRIPT_DIR /'evaluate_art_raw_vs_finetuned.py'),
+        'script': str(SCRIPT_DIR / 'evaluate_art_raw_vs_finetuned.py'),
         'name': 'ART Dataset Evaluation',
         'output_subdir': 'art_evaluation_results',
-        'params': {
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
+        'params': {'max_samples': 400},
+        'override_terminal': True
     },
     {
-        'script': str(SCRIPT_DIR /'evaluate_goEmotion_raw_vs_finetuned.py'),
+        'script': str(SCRIPT_DIR / 'evaluate_neulr_abductive_raw_vs_finetuned.py'),
+        'name': 'NeuLR Abductive Dataset Evaluation',
+        'output_subdir': 'neulr_abductive_evaluation_results',
+        'params': {'max_samples': 400},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_defeasible_nli_raw_vs_finetuned.py'),
+        'name': 'Defeasible NLI (Atomic) Dataset Evaluation',
+        'output_subdir': 'defeasible_nli_atomic_evaluation_results',
+        'params': {'max_samples': 400},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_goEmotion_raw_vs_finetuned.py'),
         'name': 'GoEmotion Dataset Evaluation',
         'output_subdir': 'goEmotion_evaluation_results',
-        'params': {
-            'split': 'test',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
+        'params': {'max_samples': 400},
+        'override_terminal': True
     },
     {
-        'script': str(SCRIPT_DIR /'evaluate_gsm8k_raw_vs_finetuned.py'),
-        'name': 'GSM8K Dataset Evaluation',
-        'output_subdir': 'gsm8k_evaluation_results',
-        'params': {
-            'split': 'test',
-            'max_samples': 8,
-            'skip_raw': True,
-        },
-        'override_terminal': False
-    },   
+        'script': str(SCRIPT_DIR / 'evaluate_musr_murder_mystery_raw_vs_finetuned.py'),
+        'name': 'MuSR Murder Mystery Dataset Evaluation',
+        'output_subdir': 'musr_murder_evaluation_results',
+        'params': {'max_samples': 250},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_medqa_raw_vs_finetuned.py'),
+        'name': 'MedQA Dataset Evaluation',
+        'output_subdir': 'medqa_evaluation_results',
+        'params': {'max_samples': 400},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_ml_debugging_raw_vs_finetuned.py'),
+        'name': 'ML Debugging Dataset Evaluation',
+        'output_subdir': 'ml_debugging_evaluation_results',
+        'params': {'max_samples': 400},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_copa_raw_vs_finetuned_guess_effect.py'),
+        'name': 'Balanced COPA Dataset Evaluation (Guess Effect)',
+        'output_subdir': 'copa_evaluation_guess_effect_results',
+        'params': {'max_samples': 250},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_musr_object_placements_raw_vs_finetuned.py'),
+        'name': 'MuSR Object Placements Dataset Evaluation',
+        'output_subdir': 'musr_object_evaluation_results',
+        'params': {'max_samples': 250},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_musr_team_allocation_raw_vs_finetuned.py'),
+        'name': 'MuSR Team Allocation Dataset Evaluation',
+        'output_subdir': 'musr_team_evaluation_results',
+        'params': {'max_samples': 250},
+        'override_terminal': True
+    },
+    {
+        'script': str(SCRIPT_DIR / 'evaluate_strategyqa_raw_vs_finetuned.py'),
+        'name': 'StrategyQA Dataset Evaluation',
+        'output_subdir': 'strategyqa_evaluation_results',
+        'params': {'max_samples': 400},
+        'override_terminal': True
+    },
 ]
 
 # Default parameters shared across all scripts

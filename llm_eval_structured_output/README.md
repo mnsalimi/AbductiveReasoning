@@ -270,13 +270,13 @@ results/
 |---|---|---|
 | `JUDGE_MODEL` | `gpt-4o-mini` | LLM used for judging |
 | `REASONING_EFFORT` | `"low"` | Reasoning token budget for GPT-5+ models (`"low"` / `"medium"` / `"high"`). Ignored for older models. |
-| `N_SAMPLES` | `10` | Items per dataset per checkpoint |
+| `N_SAMPLES` | `50` | Items per dataset per checkpoint |
 | `MAX_WORKERS` | `1` | Parallel threads |
 | `SAMPLE_CORRECT_RATIO` | `None` | Fraction of correct items in sample. `1.0` = all correct, `0.0` = all incorrect, `None` = pure random. |
 | `RANDOM_SEED` | `42` | Reproducibility seed (used only when no pinned sample file is found) |
 | `RANDOM_SAMPLES_DIR` | `"random_samples"` | Directory of pre-generated sample index files (see [Pinned samples](#pinned-samples-random_samples)). Set to `None` or `""` to always use random sampling. |
 | `ACTIVE_METRICS` | `[]` | Names of metrics to run. Empty list activates **all** registered metrics. |
-| `ACTIVE_DATASETS` | `[]` | Dataset folder names to evaluate. Empty list evaluates **all** datasets found in each checkpoint. |
+| `ACTIVE_DATASETS` | ten non-code held-out datasets | Dataset folder names to evaluate; ML-debugging is excluded from process metrics. |
 | `EXCLUDED_CHECKPOINTS` | `[]` | Checkpoint directory basenames to skip entirely (e.g. `["raw_model", "checkpoint-500"]`). |
 | `MAX_COMPLETION_TOKENS` | `2048` | Default max completion tokens per LLM call |
 | `METRIC_MAX_COMPLETION_TOKENS` | `{"observation_coverage": 4096, "rationale_graph": 8192}` | Per-metric token overrides; falls back to `MAX_COMPLETION_TOKENS` for unlisted metrics |
@@ -302,11 +302,12 @@ When `compute_sampled_pids()` is called it checks `{RANDOM_SAMPLES_DIR}/samples_
 
 | Condition | Behaviour |
 |---|---|
-| File found, indices overlap dataset | Those indices are used as-is (filtered to valid PIDs only) |
+| File found, all indices are valid | Those pinned indices are used as-is |
+| File found, some indices are unavailable | Valid pinned indices are retained and deterministically topped up to `N_SAMPLES` |
 | File found, **no overlap** with dataset | Falls back to seeded random sampling with a warning |
 | File **not found** | Falls back to seeded random sampling (controlled by `RANDOM_SEED`) |
 
-This guarantees that runs with `N_SAMPLES = 3 / 5 / 10 / 50 / 100 / 200` always evaluate exactly the same problem IDs across experiments, making results directly comparable without relying on seed reproducibility.
+The run fails clearly if a required dataset has fewer than `N_SAMPLES` valid items shared by all checkpoints. Otherwise, sampling is fixed and reproducible across experiments.
 
 ### Adding more sizes
 

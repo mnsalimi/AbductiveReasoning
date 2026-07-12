@@ -4,7 +4,7 @@
 
 ## Overview
 
-We investigate whether post-training with **Group Relative Policy Optimization (GRPO)** can strengthen abductive reasoning as a *transferable* competence in large language models. We train on a deliberately domain-neutral mixture of abductive tasks (hypothesis generation and hypothesis selection) and evaluate on nine held-out benchmarks—none seen during training—spanning classic abductive selection, abstract rule induction, long-context multi-step inference, defeasible reasoning, and non-abductive controls.
+We investigate whether post-training with **Group Relative Policy Optimization (GRPO)** can strengthen abductive reasoning as a *transferable* competence in large language models. We train on a deliberately domain-neutral mixture of abductive tasks (hypothesis generation and hypothesis selection) and evaluate on eleven held-out benchmarks—none seen during training—spanning classic abductive selection, abstract rule induction, long-context multi-step inference, defeasible reasoning, and non-abductive controls.
 
 Beyond end-task accuracy, we introduce **process-level metrics** (hypothesis branching, explicit backtracking, epistemic uncertainty marking, and observation coverage) to verify that improved benchmark performance co-occurs with measurably more exploratory and evidence-grounded reasoning traces.
 
@@ -86,7 +86,7 @@ Key constants to set at the top of the notebook:
 |---|---|
 | `MODEL_NAME` | HuggingFace model path |
 | `OUTPUT_DIR` | Where checkpoints are saved |
-| `NUM_TRAIN_EPOCHS` | Number of GRPO epochs (default: 20) |
+| `NUM_TRAIN_EPOCHS` | Number of GRPO epochs (default: 3) |
 
 Checkpoints are saved under `GRPO/results/<run_name>/`.
 
@@ -130,7 +130,7 @@ To evaluate a single dataset:
 ```bash
 python GRPO/Evaluation/evaluate_art_raw_vs_finetuned.py \
     --checkpoint_path /path/to/checkpoint-<N> \
-    --max_samples 200
+    --max_samples 400
 ```
 
 Available dataset scripts: `art`, `copa` (cause/effect), `defeasible_nli`, `goEmotion`, `musr_murder_mystery`, `musr_object_placements`, `musr_team_allocation`, `neulr_abductive`, `strategyqa`, and 15+ more.

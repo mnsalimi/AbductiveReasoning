@@ -260,6 +260,8 @@ def _load_pinned_sample(n_samples: int) -> list | None:
     samples_dir = getattr(config, "RANDOM_SAMPLES_DIR", None)
     if not samples_dir:
         return None
+    if not os.path.isabs(samples_dir):
+        samples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), samples_dir)
     candidate = os.path.join(samples_dir, f"samples_{n_samples}.json")
     if not os.path.isfile(candidate):
         return None
@@ -346,28 +348,43 @@ def compute_sampled_pids(
         if not pid_set:
             print(f"[WARN] Dataset '{ds}': no common valid items across checkpoints.")
             continue
+        if len(pid_set) < n_samples:
+            raise ValueError(
+                f"Dataset '{ds}' has only {len(pid_set)} common valid items across checkpoints; "
+                f"cannot evaluate the requested {n_samples}."
+            )
 
         # ── Pinned-sample path ───────────────────────────────────────────
         if pinned_indices is not None:
             # Keep only indices that are valid PIDs for this dataset
-            available = [p for p in pinned_indices if p in pid_set]
+            available = set(p for p in pinned_indices if p in pid_set)
             if not available:
                 print(
                     f"[WARN] Dataset '{ds}': pinned sample has no overlap with valid PIDs – "
                     "falling back to random sampling."
                 )
             else:
-                sampled[ds] = _sort_pids(set(available))
+                k = n_samples
+                replacement_count = k - len(available)
+                if len(available) < k:
+                    remaining = _sort_pids(pid_set - available)
+                    available.update(random.sample(remaining, replacement_count))
+                sampled[ds] = _sort_pids(available)
                 print(
-                    f"[OK] '{ds}': using {len(sampled[ds])} pinned indices "
-                    f"({n_samples - len(sampled[ds])} requested indices not present in dataset)"
-                    if len(sampled[ds]) < n_samples else
-                    f"[OK] '{ds}': using {len(sampled[ds])} pinned indices"
+                    f"[OK] '{ds}': using {len(sampled[ds])} fixed indices"
+                    + (f" ({replacement_count} seeded replacements)" if replacement_count else "")
                 )
                 continue
 
-        k = min(n_samples, len(pid_set))
-        sampled[ds] = _sort_pids(random.sample(_sort_pids(pid_set), k))
+        sampled[ds] = _sort_pids(random.sample(_sort_pids(pid_set), n_samples))
         print(f"[OK] '{ds}': sampled {len(sampled[ds])} items (no stratification)")
+
+    expected_datasets = {name.lower() for name in (config.ACTIVE_DATASETS or [])}
+    missing_datasets = sorted(expected_datasets - set(sampled))
+    if missing_datasets:
+        raise ValueError(
+            "Missing required metric-evaluation datasets shared by all checkpoints: "
+            + ", ".join(missing_datasets)
+        )
 
     return sampled

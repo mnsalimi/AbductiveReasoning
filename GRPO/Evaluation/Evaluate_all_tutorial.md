@@ -142,7 +142,7 @@ python run_evaluations.py --skip_finetuned
 
 ```bash
 # Run 3 evaluations in parallel with custom settings
-python run_evaluations.py --parallel 3 --batch_size 4 --max_samples 200
+python evaluate_all.py --parallel 3 --batch_size 4
 
 # Use custom checkpoint and disable real-time console output
 python run_evaluations.py --checkpoint_path /path/to/checkpoint-1280 --no_realtime

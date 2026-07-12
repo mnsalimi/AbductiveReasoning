@@ -188,11 +188,15 @@ def extract_reasoning(item: Item) -> str | None:
     # Schema variant 3: Extract reasoning from full_response
     full_response = item.get("full_response", "")
     if full_response:
-        # Try to extract reasoning text between <reasoning> tags
+        # Current prompts use <think>; retain <reasoning> for legacy cached outputs.
         import re
-        reasoning_match = re.search(r'<reasoning>(.*?)</reasoning>', full_response, re.DOTALL)
+        reasoning_match = re.search(
+            r'<(?P<tag>think|reasoning)>(?P<content>.*?)</(?P=tag)>',
+            full_response,
+            re.DOTALL | re.IGNORECASE,
+        )
         if reasoning_match:
-            return reasoning_match.group(1).strip()
+            return reasoning_match.group("content").strip()
     return None
 
 

@@ -51,16 +51,19 @@ import pandas as pd
 from openpyxl.styles import PatternFill, Font, Alignment
 import re
 
-from evaluate_aime_raw_vs_finetuned import find_best_checkpoint  
-
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload  
-from google.oauth2.service_account import Credentials
-from google.oauth2.credentials import Credentials as UserCredentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 from openpyxl import load_workbook
-import io 
+
+try:
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+    from google.oauth2.credentials import Credentials as UserCredentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+    import io
+    GOOGLE_DRIVE_AVAILABLE = True
+except ImportError:
+    UserCredentials = Any
+    GOOGLE_DRIVE_AVAILABLE = False
 
 os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
@@ -94,6 +97,50 @@ def load_metrics_from_json(json_path: str) -> Dict[str, Scalar]:
     return out
 
 
+def select_reported_metric(dataset_name: str, metrics: Dict[str, Scalar]) -> Tuple[str, Scalar] | None:
+    """Return the task-native metric used by the manuscript's main table."""
+    dataset_key = dataset_name.lower()
+    if "goemotion" in dataset_key and "exact_match_accuracy" in metrics:
+        return f"{dataset_key}_acc", metrics["exact_match_accuracy"]
+
+    for metric_name in ("accuracy", "exact_match_accuracy"):
+        if metric_name in metrics:
+            return f"{dataset_key}_acc", metrics[metric_name]
+    return None
+
+
+def find_best_checkpoint(training_dir: str) -> Tuple[str | None, float]:
+    """Select the saved step with the highest validation average reward."""
+    checkpoint_dir = os.path.join(training_dir, "checkpoint")
+    if not os.path.isdir(checkpoint_dir):
+        return None, float("-inf")
+
+    checkpoints = {
+        int(name.split("-")[-1]): name
+        for name in os.listdir(checkpoint_dir)
+        if re.fullmatch(r"checkpoint-\d+", name)
+        and os.path.isdir(os.path.join(checkpoint_dir, name))
+    }
+    if not checkpoints:
+        return None, float("-inf")
+
+    metrics_path = os.path.join(training_dir, "val_metrics.json")
+    if os.path.isfile(metrics_path):
+        with open(metrics_path, "r", encoding="utf-8") as f:
+            validation = json.load(f)
+        candidates = []
+        for step, name in checkpoints.items():
+            entry = validation.get(str(step), {})
+            if isinstance(entry, dict) and "avg_reward" in entry:
+                candidates.append((float(entry["avg_reward"]), step, name))
+        if candidates:
+            score, _, name = max(candidates)
+            return os.path.join(checkpoint_dir, name), score
+
+    latest_step = max(checkpoints)
+    return os.path.join(checkpoint_dir, checkpoints[latest_step]), float("-inf")
+
+
 def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model_name: str = "qwen2.5-3B") -> Tuple[List[Dict[str, Scalar]], List[str]]:
     """Walk the checkpoints directory and collect rows + column names.
 
@@ -125,34 +172,11 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
             print(f"[WARN] Failed to read {json_path}: {e}")
             continue
 
-        f1_flag = False
-        possible_col_names = []
-        for metric_name, metric_value in metrics.items():
-            if "accuracy" in metric_name or "hamming_accuracy" in metric_name:
-                col_name = f"{dataset_name}_acc"
-            elif "macro_f1" in metric_name or "f1_macro" in metric_name or "f1" in metric_name:
-                col_name = f"{dataset_name}_f1"
-                f1_flag = True
-            elif "precision" in metric_name:
-                col_name = f"{dataset_name}_precision"
-            elif "recall" in metric_name:
-                col_name = f"{dataset_name}_recall"
-            elif "exact_match_accuracy" in metric_name:
-                col_name = f"{dataset_name}_EM"
-            else:
-                continue
-            
-            possible_col_names.append((col_name, metric_value))
-        
-        for col_name, metric_value in possible_col_names:
-            if f1_flag and "_f1" in col_name:    
-                if col_name not in row:
-                    row[col_name] = round(metric_value, 4)
-                    all_metric_cols.add(col_name)
-            elif not f1_flag:
-                if col_name not in row:
-                    row[col_name] = round(metric_value, 4)
-                    all_metric_cols.add(col_name)
+        selected = select_reported_metric(dataset_name, metrics)
+        if selected:
+            col_name, metric_value = selected
+            row[col_name] = round(float(metric_value), 4)
+            all_metric_cols.add(col_name)
 
     rows.append(row)
 
@@ -193,34 +217,11 @@ def collect_all_rows(root_dir: str, run: str, best_checkpoint: str = None, model
                 print(f"[WARN] Failed to read {json_path}: {e}")
                 continue
             
-            f1_flag = False
-            possible_col_names = []
-            for metric_name, metric_value in metrics.items():
-                if "accuracy" in metric_name or "hamming_accuracy" in metric_name:
-                    col_name = f"{dataset_name}_acc"
-                elif "macro_f1" in metric_name or "f1_macro" in metric_name or "f1" in metric_name:
-                    col_name = f"{dataset_name}_f1"
-                    f1_flag = True
-                elif "precision" in metric_name:
-                    col_name = f"{dataset_name}_precision"
-                elif "recall" in metric_name:
-                    col_name = f"{dataset_name}_recall"
-                elif "exact_match_accuracy" in metric_name:
-                    col_name = f"{dataset_name}_EM"
-                else:
-                    continue
-                
-                possible_col_names.append((col_name, metric_value))
-            
-            for col_name, metric_value in possible_col_names:
-                if f1_flag and "f1" in col_name:    
-                    if col_name not in row:
-                        row[col_name] = round(metric_value, 4)
-                        all_metric_cols.add(col_name)
-                elif not f1_flag:
-                    if col_name not in row:
-                        row[col_name] = round(metric_value, 4)
-                        all_metric_cols.add(col_name)
+            selected = select_reported_metric(dataset_name, metrics)
+            if selected:
+                col_name, metric_value = selected
+                row[col_name] = round(float(metric_value), 4)
+                all_metric_cols.add(col_name)
 
         rows.append(row)
 
@@ -442,6 +443,7 @@ def write_excel(
                     columns=columns,
                     out_path=out_path,
                     sheet_name=sheet_name,
+                    old_sheet_name=old_sheet_name,
                     best_checkpoint=best_checkpoint,
                     model_name=model_name,
                 )
@@ -833,6 +835,11 @@ def main():
         default="UniADILR",
         help="Name of the training data that the model was trained on.",
     )
+    parser.add_argument(
+        "--upload_to_gdrive",
+        action="store_true",
+        help="Also upload the workbook to Google Drive (local-only by default).",
+    )
 
     args = parser.parse_args()
 
@@ -852,9 +859,9 @@ def main():
             return 
 
         best_path, _ = find_best_checkpoint(TRAINING_BASE)
-        best_path, _ = find_best_checkpoint(TRAINING_BASE)
         args.best_checkpoint = os.path.basename(best_path) if best_path else None
-        # args.best_checkpoint = "checkpoint-4096"
+        if args.best_checkpoint is None:
+            raise RuntimeError(f"No saved checkpoint found under {TRAINING_BASE}")
 
     rows, columns = collect_all_rows(args.root, args.run, args.best_checkpoint, args.base_model_name)
     # write_csv(rows, columns, args.out_csv)
@@ -868,10 +875,37 @@ def main():
     else:
         # Fallback if pattern not found
         sheet_name = args.run + "_" + args.train_data
-    # Google Drive service account JSON path - should be set via environment variable or config
-    gdrive_json = os.environ.get('GDRIVE_SERVICE_ACCOUNT_JSON', 
-                                  os.path.expanduser("~/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json"))
-    write_excel_to_gdrive(rows, columns, args.out_csv, sheet_name=sheet_name, old_sheet_name=old_sheet_name, best_checkpoint=args.best_checkpoint, model_name=args.base_model_name, gdrive_folder_id="1UVSy7yB2pvj8GSa9ns89JAujxzxkLEC-", gdrive_service_account_json=gdrive_json) 
+    os.makedirs(os.path.dirname(os.path.abspath(args.out_csv)), exist_ok=True)
+    if args.upload_to_gdrive:
+        if not GOOGLE_DRIVE_AVAILABLE:
+            raise RuntimeError(
+                "Google Drive upload requested, but the Google API packages are not installed."
+            )
+        gdrive_json = os.environ.get(
+            "GDRIVE_SERVICE_ACCOUNT_JSON",
+            os.path.expanduser("~/client_secret_709163142430-45tbm173bvr506elk6mvf1093ecatcmg.apps.googleusercontent.com.json"),
+        )
+        write_excel_to_gdrive(
+            rows,
+            columns,
+            args.out_csv,
+            sheet_name=sheet_name,
+            old_sheet_name=old_sheet_name,
+            best_checkpoint=args.best_checkpoint,
+            model_name=args.base_model_name,
+            gdrive_folder_id="1UVSy7yB2pvj8GSa9ns89JAujxzxkLEC-",
+            gdrive_service_account_json=gdrive_json,
+        )
+    else:
+        write_excel(
+            rows,
+            columns,
+            args.out_csv,
+            sheet_name=sheet_name,
+            old_sheet_name=old_sheet_name,
+            best_checkpoint=args.best_checkpoint,
+            model_name=args.base_model_name,
+        )
 
 
 if __name__ == "__main__":

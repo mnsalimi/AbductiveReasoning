@@ -96,6 +96,8 @@ declare -A SPLITS=(
 : "${EVALUATE_CHECKPOINTS:?Error: EVALUATE_CHECKPOINTS must be set.}"
 
 COMMON_ARGS="--cuda_device ${CUDA_DEVICE} --evaluate_checkpoints ${EVALUATE_CHECKPOINTS}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+mkdir -p "$OUTPUT_DIR"
 
 
 # ============================
@@ -143,7 +145,7 @@ for script in "${scripts[@]}"; do
     sample_count="${SAMPLE_COUNTS[$script]}"
     split="${SPLITS[$script]:-test}"
     echo "Running $script with checkpoint $ckpt (batch_size=$batch_size, samples=$sample_count, split=$split) ..."
-    python3 "${SCRIPT_DIR}/${script}" \
+    "$PYTHON_BIN" "${SCRIPT_DIR}/${script}" \
         $COMMON_ARGS \
         --batch_size "$batch_size" \
         --checkpoint_path "$ckpt" \
@@ -157,10 +159,11 @@ for script in "${scripts[@]}"; do
     echo "-------------------------------------"
 done
 
-python3 "${SCRIPT_DIR}/create_table.py" \
+"$PYTHON_BIN" "${SCRIPT_DIR}/create_table.py" \
     --root "$ROOT_DIR" \
-    --out_csv "${SCRIPT_DIR}/metrics_summary_${BASE_MODEL_NAME}.xlsx" \
+    --out_csv "${OUTPUT_DIR}/metrics_summary.xlsx" \
     --run "$RUN_NAME" \
+    --best_checkpoint "$CHKPT_NAME" \
     --base_model_name "$BASE_MODEL_NAME" \
     --base_result_dir "$BASE_RESULTS_DIR" \
     --train_data "$TRAIN_DATA"
